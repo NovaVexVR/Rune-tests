@@ -24,5 +24,14 @@
   ],
   "loop": true,
   "paused": false,
-  "step": 1
+  "step": 1,
+  "personality": {
+    "archetype": "loyalist",
+    "greed": 0.22,
+    "generosity": 0.52,
+    "caution": 0.37,
+    "loyalty": 0.86,
+    "patience": 0.45,
+    "sociability": 0.54
+  }
 }

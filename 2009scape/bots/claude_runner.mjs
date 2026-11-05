@@ -11,6 +11,7 @@ import path from 'path';
 import { Bot, LOG_DIR, sleep, summary } from './lib.mjs';
 import { taskById, RESUPPLY } from './tasks.mjs';
 import { Market, TEAMS } from './market.mjs';
+import { personalityOf } from './social.mjs';
 
 const market = new Market((...a) => console.log(new Date().toISOString(), ...a));
 
@@ -37,6 +38,9 @@ function writeStep(name, step) {
 async function runBot(name, delay) {
     await sleep(delay);
     const bot = new Bot(name, { quiet: true });
+    readOrders(name);
+    const pers = personalityOf(name);
+    bot.log(`personality: ${pers.archetype} ${JSON.stringify(pers)}`);
     market.register(bot, () => readOrders(name).plan ?? []);
     bot.market = market;
     let lastSeek = 0;

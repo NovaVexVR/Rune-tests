@@ -24,5 +24,14 @@
   ],
   "loop": true,
   "paused": false,
-  "step": 0
+  "step": 0,
+  "personality": {
+    "archetype": "merchant",
+    "greed": 0.86,
+    "generosity": 0.32,
+    "caution": 0.57,
+    "loyalty": 0.73,
+    "patience": 0.7,
+    "sociability": 0.67
+  }
 }

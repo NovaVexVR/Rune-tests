@@ -19,6 +19,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { dist, sleep } from './lib.mjs';
+import { Social } from './social.mjs';
 
 const DIR = path.join(path.dirname(new URL(import.meta.url).pathname), 'market');
 const VALUES_DIR = path.join(DIR, 'values');
@@ -60,6 +61,7 @@ export class Market {
         this.busy = new Set();
         this.seq = 0;
         this.log = log;
+        this.social = new Social(log);
         this.memory = {}; // item -> recent trade prices seen by everyone (public ledger)
         if (fs.existsSync(LEDGER)) {
             for (const line of fs.readFileSync(LEDGER, 'utf8').trim().split('\n').filter(Boolean)) {
@@ -153,6 +155,17 @@ export class Market {
         const me = this.bots.get(name).bot.s;
         if (!me?.online || (me.x >= 3050 && me.x <= 3160 && me.y >= 3050 && me.y <= 3140)) return;
         this.saveValues(name);
+        this.social.sweepDefaults();
+
+        // pay debts first (loyal bots promptly; others when overdue or on a whim)
+        for (const iou of this.social.openDebts(name)) {
+            const cred = this.bots.get(iou.creditor);
+            if (!cred?.bot.s?.online || this.busy.has(iou.creditor)) continue;
+            if (this.social.wantsToRepay(name, iou, this.coins(name))) {
+                this.open({ buyer: iou.creditor, seller: name, item: 'Coins', amount: iou.owed, price: 0, kind: 'repay', iouId: iou.id });
+                return;
+            }
+        }
 
         // guild members send spare coins to the treasurer
         const tre = treasurerOf(name);
@@ -171,10 +184,19 @@ export class Market {
                     this.open({ buyer: name, seller: other, item: need, amount: 1, price: 0, kind: 'gift' });
                     return;
                 }
-                const ask = this.perceived(other, need);
-                const bid = this.perceived(name, need);
+                // personality + trust shape the ask/bid around each side's perceived value
+                const ask = Math.round(this.perceived(other, need) * this.social.askFactor(other, name) * 10) / 10;
+                const bid = Math.round(this.perceived(name, need) * this.social.bidFactor(name, other) * 10) / 10;
                 if (bid < ask) { this.log(`[market] ${name} won't pay ${other}'s ask of ${ask} for ${need} (values it at ${bid})`); continue; }
                 const price = Math.max(1, Math.round((ask + bid) / 2));
+                // can't pay now: ask for it as a favor (IOU), if the seller trusts us enough
+                if (this.coins(name) < price && !tre) {
+                    if (this.social.willExtendFavor(other, name)) {
+                        this.open({ buyer: name, seller: other, item: need, amount: 1, price: 0, kind: 'favor', value: price, ask, bid });
+                        return;
+                    }
+                    continue;
+                }
                 // guild buyers draw on the treasury
                 const payer = tre && this.coins(name) < price ? null : name;
                 if (!payer) {
@@ -211,6 +233,18 @@ export class Market {
         this.busy.delete(deal.buyer);
         this.busy.delete(deal.seller);
         if (outcome === 'completed' && deal.kind === 'sale') (this.memory[deal.item] ??= []).push(deal.price / (deal.amount ?? 1));
+        if (outcome === 'completed' && deal.kind === 'favor') this.social.createIou(deal.buyer, deal.seller, deal.item, deal.value);
+        if (outcome === 'completed' && deal.kind === 'repay') {
+            const iou = this.social.ious.find(i => i.id === deal.iouId);
+            if (iou && iou.status === 'open') this.social.settle(iou, true);
+        }
+        if (outcome === 'completed') {
+            const event = { sale: 'sale', favor: 'favor', repay: 'repaid' }[deal.kind];
+            const speaker = deal.kind === 'repay' ? deal.buyer : deal.seller;
+            const other = speaker === deal.buyer ? deal.seller : deal.buyer;
+            const text = event && this.social.line(speaker, event, other);
+            if (text) this.bots.get(speaker)?.bot.act({ type: 'say', text }).catch?.(() => {});
+        }
         const rec = { t: new Date().toISOString(), id: deal.id, buyer: deal.buyer, seller: deal.seller, item: deal.item, amount: deal.amount ?? 1, price: deal.price, kind: deal.kind, ask: deal.ask, bid: deal.bid, outcome };
         fs.appendFileSync(LEDGER, JSON.stringify(rec) + '\n');
         this.log(`[market] deal #${deal.id} ${outcome}`);
@@ -220,10 +254,11 @@ export class Market {
     acceptable(name, trade, deal) {
         const partner = name === deal.buyer ? deal.seller : deal.buyer;
         if (sameGuild(name, partner)) return true;
+        if (deal.kind === 'favor' || deal.kind === 'repay') return true; // the IOU is the other half of the exchange
         const val = list => list.reduce((t, i) => t + this.perceived(name, i.name) * i.count, 0);
         const give = val(trade.mine), get = val(trade.theirs);
         if (give === 0) return true;
-        const ok = get >= give * 0.9;
+        const ok = get >= give * this.social.acceptRatio(name, partner);
         if (!ok) this.log(`[market] ${name} sees deal #${deal.id} as unfair: gives ${give.toFixed(1)}, gets ${get.toFixed(1)}`);
         return ok;
     }
@@ -264,7 +299,9 @@ export class Market {
             const inv = s.inv.find(i => i.name === myItem);
             if (!inv) { await bot.act({ type: 'tradedecline' }); this.close(deal, `${bot.name} lacks ${myItem}`); return false; }
             const left = myAmount - offered;
-            await bot.act({ type: 'tradeoffer', slot: inv.slot, amount: left >= inv.count ? 'all' : left >= 10 ? 10 : left >= 5 ? 5 : 1 });
+            // "offer all" puts every unit of this item on the window, so only use it when we mean to give all of them
+            const total = s.inv.filter(i => i.name === myItem).reduce((n, i) => n + i.count, 0);
+            await bot.act({ type: 'tradeoffer', slot: inv.slot, amount: left >= total ? 'all' : left >= 10 && inv.count >= 10 ? 10 : left >= 5 && inv.count >= 5 ? 5 : 1 });
             await bot.wait(1);
             return true;
         }
