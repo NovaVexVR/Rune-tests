@@ -215,6 +215,10 @@ export class Market {
 
     open(d) {
         const deal = { id: ++this.seq, ...d, state: 'meeting', started: Date.now() };
+        // freeze each side's valuation of the traded item now: once it moves onto the trade window
+        // the owner's inventory changes and its perceived value would jump mid-trade
+        deal.snap = {};
+        for (const who of [d.buyer, d.seller]) deal.snap[who] = { [d.item]: this.perceived(who, d.item), Coins: 1 };
         this.deals.set(deal.id, deal);
         this.busy.add(d.buyer);
         this.busy.add(d.seller);
@@ -255,7 +259,7 @@ export class Market {
         const partner = name === deal.buyer ? deal.seller : deal.buyer;
         if (sameGuild(name, partner)) return true;
         if (deal.kind === 'favor' || deal.kind === 'repay') return true; // the IOU is the other half of the exchange
-        const val = list => list.reduce((t, i) => t + this.perceived(name, i.name) * i.count, 0);
+        const val = list => list.reduce((t, i) => t + (deal.snap?.[name]?.[i.name] ?? this.perceived(name, i.name)) * i.count, 0);
         const give = val(trade.mine), get = val(trade.theirs);
         if (give === 0) return true;
         const ok = get >= give * this.social.acceptRatio(name, partner);
