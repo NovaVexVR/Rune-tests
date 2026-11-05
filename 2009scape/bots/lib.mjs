@@ -1,0 +1,395 @@
+// Bot client library for the 2009Scape bot API (127.0.0.1:8899).
+import fs from 'fs';
+import path from 'path';
+
+const API = process.env.BOT_API ?? 'http://127.0.0.1:8899';
+export const LOG_DIR = path.join(path.dirname(new URL(import.meta.url).pathname), 'logs');
+fs.mkdirSync(LOG_DIR, { recursive: true });
+
+export const sleep = ms => new Promise(r => setTimeout(r, ms));
+export const TICK = 600;
+export const dist = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+export const rand = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+export const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+
+export const SKILLS = ['attack', 'defence', 'strength', 'hitpoints', 'ranged', 'prayer', 'magic', 'cooking', 'woodcutting', 'fletching', 'fishing', 'firemaking', 'crafting', 'smithing', 'mining', 'herblore', 'agility', 'thieving', 'slayer', 'farming', 'runecrafting', 'hunter', 'construction', 'summoning'];
+export const FOOD = ['Shrimps', 'Anchovies', 'Bread', 'Cooked chicken', 'Cooked meat', 'Sardine', 'Herring', 'Trout', 'Salmon', 'Pike', 'Tuna', 'Lobster', 'Cake', 'Meat pie', 'Swordfish'];
+const DEBUG_MSG = /^(\[|-{3,}|ID:|Option:|SpawnLoc|Wrapper|RCM|Iface|Slot:|Loc:|Index:|Your debug mode)/;
+
+async function http(method, url, body) {
+    const res = await fetch(API + url, { method, headers: { 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+    return json;
+}
+
+export class Bot {
+    constructor(name, { quiet = false } = {}) {
+        this.name = name.toLowerCase();
+        this.s = null;
+        this.since = 0;
+        this.msgs = [];
+        this.quiet = quiet;
+        this.logFile = path.join(LOG_DIR, `${this.name}.log`);
+    }
+
+    log(...a) {
+        const line = `${new Date().toISOString().slice(0, 19).replace('T', ' ')} [${this.name}] ${a.join(' ')}`;
+        if (!this.quiet) console.log(line);
+        fs.appendFileSync(this.logFile, line + '\n');
+    }
+
+    async login() {
+        await http('POST', `/bot/${this.name}/login`);
+        for (let i = 0; i < 30; i++) {
+            await sleep(600);
+            const s = await this.state(5);
+            if (s.online && s.iface === 378) { await this.act({ type: 'button', iface: 378, child: 140 }); continue; } // welcome screen: Play
+            if (s.online) return s;
+        }
+        throw new Error('login timed out');
+    }
+
+    async logout() {
+        await http('POST', `/bot/${this.name}/logout`);
+    }
+
+    async state(r = 15) {
+        const s = await http('GET', `/bot/${this.name}/state?r=${r}&since=${this.since}`);
+        for (const m of s.messages ?? []) {
+            this.since = Math.max(this.since, m.id);
+            if (!DEBUG_MSG.test(m.text)) this.msgs.push(m.text);
+        }
+        if (this.msgs.length > 150) this.msgs.splice(0, this.msgs.length - 150);
+        this.s = s;
+        return s;
+    }
+
+    async act(a) {
+        try {
+            const r = await http('POST', `/bot/${this.name}/act`, a);
+            return r.results[0];
+        } catch (e) {
+            this.log(`act ${a.type} failed: ${e.message}`);
+            return null;
+        }
+    }
+
+    inv(name, s = this.s) {
+        return s.inv.filter(i => (typeof name === 'function' ? name(i) : i.name === name));
+    }
+    count(name, s = this.s) {
+        return this.inv(name, s).reduce((t, i) => t + i.count, 0);
+    }
+    has(name, s = this.s) {
+        return this.count(name, s) > 0 || s.worn.some(i => i.name === name);
+    }
+    lvl(skill) {
+        return this.s.stats[skill].level;
+    }
+
+    isIdle(s = this.s) {
+        return !s.moving && !s.busy && !s.attacking && !s.locked;
+    }
+
+    async wait(ticks = 1) {
+        await sleep(TICK * ticks);
+    }
+
+    async waitIdle({ timeout = 60, quiet = 2, cond = null, r = 15 } = {}) {
+        let idle = 0;
+        const end = Date.now() + timeout * 1000;
+        while (Date.now() < end) {
+            await this.wait(1);
+            const s = await this.state(r);
+            if (await this.handleInterrupts()) continue;
+            if (cond && cond(s)) return true;
+            idle = this.isIdle(s) ? idle + 1 : 0;
+            if (idle >= quiet) return true;
+        }
+        return false;
+    }
+
+    // After "I can't reach that", open the closest closed gate/door near us or the target.
+    async openNearbyGate(target = null) {
+        const s = await this.state(10);
+        const ref = target ?? s;
+        const g = s.scenery
+            .filter(l => l.ops.includes('Open') && /gate|door/i.test(l.name) && l.dist <= 10)
+            .sort((a, b) => dist(a, ref) + a.dist - (dist(b, ref) + b.dist))[0];
+        if (!g) return false;
+        this.log(`opening ${g.name} at ${g.x},${g.y}`);
+        await this.act({ type: 'scenery', x: g.x, y: g.y, id: g.id, op: 'Open' });
+        await this.waitIdle({ timeout: 12 });
+        return true;
+    }
+
+    // Level-ups, dialogs, random events, low HP. Returns true if it did something.
+    async handleInterrupts({ answer = null } = {}) {
+        // market/trading hook (set by the runner); guarded against re-entry while it walks
+        if (this.hook && !this._inHook) {
+            this._inHook = true;
+            try { if (await this.hook(this)) return true; } finally { this._inHook = false; }
+        }
+        const s = this.s;
+        const unreachable = s.messages?.some(m => /can't reach that/i.test(m.text));
+        if (unreachable && !this._gateCooldown) {
+            this._gateCooldown = true;
+            setTimeout(() => (this._gateCooldown = false), 8000);
+            if (await this.openNearbyGate()) return true;
+        }
+        if (s.iface === 378) {
+            await this.act({ type: 'button', iface: 378, child: 140 });
+            await this.wait(2);
+            return true;
+        }
+        if (s.iface === 771) {
+            await this.act({ type: 'button', iface: 771, child: 321 });
+            await this.act({ type: 'button', iface: 771, child: 362 });
+            await this.wait(2);
+            return true;
+        }
+        if (s.dialog && s.chatbox !== 372) {
+            if (s.dialog.options.length) {
+                const want = answer ? s.dialog.options.find(o => answer.test(o)) : null;
+                const o = want ?? s.dialog.options.find(o => /^(yes|okay|ok|sure|i'll|continue)/i.test(o)) ?? s.dialog.options[0];
+                await this.act({ type: 'choose', option: o });
+            } else {
+                await this.act({ type: 'continue' });
+            }
+            await this.wait(1);
+            return true;
+        }
+        // Something we didn't pick a fight with is hurting us: run toward Lumbridge
+        if (s.inCombat && !s.attacking && s.hp < s.maxHp * 0.7 && !this._fleeing) {
+            this._fleeing = true;
+            this.log(`under attack at ${s.x},${s.y} (hp ${s.hp}), fleeing`);
+            const dx = Math.sign(3222 - s.x) * 14, dy = Math.sign(3218 - s.y) * 14;
+            await this.act({ type: 'walk', x: s.x + dx, y: s.y + dy, run: true });
+            await this.wait(8);
+            this._fleeing = false;
+            return true;
+        }
+        // Eat when low
+        if (s.hp <= Math.max(4, Math.floor(s.maxHp * 0.4))) {
+            const food = s.inv.find(i => FOOD.includes(i.name) && i.ops.includes('Eat'));
+            if (food) {
+                await this.act({ type: 'item', slot: food.slot, op: 'Eat' });
+                await this.wait(2);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Talk to an NPC and click through its dialogue (optionally steering options with a regex).
+    async talkTo(name, { answer = null, maxSteps = 40 } = {}) {
+        let s = await this.state(15);
+        const npc = this.nearestNpc(n => n.name.toLowerCase() === name.toLowerCase() && n.ops.some(o => /talk/i.test(o)));
+        if (!npc) return false;
+        const op = npc.ops.find(o => /talk/i.test(o));
+        await this.act({ type: 'npc', npc: npc.npc, op });
+        let quiet = 0;
+        for (let i = 0; i < maxSteps && quiet < 4; i++) {
+            await this.wait(2);
+            s = await this.state(10);
+            if (s.dialog && s.chatbox !== 372) {
+                quiet = 0;
+                await this.handleInterrupts({ answer });
+            } else quiet++;
+        }
+        return true;
+    }
+
+    // Long-distance walking in hops, opening doors/gates when stuck.
+    async walkTo(x, y, { tol = 2, timeout = 300 } = {}) {
+        const end = Date.now() + timeout * 1000;
+        let stuck = 0;
+        let last = null;
+        while (Date.now() < end) {
+            const s = await this.state(10);
+            if (await this.handleInterrupts()) continue;
+            if (dist(s, { x, y }) <= tol) return true;
+            if (last && dist(last, s) === 0) stuck++;
+            else stuck = 0;
+            last = { x: s.x, y: s.y };
+            if (stuck >= 2) {
+                const door = s.scenery
+                    .filter(l => l.ops.includes('Open') && l.dist <= 5 && /door|gate/i.test(l.name))
+                    .sort((a, b) => dist(a, { x, y }) - dist(b, { x, y }))[0];
+                if (door && stuck < 5) {
+                    this.log(`opening ${door.name} at ${door.x},${door.y}`);
+                    await this.act({ type: 'scenery', x: door.x, y: door.y, id: door.id, op: 'Open' });
+                    await this.waitIdle({ timeout: 10 });
+                } else {
+                    await this.act({ type: 'walk', x: s.x + rand(-8, 8), y: s.y + rand(-8, 8) });
+                    await this.waitIdle({ timeout: 10 });
+                }
+                if (stuck > 8) {
+                    this.log(`walkTo ${x},${y} gave up (stuck at ${s.x},${s.y})`);
+                    return false;
+                }
+                continue;
+            }
+            const d = dist(s, { x, y });
+            const k = Math.min(1, 25 / d);
+            await this.act({ type: 'walk', x: Math.round(s.x + (x - s.x) * k), y: Math.round(s.y + (y - s.y) * k), run: s.runEnergy > 30 });
+            await this.waitIdle({ timeout: 25, quiet: 1 });
+        }
+        return false;
+    }
+
+    async route(points, opts) {
+        for (const [x, y] of points) if (!(await this.walkTo(x, y, opts))) return false;
+        return true;
+    }
+
+    // New characters: design, skip tutorial via Skippy, then Terrova sends us to Lumbridge.
+    async onboard() {
+        let s = await this.state(10);
+        const onTutorial = () => s.x >= 3050 && s.x <= 3160 && s.y >= 3050 && s.y <= 3140;
+        for (let tries = 0; tries < 25 && onTutorial(); tries++) {
+            if (await this.handleInterrupts({ answer: /skip|yes/i })) { s = await this.state(10); continue; }
+            if (this.nearestNpc(n => n.name === 'Skippy')) await this.talkTo('Skippy', { answer: /skip/i });
+            else if (this.nearestNpc(n => n.name === 'Magic instructor')) await this.talkTo('Magic instructor', { answer: /yes|mainland|ready|inauthentic|no/i });
+            else await this.wait(2);
+            s = await this.state(10);
+        }
+        if (onTutorial()) throw new Error(`could not leave tutorial island (at ${s.x},${s.y})`);
+        this.log(`onboarded at ${s.x},${s.y}`);
+    }
+
+    // ---- shops ----
+    async openShop(shop) {
+        await this.walkTo(shop.x, shop.y, { tol: 3 });
+        for (let i = 0; i < 4; i++) {
+            const s = await this.state(10);
+            if (s.shop) return s.shop;
+            const npc = this.nearestNpc(n => shop.npcs.includes(n.name) && n.ops.includes('Trade'));
+            if (!npc) { await this.walkTo(shop.x, shop.y, { tol: 1 }); continue; }
+            await this.act({ type: 'npc', npc: npc.npc, op: 'Trade' });
+            await this.waitIdle({ timeout: 15, cond: st => !!st.shop });
+        }
+        return this.s.shop ?? null;
+    }
+
+    async buy(item, amount = 1) {
+        let s = await this.state(3);
+        const entry = s.shop?.items.find(i => i.name === item);
+        if (!entry || entry.count < 1) return false;
+        const before = this.count(item);
+        for (let left = amount; left > 0; ) {
+            const n = left >= 10 ? 10 : left >= 5 ? 5 : 1;
+            await this.act({ type: 'buy', item, amount: n });
+            left -= n;
+            await this.wait(1);
+        }
+        s = await this.state(3);
+        const got = this.count(item) - before;
+        this.log(`bought ${got}x ${item} at ${s.shop?.title ?? 'shop'} (${entry.price}gp each)`);
+        return got > 0;
+    }
+
+    async sell(item, amount = 1) {
+        for (let left = amount; left > 0; ) {
+            const it = this.s.inv.find(i => i.name === item);
+            if (!it) break;
+            const n = left >= 10 ? 10 : left >= 5 ? 5 : 1;
+            await this.act({ type: 'sell', slot: it.slot, amount: n });
+            left -= n;
+            await this.wait(1);
+            await this.state(3);
+        }
+    }
+
+    // Climb the Lumbridge castle staircase to floor `target` (0-2).
+    async lumbridgeFloor(target) {
+        for (let i = 0; i < 8; i++) {
+            const s = await this.state(8);
+            if (s.z === target) return true;
+            if (s.dialog && s.dialog.options.length) { await this.act({ type: 'choose', option: s.z < target ? 'up' : 'down' }); await this.wait(3); continue; }
+            await this.walkTo(3206, 3210, { tol: 3 });
+            await this.state(15);
+            const st = this.nearestScenery(l => /staircase/i.test(l.name));
+            if (!st) { await this.wait(2); continue; }
+            const op = st.ops.find(o => (s.z < target ? /climb-up/i : /climb-down/i).test(o)) ?? st.ops.find(o => /^climb$/i.test(o)) ?? st.ops[0];
+            await this.act({ type: 'scenery', x: st.x, y: st.y, id: st.id, op });
+            await this.wait(4);
+        }
+        return this.s.z === target;
+    }
+
+    // ---- bank: Lumbridge castle top floor (safe for low levels) ----
+    async openBank() {
+        if (!(await this.lumbridgeFloor(2))) return false;
+        await this.walkTo(3208, 3220, { tol: 2 });
+        for (let i = 0; i < 4; i++) {
+            const s = await this.state(8);
+            if (s.iface === 762) return true;
+            const booth = this.nearestScenery(l => /bank booth/i.test(l.name) && l.ops.some(o => /bank|use/i.test(o)));
+            const op = booth?.ops.find(o => /^use-quickly$/i.test(o)) ?? booth?.ops.find(o => /^bank$/i.test(o)) ?? booth?.ops.find(o => /use/i.test(o));
+            if (!booth) { await this.walkTo(3208, 3220, { tol: 1 }); continue; }
+            await this.act({ type: 'scenery', x: booth.x, y: booth.y, id: booth.id, op });
+            await this.waitIdle({ timeout: 15, cond: st => st.iface === 762 });
+            await this.handleInterrupts();
+        }
+        return this.s.iface === 762;
+    }
+
+    async depositAll(pred = () => true) {
+        for (let i = 0; i < 28; i++) {
+            const s = await this.state(2);
+            const it = s.inv.find(pred);
+            if (!it) break;
+            await this.act({ type: 'deposit', slot: it.slot, amount: 'all' });
+            await this.wait(1);
+        }
+    }
+
+    async withdraw(item, amount = 'all') {
+        await this.act({ type: 'withdraw', item, amount });
+        await this.wait(1);
+        await this.state(2);
+    }
+
+    async leaveBank() {
+        await this.closeInterfaces();
+        if (this.s.z > 0 && this.s.x > 3190 && this.s.x < 3220 && this.s.y > 3200 && this.s.y < 3230) await this.lumbridgeFloor(0);
+    }
+
+    async closeInterfaces() {
+        await this.act({ type: 'close' });
+        await this.wait(1);
+    }
+
+    nearestScenery(pred, s = this.s) {
+        return s.scenery.filter(pred).sort((a, b) => a.dist - b.dist)[0] ?? null;
+    }
+    nearestNpc(pred, s = this.s) {
+        return s.npcs.filter(pred).sort((a, b) => a.dist - b.dist)[0] ?? null;
+    }
+
+    async dropAll(pred) {
+        for (const it of this.s.inv.filter(pred)) {
+            await this.act({ type: 'item', slot: it.slot, op: 'Drop' });
+            await this.wait(1);
+        }
+        await this.state();
+    }
+
+    async equip(name) {
+        const it = this.s.inv.find(i => i.name === name);
+        if (!it) return false;
+        const op = it.ops.find(o => /^(Wield|Wear|Equip)$/i.test(o));
+        if (!op) return false;
+        await this.act({ type: 'item', slot: it.slot, op });
+        await this.wait(2);
+        await this.state();
+        return true;
+    }
+}
+
+export function summary(s) {
+    const lv = SKILLS.map(k => `${k.slice(0, 3)}:${s.stats[k].level}`).join(' ');
+    return `total ${s.totalLevel} cb ${s.combat} @${s.x},${s.y} | ${lv}`;
+}

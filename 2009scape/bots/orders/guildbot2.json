@@ -1,0 +1,28 @@
+{
+  "role": "Guild miner: banks ore for future smithing, also fights and fishes",
+  "plan": [
+    {
+      "task": "mine",
+      "minutes": 45,
+      "why": "ore stockpile in bank"
+    },
+    {
+      "task": "melee",
+      "minutes": 20,
+      "why": "combat"
+    },
+    {
+      "task": "fish_cook",
+      "minutes": 20,
+      "why": "food"
+    },
+    {
+      "task": "woodcut_fire",
+      "minutes": 15,
+      "why": "variety"
+    }
+  ],
+  "loop": true,
+  "paused": false,
+  "step": 0
+}

@@ -1,0 +1,5 @@
+logs/
+*.log
+2009scape/bots/market/
+2009scape/viewer/shots/
+node_modules/

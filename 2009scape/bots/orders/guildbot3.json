@@ -1,0 +1,28 @@
+{
+  "role": "Guild woodsman: logs/fires, also mines and fights",
+  "plan": [
+    {
+      "task": "woodcut_fire",
+      "minutes": 45,
+      "why": "wc/fm"
+    },
+    {
+      "task": "melee",
+      "minutes": 20,
+      "why": "combat"
+    },
+    {
+      "task": "mine",
+      "minutes": 20,
+      "why": "mining"
+    },
+    {
+      "task": "thieving",
+      "minutes": 15,
+      "why": "coins for treasury"
+    }
+  ],
+  "loop": true,
+  "paused": false,
+  "step": 0
+}

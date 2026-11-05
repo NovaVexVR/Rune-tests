@@ -1,0 +1,43 @@
+{
+  "role": "Generalist/quester (own goal: balanced levels for early quests)",
+  "plan": [
+    {
+      "task": "melee",
+      "minutes": 25,
+      "why": "combat"
+    },
+    {
+      "task": "woodcut_fire",
+      "minutes": 25,
+      "why": "wc/fm"
+    },
+    {
+      "task": "fish_cook",
+      "minutes": 25,
+      "why": "fish/cook"
+    },
+    {
+      "task": "mine",
+      "minutes": 20,
+      "why": "mining"
+    },
+    {
+      "task": "thieving",
+      "minutes": 15,
+      "why": "coins"
+    },
+    {
+      "task": "ranged",
+      "minutes": 10,
+      "why": "ranged"
+    },
+    {
+      "task": "magic",
+      "minutes": 10,
+      "why": "magic"
+    }
+  ],
+  "loop": true,
+  "paused": false,
+  "step": 0
+}

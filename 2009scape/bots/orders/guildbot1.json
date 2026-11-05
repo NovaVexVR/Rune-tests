@@ -1,0 +1,28 @@
+{
+  "role": "Guild vanguard: combat first, gathers food/supplies in between",
+  "plan": [
+    {
+      "task": "melee",
+      "minutes": 45,
+      "why": "guild fighter"
+    },
+    {
+      "task": "fish_cook",
+      "minutes": 20,
+      "why": "food"
+    },
+    {
+      "task": "ranged",
+      "minutes": 15,
+      "why": "ranged"
+    },
+    {
+      "task": "woodcut_fire",
+      "minutes": 20,
+      "why": "variety"
+    }
+  ],
+  "loop": true,
+  "paused": false,
+  "step": 0
+}

@@ -1,0 +1,21 @@
+diff --git a/src/app.ts b/src/app.ts
+index 3bcdc74..afdce3f 100644
+--- a/src/app.ts
++++ b/src/app.ts
+@@ -10,6 +10,7 @@ import Environment from '#/util/Environment.js';
+ import { printError, printInfo } from '#/util/Logger.js';
+ import { startManagementWeb, startWeb } from '#/web.js';
+ import OnDemand from '#/engine/OnDemand.js';
++import BotManager from '#/bot/BotManager.js';
+ 
+ if (OnDemand.cache.count(0) !== 9 || OnDemand.cache.count(2) === 0 || !fs.existsSync('data/pack/server/script.dat')) {
+     printInfo('Packing cache, please wait until you see the world is ready.');
+@@ -41,6 +42,8 @@ tcpServer.start();
+ await startWeb();
+ await startManagementWeb();
+ 
++BotManager.startApi(8899);
++
+ register.setDefaultLabels({ nodeId: Environment.node.id });
+ collectDefaultMetrics({ register });
+ 

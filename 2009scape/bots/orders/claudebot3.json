@@ -1,0 +1,33 @@
+{
+  "role": "Woodsman (own goal: willows at 30 WC); also fishes, mines and fights",
+  "plan": [
+    {
+      "task": "woodcut_fire",
+      "minutes": 45,
+      "why": "main goal"
+    },
+    {
+      "task": "melee",
+      "minutes": 20,
+      "why": "combat"
+    },
+    {
+      "task": "fish_cook",
+      "minutes": 20,
+      "why": "food"
+    },
+    {
+      "task": "mine",
+      "minutes": 15,
+      "why": "mining"
+    },
+    {
+      "task": "thieving",
+      "minutes": 15,
+      "why": "coins"
+    }
+  ],
+  "loop": true,
+  "paused": false,
+  "step": 0
+}

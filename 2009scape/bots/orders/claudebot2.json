@@ -1,0 +1,33 @@
+{
+  "role": "Merchant (own goal: build a coin stack); thieves, mines, and sells spares at its own prices",
+  "plan": [
+    {
+      "task": "thieving",
+      "minutes": 40,
+      "why": "coins"
+    },
+    {
+      "task": "mine",
+      "minutes": 30,
+      "why": "ore to bank/sell"
+    },
+    {
+      "task": "melee",
+      "minutes": 20,
+      "why": "hp for stuns"
+    },
+    {
+      "task": "woodcut_fire",
+      "minutes": 20,
+      "why": "variety"
+    },
+    {
+      "task": "fish_cook",
+      "minutes": 20,
+      "why": "food"
+    }
+  ],
+  "loop": true,
+  "paused": false,
+  "step": 0
+}

@@ -1,0 +1,38 @@
+{
+  "role": "Fighter (own goal: 30+ combat to start quests); still trains gathering for cash and food",
+  "plan": [
+    {
+      "task": "melee",
+      "minutes": 40,
+      "why": "main goal: combat"
+    },
+    {
+      "task": "fish_cook",
+      "minutes": 20,
+      "why": "own food supply"
+    },
+    {
+      "task": "ranged",
+      "minutes": 15,
+      "why": "ranged while arrows last"
+    },
+    {
+      "task": "melee",
+      "minutes": 40,
+      "why": "combat"
+    },
+    {
+      "task": "woodcut_fire",
+      "minutes": 20,
+      "why": "wc/fm variety"
+    },
+    {
+      "task": "magic",
+      "minutes": 10,
+      "why": "starter runes"
+    }
+  ],
+  "loop": true,
+  "paused": false,
+  "step": 0
+}

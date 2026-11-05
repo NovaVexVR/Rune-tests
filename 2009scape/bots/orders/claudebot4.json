@@ -1,0 +1,28 @@
+{
+  "role": "Fisher-cook (own goal: Draynor-safe combat then trout); rebuilt kit after dying",
+  "plan": [
+    {
+      "task": "fish_cook",
+      "minutes": 40,
+      "why": "main goal"
+    },
+    {
+      "task": "melee",
+      "minutes": 30,
+      "why": "combat to 20 so Draynor is safe"
+    },
+    {
+      "task": "woodcut_fire",
+      "minutes": 20,
+      "why": "fires for cooking"
+    },
+    {
+      "task": "thieving",
+      "minutes": 15,
+      "why": "coins"
+    }
+  ],
+  "loop": true,
+  "paused": false,
+  "step": 1
+}

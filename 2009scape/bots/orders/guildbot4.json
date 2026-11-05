@@ -1,0 +1,28 @@
+{
+  "role": "Guild cook: food for the guild, also fights and chops",
+  "plan": [
+    {
+      "task": "fish_cook",
+      "minutes": 45,
+      "why": "food"
+    },
+    {
+      "task": "melee",
+      "minutes": 20,
+      "why": "combat"
+    },
+    {
+      "task": "woodcut_fire",
+      "minutes": 20,
+      "why": "fires"
+    },
+    {
+      "task": "mine",
+      "minutes": 15,
+      "why": "mining"
+    }
+  ],
+  "loop": true,
+  "paused": false,
+  "step": 0
+}

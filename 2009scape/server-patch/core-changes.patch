@@ -1,0 +1,32 @@
+diff --git a/Server/src/main/core/net/packet/PacketRepository.java b/Server/src/main/core/net/packet/PacketRepository.java
+index e2656b0..3535a41 100644
+--- a/Server/src/main/core/net/packet/PacketRepository.java
++++ b/Server/src/main/core/net/packet/PacketRepository.java
+@@ -89,6 +89,14 @@ public final class PacketRepository {
+ 	@SuppressWarnings({ "rawtypes", "unchecked" })
+ 	public static void send(Class<? extends OutgoingPacket> clazz, Context context) {
+                 if(context.getPlayer() instanceof AIPlayer) return;
++                if(content.botapi.BotRegistry.INSTANCE.isBot(context.getPlayer())) {
++                    if (context instanceof core.net.packet.context.GameMessageContext)
++                        content.botapi.BotRegistry.onMessage(context.getPlayer(), ((core.net.packet.context.GameMessageContext) context).getMessage());
++                    else if (context instanceof core.net.packet.context.StringContext) {
++                        core.net.packet.context.StringContext sc = (core.net.packet.context.StringContext) context;
++                        content.botapi.BotRegistry.onString(context.getPlayer(), sc.getInterfaceId(), sc.getLineId(), sc.getString());
++                    }
++                }
+ 		if(context.getPlayer().getSession() == null) return;
+ 		OutgoingPacket p = OUTGOING_PACKETS.get(clazz);
+ 		if (p == null) {
+diff --git a/Server/worldprops/default.conf b/Server/worldprops/default.conf
+index 2fe516c..7c0746a 100644
+--- a/Server/worldprops/default.conf
++++ b/Server/worldprops/default.conf
+@@ -71,7 +71,7 @@ activity = "2009Scape Classic."
+ pvp = false
+ #enables a default clan for players to join automatically. Should be an account with the same name as @name, with a clan set up already.
+ enable_default_clan = true
+-enable_bots = true
++enable_bots = false
+ #message of the week model ID, 0 for random
+ motw_identifier = "0"
+ #text shown for message of the week - @name will be replaced with the name property set above.
