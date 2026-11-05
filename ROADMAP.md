@@ -46,6 +46,15 @@ Builds directly on trust and IOUs.
 - When average member trust in the treasurer falls below a threshold, the team **votes** (highest-trust member wins) and the treasurer role moves; plans for both bots are rewritten (`TEAMS[*].treasurer` becomes dynamic in `market/teams.json`).
 - **Check:** give a test treasurer a high tax rate, watch trust fall and a new treasurer get elected.
 
+### 2.3 Leaving and joining teams
+Teams start pre-made, but membership changes with how the bots get along (needs the dynamic `market/teams.json` from 2.2).
+- **Satisfaction:** each team member tracks how the team treats it: gifts received vs. coins/items given, how often its needs were met, its average trust in teammates and the treasurer, and taxes paid.
+- **Leaving (extreme cases only):** if satisfaction stays very low for a sustained period (e.g. several hours) *and* its trust in the treasurer or team has gone negative, the bot quits and becomes an individualist. It keeps its own items, announces it in chat, and its old teammates' trust in it drops (they see it as a deserter). A short cooldown stops it from rejoining immediately.
+- **Recruiting:** an individualist that has built high trust *with* a team (fair trades, repaid IOUs, completed bounties), where the team's members also trust it highly, gets an invitation. Both sides must clear a trust threshold; the bot's personality decides whether it accepts (loyal/sociable bots join readily; misers and opportunists weigh the tax rate and what the team can offer).
+- On joining, it switches to team rules (free giving inside, coins pooled to the treasurer) and gets a team role based on its skills.
+- Team size limits keep the 20-man legion and the 5-bot teams from absorbing everyone; full teams can still recruit by inviting a replacement for a low-satisfaction member.
+- **Check:** push a test bot's satisfaction down and confirm it leaves; build mutual trust between an individualist and a team and confirm the invite, acceptance, and switch to team rules.
+
 ## Phase 3: Bots with character
 
 ### 3.1 Habits
@@ -65,10 +74,12 @@ Builds directly on trust and IOUs.
 
 ## Phase 4: Gatherings and stories
 
-### 4.1 Market days
-- Once per in-game day, bots with spare goods walk to the Lumbridge courtyard for a 20-minute market.
+### 4.1 Market days at the Grand Exchange
+- Once per in-game day, bots with spare goods travel to the **Grand Exchange in Varrock** for a 20-minute market.
+- Getting there safely: the Lumbridge–Varrock road passes the dark wizards' stone circle south of Varrock, which kills low-level bots. Bots take a route around it, travel in groups with a fighter escort, or skip market day until their combat level can handle it.
+- Bots can also post GE buy/sell offers while they're there (needs the Grand Exchange API work below), so market day mixes face-to-face haggling with GE offers.
 - Sellers "shout" offers in chat at their asking prices; buyers make counter-offers; deals still use the normal trade flow and personality-based acceptance, so haggling is real.
-- **Check:** at market time, a crowd forms, offers appear in chat, trades complete at prices between ask and bid.
+- **Check:** at market time, bots arrive at the GE without deaths on the way, a crowd forms, offers appear in chat, and trades complete at prices between ask and bid.
 
 ### 4.2 Quest parties
 - Bots form small parties for quests, with roles: the fighter escorts and kills, others gather items.
@@ -87,6 +98,6 @@ Builds directly on trust and IOUs.
 ---
 
 ## Also planned (from earlier)
-- **Grand Exchange:** bot API support for the GE offer screen, so bots can buy and sell there; prices form from bot offers.
+- **Grand Exchange:** bot API support for the GE offer screen, so bots can buy and sell there; prices form from bot offers. Needed for market days (4.1).
 - **More training:** fly fishing, iron mining, smithing, leather crafting, oak/willow bows, agility, as the guides recommend.
 - **Run locally:** single cross-platform launcher (Windows and CachyOS).
