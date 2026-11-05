@@ -1,49 +1,41 @@
-# Early-2009 leveling plan (bots)
+# Leveling plan the bots follow
 
-Era-typical training routes as of RuneScape ~January 2009 (the build 2009Scape emulates).
-The archived fan-site guides of the time (Tip.It, RuneHQ, Sal's Realm) aren't reachable from
-this environment, so this is written from knowledge of that era's standard methods and checked
-against what 2009Scape implements. No Grand Exchange flipping, no post-2009 methods.
+Built from the 2009Scape wiki skill guides (saved in `../guides/`, CC BY-SA 4.0,
+https://cdn.2009scape.org/wiki/skill_guides/skill_guides). Each line notes whether the bots do it yet.
 
-Rules for all bots: start at level 1 with the tutorial starter kit, earn everything in-game,
-power-train (drop) while banking routes aren't scripted yet, rotate skills so nothing lags behind.
+## Free stuff near Lumbridge (bots check these before paying)
+- **Small fishing net**: respawns by the fishing tutor in Lumbridge Swamp (3245,3155) *(cooking guide; in use)*
+- **Knife**: Lumbridge castle kitchen (3205,3212) and (3224,3202) *(in use for fletching)*
+- **Bronze axe**: Lumbridge chicken coop *(woodcutting guide; not yet located on the map)*
+- **Eggs / bucket / pot**: farm and castle kitchen spawns: everything Cook's Assistant needs *(quest planned)*
 
-## Tier 1: Lumbridge/Draynor starter loop (all skills < 15)
-
-| Skill | Method (2009-era standard) | Where |
+## Combat (melee, ranged, magic, prayer guides)
+| Levels | Method | Status |
 |---|---|---|
-| Attack/Strength/Defence/HP | Chickens → cows; bury bones | Lumbridge chicken pen, east cow field |
-| Prayer | Bury bones from combat | — |
-| Ranged | Shortbow + bronze arrows on chickens, pick arrows back up | Chicken pen |
-| Magic | Wind Strike on chickens (starter runes) | Chicken pen |
-| Woodcutting / Firemaking | Normal trees, burn the logs in place | West of Lumbridge castle |
-| Fishing / Cooking | Net shrimp/anchovies, cook on a fire | Draynor or Lumbridge Swamp |
-| Mining | Copper/tin, drop ore | Lumbridge Swamp east mine |
-| Thieving | Pickpocket men/women (gives coins for later skills) | Lumbridge |
+| 1-20 | Chickens at the Lumbridge farm, bury bones | in use |
+| 20-40 | Cows in the Lumbridge cow field (cowhides for Crafting) | in use (switch at avg melee 20) |
+| 40-60 | Hill Giants, Edgeville Dungeon (big bones) | later |
+- Melee style order: **Strength first, keep Attack close, Defence last** *(in use)*
+- Ranged: **Rapid** style; chickens/cows 1-20, Rock Crabs 20-40 *(rapid in use)*
+- Free steel dagger in a building across the Lumbridge bridge *(later)*
 
-## Tier 2: 15-30
+## Gathering
+| Skill | Levels | Method | Status |
+|---|---|---|---|
+| Woodcutting | 1-20 / 20-35 / 30+ | normal trees / oaks / Draynor willows | in use (willows only once combat ≥ 20, Draynor dark wizards) |
+| Firemaking | any | burn what you cut (logs 40, oak 60, willow 90 xp) | in use |
+| Fishing | 1-20 | small-net shrimp/anchovies (Lumbridge Swamp) | in use |
+| Fishing | 20-30+ | fly fishing trout/salmon (feathers from chickens) | later |
+| Mining | 1-28 / 29+ | copper & tin / iron | in use (copper/tin) |
+| Thieving | 1-10 / 10+ | men & women / farmers (Lumbridge farm) | in use |
 
-| Skill | Method | Where |
-|---|---|---|
-| Woodcutting/FM | Oaks (15+), willows (30+) | Lumbridge oaks, Draynor willows |
-| Fishing/Cooking | Fly fishing trout/salmon (20+, needs rod + feathers from chickens) | Lumbridge river / Barbarian Village |
-| Combat | Cows → goblins/Al-Kharid warriors (toll 10gp) / Barbarians | Lumbridge, Al-Kharid, Barbarian Village |
-| Mining/Smithing | Iron (15+) for xp; smelt bronze then iron at Lumbridge/Al-Kharid furnace | Swamp mine, Al-Kharid |
-| Crafting | Leather (cowhide → tan at Al-Kharid → gloves/boots/bodies) | Cow field + Ellis in Al-Kharid |
-| Fletching | Knife on logs → arrow shafts, later longbows | Anywhere |
-| Thieving | Men → farmers (10) → H.A.M. members/master farmers | Lumbridge → Draynor |
-| Agility | Gnome Stronghold course (members) | Tree Gnome Stronghold |
-| Runecrafting | Rune Mysteries quest → air runes from essence | Falador air altar |
-
-## Tier 3: 30+ (members; mostly for Claude-directed bots)
-
-Barbarian Outpost agility, Draynor/Seers willows→maples, Catherby lobsters,
-Ardougne cakes/master farmers, Slayer from Turael/Mazchna, quests for xp rewards
-(Waterfall Quest for 1→30 Attack/Strength, Fight Arena, Tree Gnome Village), Herblore after Druidic Ritual.
-
-## How the scripted bots use this
-
-`scripted.mjs` scores each available task by the average level of the skills it trains and runs
-the lowest-scoring one for 8-20 minutes before re-picking, so all trainable skills creep up
-together. Tasks unlock automatically as the plan above allows (e.g. oaks at 15 Woodcutting,
-willows at 30, cows/goblins as combat rises).
+## Processing
+| Skill | Levels | Method | Status |
+|---|---|---|---|
+| Cooking | 1+ | shrimp/anchovies on fires; Lumbridge range after Cook's Assistant | fires in use; quest planned |
+| Fletching | 1-10 / 10-20 / 20+ | arrow shafts / normal bows (u) / oak bows | in use (normal logs) |
+| Smithing | 1-29 | **The Knight's Sword** quest takes 1 → 29 | quest planned |
+| Crafting | 1-20 | leather (cowhide → Al Kharid tanner → gloves/boots/body) | later |
+| Herblore | - | needs **Druidic Ritual** quest first | quest planned |
+| Agility | 1-30 | Gnome Stronghold course (members, far) | later |
+| Runecrafting / Hunter / Farming / Construction / Summoning / Slayer | - | see guides | later |

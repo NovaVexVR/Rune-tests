@@ -1,0 +1,43 @@
+{
+  "role": "All-rounder (own goal: highest total level)",
+  "plan": [
+    {
+      "task": "melee",
+      "minutes": 20,
+      "why": "combat"
+    },
+    {
+      "task": "woodcut_fire",
+      "minutes": 20,
+      "why": "wc/fm"
+    },
+    {
+      "task": "fletch",
+      "minutes": 20,
+      "why": "fletching"
+    },
+    {
+      "task": "fish_cook",
+      "minutes": 20,
+      "why": "fish/cook"
+    },
+    {
+      "task": "mine",
+      "minutes": 20,
+      "why": "mining"
+    },
+    {
+      "task": "thieving",
+      "minutes": 15,
+      "why": "thieving"
+    },
+    {
+      "task": "magic",
+      "minutes": 10,
+      "why": "magic"
+    }
+  ],
+  "loop": true,
+  "paused": false,
+  "step": 0
+}

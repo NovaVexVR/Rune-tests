@@ -1,0 +1,28 @@
+{
+  "role": "[wolf] Team fighter: combat first, gathers food between fights",
+  "plan": [
+    {
+      "task": "melee",
+      "minutes": 45,
+      "why": "strength-first melee (guide)"
+    },
+    {
+      "task": "fish_cook",
+      "minutes": 20,
+      "why": "food"
+    },
+    {
+      "task": "ranged",
+      "minutes": 15,
+      "why": "rapid ranged while arrows last"
+    },
+    {
+      "task": "woodcut_fire",
+      "minutes": 15,
+      "why": "variety"
+    }
+  ],
+  "loop": true,
+  "paused": false,
+  "step": 0
+}

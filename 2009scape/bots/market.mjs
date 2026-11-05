@@ -25,9 +25,21 @@ const VALUES_DIR = path.join(DIR, 'values');
 fs.mkdirSync(VALUES_DIR, { recursive: true });
 const LEDGER = path.join(DIR, 'ledger.jsonl');
 
-export const faction = name => (/^guildbot/.test(name) ? 'guild' : 'individual');
-const sameGuild = (a, b) => faction(a) === 'guild' && faction(b) === 'guild';
-export const TREASURER = 'guildbot5';
+// Teams: every bot name maps to a team; individualists (and scripted bots) are 'individual'.
+export const TEAMS = {
+    guild: { prefix: 'guildbot', size: 5, treasurer: 'guildbot5' },
+    wolf: { prefix: 'wolfbot', size: 5, treasurer: 'wolfbot5' },
+    hawk: { prefix: 'hawkbot', size: 5, treasurer: 'hawkbot5' },
+    bear: { prefix: 'bearbot', size: 5, treasurer: 'bearbot5' },
+    legion: { prefix: 'legion', size: 20, treasurer: 'legion1' }
+};
+export const faction = name => {
+    for (const [team, t] of Object.entries(TEAMS)) if (new RegExp(`^${t.prefix}\\d+$`).test(name)) return team;
+    return 'individual';
+};
+const sameGuild = (a, b) => faction(a) !== 'individual' && faction(a) === faction(b);
+export const treasurerOf = name => TEAMS[faction(name)]?.treasurer ?? null;
+export const TREASURER = 'guildbot5'; // legacy name, prefer treasurerOf()
 const COIN_FLOAT = 40; // coins a guild member keeps; the rest goes to the treasurer
 
 export const TASK_NEEDS = {
@@ -35,7 +47,8 @@ export const TASK_NEEDS = {
     fish_cook: [['Small fishing net'], ['Tinderbox']],
     mine: [['Bronze pickaxe', 'Iron pickaxe', 'Steel pickaxe']],
     ranged: [['Shortbow'], ['Bronze arrow']],
-    magic: [['Air rune'], ['Mind rune']]
+    magic: [['Air rune'], ['Mind rune']],
+    fletch: [['Knife'], ['Bronze axe', 'Iron axe', 'Steel axe']]
 };
 const TRADEABLE = new Set([...Object.values(TASK_NEEDS).flat(2), 'Copper ore', 'Tin ore', 'Iron ore', 'Logs', 'Oak logs', 'Willow logs', 'Shrimps', 'Anchovies', 'Bones', 'Feather', 'Cowhide']);
 const STORE_FALLBACK = { 'Small fishing net': 5, 'Bronze axe': 16, 'Bronze pickaxe': 1, Tinderbox: 1, Shortbow: 50, 'Bronze arrow': 1, 'Air rune': 4, 'Mind rune': 3, 'Copper ore': 3, 'Tin ore': 3, 'Iron ore': 17, Logs: 4, 'Oak logs': 20, 'Willow logs': 32, Shrimps: 5, Anchovies: 15, Bones: 1, Feather: 2, Cowhide: 1 };
@@ -142,8 +155,9 @@ export class Market {
         this.saveValues(name);
 
         // guild members send spare coins to the treasurer
-        if (faction(name) === 'guild' && name !== TREASURER && this.coins(name) > COIN_FLOAT + 20 && this.bots.get(TREASURER)?.bot.s?.online && !this.busy.has(TREASURER)) {
-            this.open({ buyer: TREASURER, seller: name, item: 'Coins', amount: this.coins(name) - COIN_FLOAT, price: 0, kind: 'gift' });
+        const tre = treasurerOf(name);
+        if (tre && name !== tre && this.coins(name) > COIN_FLOAT + 20 && this.bots.get(tre)?.bot.s?.online && !this.busy.has(tre)) {
+            this.open({ buyer: tre, seller: name, item: 'Coins', amount: this.coins(name) - COIN_FLOAT, price: 0, kind: 'gift' });
             return;
         }
 
@@ -162,10 +176,10 @@ export class Market {
                 if (bid < ask) { this.log(`[market] ${name} won't pay ${other}'s ask of ${ask} for ${need} (values it at ${bid})`); continue; }
                 const price = Math.max(1, Math.round((ask + bid) / 2));
                 // guild buyers draw on the treasury
-                const payer = faction(name) === 'guild' && this.coins(name) < price ? null : name;
+                const payer = tre && this.coins(name) < price ? null : name;
                 if (!payer) {
-                    if (this.coins(TREASURER) >= price && !this.busy.has(TREASURER) && name !== TREASURER) {
-                        this.open({ buyer: name, seller: TREASURER, item: 'Coins', amount: price, price: 0, kind: 'gift' });
+                    if (this.bots.has(tre) && this.coins(tre) >= price && !this.busy.has(tre) && name !== tre) {
+                        this.open({ buyer: name, seller: tre, item: 'Coins', amount: price, price: 0, kind: 'gift' });
                         return;
                     }
                     continue;

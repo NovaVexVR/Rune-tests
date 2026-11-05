@@ -1,0 +1,28 @@
+{
+  "role": "[wolf] Team treasurer: earns coins, pools members' spare coins, buys their missing tools, banks the pool",
+  "plan": [
+    {
+      "task": "treasury",
+      "minutes": 40,
+      "why": "equip team + manage pool"
+    },
+    {
+      "task": "melee",
+      "minutes": 20,
+      "why": "hp/combat"
+    },
+    {
+      "task": "treasury",
+      "minutes": 40,
+      "why": "treasury"
+    },
+    {
+      "task": "fletch",
+      "minutes": 15,
+      "why": "variety"
+    }
+  ],
+  "loop": true,
+  "paused": false,
+  "step": 0
+}

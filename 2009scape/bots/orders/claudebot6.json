@@ -1,0 +1,28 @@
+{
+  "role": "Ranger (own goal: 30 Ranged, rapid style per guide)",
+  "plan": [
+    {
+      "task": "ranged",
+      "minutes": 30,
+      "why": "main goal"
+    },
+    {
+      "task": "fletch",
+      "minutes": 30,
+      "why": "make own arrow shafts"
+    },
+    {
+      "task": "melee",
+      "minutes": 20,
+      "why": "hp/defence"
+    },
+    {
+      "task": "woodcut_fire",
+      "minutes": 15,
+      "why": "logs"
+    }
+  ],
+  "loop": true,
+  "paused": false,
+  "step": 0
+}

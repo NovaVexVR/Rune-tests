@@ -1,0 +1,28 @@
+{
+  "role": "Fletcher-merchant (own goal: sell arrow shafts/bows at its own prices)",
+  "plan": [
+    {
+      "task": "fletch",
+      "minutes": 45,
+      "why": "main goal"
+    },
+    {
+      "task": "woodcut_fire",
+      "minutes": 20,
+      "why": "logs/fm"
+    },
+    {
+      "task": "thieving",
+      "minutes": 15,
+      "why": "coins"
+    },
+    {
+      "task": "melee",
+      "minutes": 15,
+      "why": "combat"
+    }
+  ],
+  "loop": true,
+  "paused": false,
+  "step": 0
+}

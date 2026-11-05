@@ -1,0 +1,28 @@
+{
+  "role": "[legion] Team cook: fish and cook food for the team, also fights and chops",
+  "plan": [
+    {
+      "task": "fish_cook",
+      "minutes": 45,
+      "why": "food supply"
+    },
+    {
+      "task": "melee",
+      "minutes": 20,
+      "why": "combat"
+    },
+    {
+      "task": "woodcut_fire",
+      "minutes": 15,
+      "why": "fires"
+    },
+    {
+      "task": "fletch",
+      "minutes": 10,
+      "why": "variety"
+    }
+  ],
+  "loop": true,
+  "paused": false,
+  "step": 0
+}

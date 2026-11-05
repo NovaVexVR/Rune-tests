@@ -1,0 +1,28 @@
+{
+  "role": "[bear] Team miner: banks ore for future smithing, also fights and fletches",
+  "plan": [
+    {
+      "task": "mine",
+      "minutes": 45,
+      "why": "copper/tin to bank"
+    },
+    {
+      "task": "melee",
+      "minutes": 20,
+      "why": "combat"
+    },
+    {
+      "task": "fletch",
+      "minutes": 15,
+      "why": "arrow shafts"
+    },
+    {
+      "task": "fish_cook",
+      "minutes": 15,
+      "why": "food"
+    }
+  ],
+  "loop": true,
+  "paused": false,
+  "step": 0
+}

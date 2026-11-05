@@ -1,0 +1,28 @@
+{
+  "role": "Miner (own goal: 30 Mining for iron, then smithing)",
+  "plan": [
+    {
+      "task": "mine",
+      "minutes": 45,
+      "why": "main goal"
+    },
+    {
+      "task": "melee",
+      "minutes": 20,
+      "why": "combat"
+    },
+    {
+      "task": "fish_cook",
+      "minutes": 15,
+      "why": "food"
+    },
+    {
+      "task": "thieving",
+      "minutes": 15,
+      "why": "coins"
+    }
+  ],
+  "loop": true,
+  "paused": false,
+  "step": 0
+}

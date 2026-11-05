@@ -1,0 +1,28 @@
+{
+  "role": "Thief (own goal: farmers at 10, coin stack)",
+  "plan": [
+    {
+      "task": "thieving",
+      "minutes": 45,
+      "why": "main goal"
+    },
+    {
+      "task": "melee",
+      "minutes": 20,
+      "why": "hp for stuns"
+    },
+    {
+      "task": "fish_cook",
+      "minutes": 20,
+      "why": "food for stuns"
+    },
+    {
+      "task": "fletch",
+      "minutes": 10,
+      "why": "variety"
+    }
+  ],
+  "loop": true,
+  "paused": false,
+  "step": 0
+}

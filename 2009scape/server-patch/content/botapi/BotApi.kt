@@ -290,6 +290,24 @@ object BotRegistry {
                 PacketProcessor.enqueue(Packet.IfAction(p, opc, IF_OPCODES.indexOf(opc), 762, 73, slot))
                 "withdraw $want"
             }
+            "skillmenu" -> {
+                // "make X" skill menus (fletching, cooking, smelting...): pick option `index` (0-based), as many as possible
+                val plugin = p.dialogueInterpreter.dialogue as? core.game.dialogue.SkillDialoguePlugin ?: throw BotError("no skill menu open")
+                val f = core.game.dialogue.SkillDialoguePlugin::class.java.getDeclaredField("handler"); f.isAccessible = true
+                val handler = f.get(plugin) as core.game.dialogue.SkillDialogueHandler
+                val type = handler.type ?: throw BotError("skill menu has no type")
+                val want = (a["index"] as? Number)?.toInt() ?: 0
+                var best = -1; var bestAmt = Int.MIN_VALUE
+                for (b in 0..60) {
+                    val idx = try { type.getIndex(handler, b) } catch (e: Exception) { continue }
+                    val amt = try { type.getAmount(handler, b) } catch (e: Exception) { continue }
+                    if (idx == want && amt > bestAmt) { best = b; bestAmt = amt }
+                }
+                if (best == -1) throw BotError("option $want not in menu")
+                PacketProcessor.enqueue(Packet.ContinueOption(p, type.interfaceId, best + 1, -1, 0)) // interpreter passes child-1 to the plugin
+                if (bestAmt < 0) PacketProcessor.enqueue(Packet.InputPromptResponse(p, 28))
+                "skill menu option $want x${if (bestAmt < 0) 28 else bestAmt}"
+            }
             "player" -> {
                 // e.g. {"type":"player","name":"claudebot2","op":"Trade with"}
                 val other = Repository.getPlayerByName(a["name"].toString()) ?: throw BotError("${a["name"]} not online")
@@ -427,6 +445,12 @@ object BotRegistry {
             d["iface"] = chat
             d["text"] = JSONArray().apply { strs.toSortedMap().values.map { strip(it) }.filter { it.isNotBlank() }.forEach { add(it) } }
             d["options"] = JSONArray().apply { dialogOptions(name, chat).forEach { add(it.second) } }
+            val sk = p.dialogueInterpreter.dialogue as? core.game.dialogue.SkillDialoguePlugin
+            if (sk != null) {
+                val f = core.game.dialogue.SkillDialoguePlugin::class.java.getDeclaredField("handler"); f.isAccessible = true
+                val h = f.get(sk) as core.game.dialogue.SkillDialogueHandler
+                d["skillMenu"] = JSONArray().apply { h.items.forEach { add(it.name) } }
+            }
             o["dialog"] = d
         }
         // messages

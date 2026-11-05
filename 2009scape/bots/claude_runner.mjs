@@ -10,7 +10,7 @@ import path from 'path';
 
 import { Bot, LOG_DIR, sleep, summary } from './lib.mjs';
 import { taskById, RESUPPLY } from './tasks.mjs';
-import { Market } from './market.mjs';
+import { Market, TEAMS } from './market.mjs';
 
 const market = new Market((...a) => console.log(new Date().toISOString(), ...a));
 
@@ -86,6 +86,11 @@ async function runBot(name, delay) {
     }
 }
 
-const names = [...Array.from({ length: COUNT }, (_, i) => `claudebot${i + 1}`), ...Array.from({ length: COUNT }, (_, i) => `guildbot${i + 1}`)];
+// individualists + every team member (see TEAMS in market.mjs)
+const INDIVIDUALS = Number(process.env.INDIVIDUALS ?? 10);
+const names = [
+    ...Array.from({ length: INDIVIDUALS }, (_, i) => `claudebot${i + 1}`),
+    ...Object.values(TEAMS).flatMap(t => Array.from({ length: t.size }, (_, i) => `${t.prefix}${i + 1}`))
+];
 console.log(`starting Claude-directed bots: ${names.join(', ')}`);
-await Promise.all(names.map((n, i) => runBot(n, i * 5000)));
+await Promise.all(names.map((n, i) => runBot(n, i * 3000)));

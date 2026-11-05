@@ -1,6 +1,7 @@
 // Skill-training tasks shared by scripted bots and Claude-directed bots (2009Scape).
 // Each task: { id, skills, canRun(bot) -> true | reason, run(bot, untilMs) }
 import { dist, rand, FOOD } from './lib.mjs';
+import { faction } from './market.mjs';
 
 export const PLACES = {
     lumbridge: { x: 3222, y: 3219 },
@@ -14,7 +15,8 @@ export const PLACES = {
     draynorWillows: { x: 3087, y: 3236 },
     draynorTrees: { x: 3087, y: 3244 },
     swampFish: { x: 3243, y: 3151 },
-    swampMine: { x: 3229, y: 3148 }
+    swampMine: { x: 3229, y: 3148 },
+    farmers: { x: 3228, y: 3293 }
 };
 
 export const SHOPS = {
@@ -22,6 +24,26 @@ export const SHOPS = {
     general: { x: 3216, y: 3241, npcs: ['Shopkeeper', 'Shop assistant'], sells: { Tinderbox: 1, Hammer: 1, Chisel: 1, Bucket: 2, 'Empty pot': 1 } }
     // Small fishing net / runes are only sold in Port Sarim / Varrock: bots trade for those
 };
+// Free respawning ground items near Lumbridge (wiki guides; coordinates from the server's ground spawns)
+export const FREE_SPAWNS = {
+    'Small fishing net': [{ x: 3245, y: 3155 }, { x: 3244, y: 3159 }], // Lumbridge Swamp, by the fishing tutor
+    Knife: [{ x: 3205, y: 3212 }, { x: 3224, y: 3202 }],
+    'Empty pot': [{ x: 3209, y: 3214 }],
+    Bucket: [{ x: 3225, y: 3294 }],
+    Egg: [{ x: 3229, y: 3299 }, { x: 3191, y: 3276 }]
+};
+export async function pickupFree(bot, item) {
+    for (const spot of FREE_SPAWNS[item] ?? []) {
+        await bot.walkTo(spot.x, spot.y, { tol: 3 });
+        const s = await bot.state(6);
+        const g = s.ground.find(o => o.name === item);
+        if (!g) continue;
+        await bot.act({ type: 'ground', x: g.x, y: g.y, id: g.id });
+        await bot.waitIdle({ timeout: 15 });
+        if (bot.has(item)) { bot.log(`picked up a free ${item}`); return true; }
+    }
+    return false;
+}
 export function shopFor(item) {
     return Object.values(SHOPS).find(sh => item in sh.sells) ?? null;
 }
@@ -32,8 +54,8 @@ const FM_REQ = { Logs: 1, 'Oak logs': 15, 'Willow logs': 30 };
 
 function treeFor(bot) {
     const wc = bot.lvl('woodcutting');
-    if (wc >= 30) return { place: PLACES.draynorWillows, names: ['Willow'] };
-    if (wc >= 15) return { place: PLACES.lumbridgeOaks, names: ['Oak'] };
+    if (wc >= 30 && bot.s.combat >= 20) return { place: PLACES.draynorWillows, names: ['Willow'] };
+    if (wc >= 20) return { place: PLACES.lumbridgeOaks, names: ['Oak'] };
     return { place: PLACES.lumbridgeTrees, names: ['Tree'] };
 }
 
@@ -96,9 +118,7 @@ async function cookAll(bot) {
 // Skill "make X" menus: press the "make all" style option if one is open.
 async function cookMenu(bot) {
     const s = await bot.state(3);
-    const iface = s.chatbox;
-    if (iface === 307) { await bot.act({ type: 'button', iface: 307, child: 3, op: 0 }); return true; } // cook all
-    if (iface === 309) { await bot.act({ type: 'button', iface: 309, child: 6, op: 3 }); return true; }
+    if (s.dialog?.skillMenu) { await bot.act({ type: 'skillmenu', index: 0 }); return true; }
     return false;
 }
 
@@ -182,10 +202,11 @@ export const TASKS = [
             await bot.state();
             for (const g of ['Bronze sword', 'Wooden shield']) if (bot.inv(g).length) await bot.equip(g);
             const atk = bot.lvl('attack'), str = bot.lvl('strength'), def = bot.lvl('defence');
-            const low = Math.min(atk, str, def);
-            await bot.act({ type: 'style', n: low === atk ? 0 : low === str ? 1 : 3 });
-            const cb = bot.s.combat;
-            const [area, targets] = cb < 10 ? [PLACES.chickens, ['Chicken']] : cb < 20 ? [PLACES.cows, ['Cow', 'Cow calf']] : [PLACES.goblins, ['Goblin', 'Cow']];
+            // melee guide: prioritise Strength, keep Attack within ~5 levels, Defence last
+            const style = str <= atk + 4 && str < def + 15 ? 1 : atk < str - 4 ? 0 : def + 10 < Math.min(atk, str) ? 3 : 1;
+            await bot.act({ type: 'style', n: style });
+            const avg = (atk + str + def) / 3;
+            const [area, targets] = avg < 20 ? [PLACES.chickens, ['Chicken']] : [PLACES.cows, ['Cow', 'Cow calf']];
             await fightLoop(bot, until, area, targets);
         }
     },
@@ -197,7 +218,7 @@ export const TASKS = [
             await bot.state();
             await bot.equip('Shortbow');
             await bot.equip('Bronze arrow');
-            await bot.act({ type: 'style', n: 0 });
+            await bot.act({ type: 'style', n: 1 }); // ranged guide: Rapid for fastest xp
             await fightLoop(bot, until, PLACES.chickens, ['Chicken'], { pickup: ['Bronze arrow'], stopIf: b => !b.s.worn.some(w => w.name === 'Bronze arrow') });
             await bot.equip('Bronze sword');
             await bot.equip('Wooden shield');
@@ -224,18 +245,52 @@ export const TASKS = [
         skills: ['thieving'],
         canRun: () => true,
         async run(bot, until) {
-            await bot.walkTo(PLACES.lumbridge.x, PLACES.lumbridge.y, { tol: 6 });
+            const start = bot.lvl('thieving') >= 10 ? PLACES.farmers : PLACES.lumbridge;
+            await bot.walkTo(start.x, start.y, { tol: 6 });
             while (now() < until) {
                 await bot.state(14);
                 if (await bot.handleInterrupts()) continue;
-                const t = bot.nearestNpc(n => /^(Man|Woman)$/.test(n.name) && n.ops.includes('Pickpocket'));
-                if (!t) { await bot.walkTo(PLACES.lumbridge.x + rand(-6, 6), PLACES.lumbridge.y + rand(-6, 6)); continue; }
+                const farmerLvl = bot.lvl('thieving') >= 10;
+                const t = bot.nearestNpc(n => (farmerLvl ? /^Farmer$/ : /^(Man|Woman)$/).test(n.name) && n.ops.includes('Pickpocket'));
+                const home = farmerLvl ? PLACES.farmers : PLACES.lumbridge;
+                if (!t) { await bot.walkTo(home.x + rand(-6, 6), home.y + rand(-6, 6)); continue; }
                 await bot.act({ type: 'npc', npc: t.npc, op: 'Pickpocket' });
                 await bot.waitIdle({ timeout: 15, quiet: 2 });
             }
         }
     }
 ];
+
+export const FLETCH = {
+    id: 'fletch',
+    skills: ['fletching', 'woodcutting'],
+    canRun: bot => (bot.has('Knife') || !!FREE_SPAWNS.Knife) && ['Bronze axe', 'Iron axe', 'Steel axe'].some(a => bot.has(a)) || 'need an axe (and a knife)',
+    async run(bot, until) {
+        if (!bot.has('Knife') && !(await pickupFree(bot, 'Knife'))) return;
+        await bot.walkTo(PLACES.lumbridgeTrees.x, PLACES.lumbridgeTrees.y, { tol: 6 });
+        while (now() < until) {
+            const s = await bot.state(14);
+            if (await bot.handleInterrupts()) continue;
+            const logs = s.inv.filter(i => i.name === 'Logs');
+            if (s.invFree === 0 || (logs.length >= 10)) {
+                // fletching guide: arrow shafts to 10, then shortbows (u) / longbows (u)
+                const fl = bot.lvl('fletching');
+                const option = fl >= 10 ? 2 : fl >= 5 ? 1 : 0; // menu order for normal logs: shafts, shortbow, longbow
+                await bot.act({ type: 'useitem', item: 'Knife', onItem: 'Logs' });
+                await bot.wait(2);
+                await bot.state(3);
+                if (bot.s.dialog?.skillMenu) await bot.act({ type: 'skillmenu', index: Math.min(option, bot.s.dialog.skillMenu.length - 1) });
+                await bot.waitIdle({ timeout: 90, quiet: 4 });
+                await bot.state();
+                await bot.dropAll(i => /^(Logs|Shortbow \(u\)|Longbow \(u\))$/.test(i.name)); // keep arrow shafts (stackable, sellable)
+                continue;
+            }
+            const tree = bot.nearestScenery(l => l.name === 'Tree' && l.ops.includes('Chop down'));
+            if (!tree) { await bot.walkTo(PLACES.lumbridgeTrees.x + rand(-6, 6), PLACES.lumbridgeTrees.y + rand(-6, 6), { tol: 3 }); continue; }
+            await gatherOnce(bot, tree, 'Chop down', 'scenery', 45);
+        }
+    }
+};
 
 async function fightLoop(bot, until, area, names, { pickup = [], stopIf = null } = {}) {
     await bot.walkTo(area.x, area.y, { tol: 6 });
@@ -277,6 +332,7 @@ export const RESUPPLY = {
         const inBank = needs.filter(n => !bot.has(n) && bot.s.bank?.some(i => i.name === n));
         if (inBank.length && (await bot.openBank())) { for (const n of inBank) await bot.withdraw(n, 1); await bot.leaveBank(); }
         for (const item of needs) {
+            if (!bot.has(item) && FREE_SPAWNS[item] && (await pickupFree(bot, item))) continue;
             const shop = shopFor(item);
             if (!shop || bot.has(item)) continue;
             if (bot.s.coins < shop.sells[item]) {
@@ -303,7 +359,7 @@ export const TREASURY = {
         while (Date.now() < until) {
             await bot.state();
             const guildNeeds = new Set();
-            for (const [other] of m.bots) if (other !== bot.name && /^guildbot/.test(other)) for (const n of m.needsOf(other)) guildNeeds.add(n);
+            for (const [other] of m.bots) if (other !== bot.name && faction(other) === faction(bot.name)) for (const n of m.needsOf(other)) guildNeeds.add(n);
             const buyable = [...guildNeeds].filter(n => shopFor(n) && !bot.inv(n).length);
             if (buyable.length) {
                 bot.log(`treasury: buying for the guild: ${buyable.join(', ')}`);
@@ -333,6 +389,7 @@ export const TREASURY = {
 
 export function taskById(id) {
     if (id === 'treasury') return TREASURY;
+    if (id === 'fletch') return FLETCH;
     if (id === 'resupply') return RESUPPLY;
     return TASKS.find(t => t.id === id);
 }
@@ -340,3 +397,4 @@ export function taskById(id) {
 function combatXp(s) {
     return ['attack', 'strength', 'defence', 'hitpoints', 'ranged', 'magic'].reduce((t, k) => t + s.stats[k].xp, 0);
 }
+TASKS.push(FLETCH);
