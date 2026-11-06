@@ -51,6 +51,7 @@ if (fs.existsSync(scoresFile)) {
     }
 }
 section('Quests', of('quest'));
+section('Market day', of('market'), undefined, 6);
 section('Team politics', of('team'));
 section('Grudges and betrayals', of('betrayal'));
 section('Collections', of('collection'));

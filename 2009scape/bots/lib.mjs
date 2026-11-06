@@ -439,6 +439,10 @@ export class Bot {
         return this.route(route, { tol: 4, timeout: 240 });
     }
 
+    async walkFromGE() {
+        return this.route([[3175, 3455], [3212, 3428], [3270, 3428], [3290, 3415], [3290, 3375], [3255, 3335], [3240, 3300], [3222, 3218]], { tol: 4, timeout: 240 });
+    }
+
     async openGE() {
         if (this.s?.iface === 105) return true;
         if (!(await this.walkToGE())) return false;

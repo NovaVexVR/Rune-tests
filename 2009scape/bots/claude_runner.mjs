@@ -15,10 +15,12 @@ import { personalityOf, SPOTS } from './social.mjs';
 import { council, STATE as POLITICS } from './politics.mjs';
 
 import { Diary } from './diary.mjs';
+import { MarketDay } from './marketday.mjs';
 
 const diary = new Diary();
 const market = new Market((...a) => { console.log(new Date().toISOString(), ...a); try { diary.fromLog(a.join(' ')); } catch (e) { console.log('diary error', e.message); } });
 
+market.marketDay = new MarketDay(market);
 const COUNT = Number(process.argv[2] ?? 5);
 const ORDERS = path.join(path.dirname(new URL(import.meta.url).pathname), 'orders');
 const PROGRESS = path.join(LOG_DIR, 'progress.jsonl');
@@ -61,6 +63,7 @@ async function runBot(name, delay) {
             while (await market.step(b)) {}
             return true;
         }
+        if (await market.marketDay.attend(b)) return true; // market day at the Grand Exchange
         if (Date.now() - lastSeek > 60_000) {
             lastSeek = Date.now();
             await market.seek(b.name);

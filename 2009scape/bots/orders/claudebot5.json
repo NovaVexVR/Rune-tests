@@ -2,6 +2,20 @@
   "role": "Generalist/quester (own goal: balanced levels for early quests)",
   "plan": [
     {
+      "task": "cooks_assistant",
+      "minutes": 30,
+      "why": "finish the quest (flour)"
+    },
+    {
+      "task": "cooks_assistant",
+      "minutes": 40,
+      "why": "quest party leader",
+      "party": {
+        "Egg": "claudebot1",
+        "Bucket of milk": "claudebot6"
+      }
+    },
+    {
       "task": "melee",
       "minutes": 25,
       "why": "combat"

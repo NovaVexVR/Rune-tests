@@ -98,6 +98,10 @@ export class Diary {
             const loser = m[4] === m[1] ? m[2] : m[1];
             this.note(m[4], `Won ${m[3]}gp from ${loser} on a coin flip.`, 'wager');
             this.note(loser, `Lost ${m[3]}gp to ${m[4]} on a coin flip.`, 'wager');
+        } else if ((m = line.match(/\[marketday\] (\S+) sets off for market day #(\d+)/))) {
+            this.note(m[1], `Set off for market day #${m[2]} at the Grand Exchange.`, 'market');
+        } else if ((m = line.match(/\[marketday\] (\S+) put 1 (.+) on the GE for (\d+)gp/))) {
+            this.note(m[1], `Put ${m[2]} up on the Grand Exchange for ${m[3]}gp.`, 'market');
         } else if ((m = line.match(/\[politics\] MUTINY in (\w+): .* voted out (\S+); (\S+) is the new treasurer/))) {
             this.note(m[2], `My team (${m[1]}) voted me out as treasurer.`, 'team');
             this.note(m[3], `Became treasurer of ${m[1]} after a mutiny.`, 'team');

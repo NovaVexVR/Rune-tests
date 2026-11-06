@@ -37,7 +37,7 @@ Last session's container had everything under `/home/user`; a new one starts emp
 **Done and seen working in-game:** shops, banking, fletching, trading at perceived values, team gifts and treasurer pooling, favors/IOUs (organic), bounties (claimed and delivered), grudges from defaults, mutiny, a member leaving, recruitment, DMs (verified delivery), habits/collectors/gamblers assigned.
 
 **Observed in-game (Nov 6):** wagers (coin flip paid via trade), debt-collector purchase -> hounding (walk + DMs) -> repayment to the collector, call-outs with bystander trust drops, mood shifts (deaths/level-ups).
-**Built but not yet observed in-game:** collection completion (bots are too poor so far; claudebot9 is 4 tools short).
+**Collection completion observed** (legion20, tools set, 03:25).
 **Fixed Nov 6:** the first state poll replayed the server's message backlog into onMsg/onPm (fake deaths/level-ups in mood after every runner restart); cookAll sent low-level bots to Draynor trees (dark wizards) when no tree was near.
 
 **Random events wave 1: done and verified** (`node bots/test_events.mjs testbot <EVENTS...>`, all resolved, no deaths).
@@ -46,18 +46,26 @@ Last session's container had everything under `/home/user`; a new one starts emp
 - Handler: talkers are talked to; Genie's lamp is rubbed (XP to the bot's lowest combat/gathering skill); strange plant is picked once grown; hostile events are fought only if combat >= 10 and HP > 60%, otherwise (and always for SWARM) the bot runs until it despawns. Evil Chicken feathers are picked up after a kill (kill path not yet seen in-game; test bots were level 3).
 - Wave 2 needs bots to "see" interface item models (Sandwich Lady, Certer), wave 3 the kidnap puzzles (Surprise Exam, Drill Demon, Freaky Forester, Maze, Mime, Pillory, Quiz Master, Evil Bob, Candlelight). The `rescue` action pulls a bot out of a kidnap area.
 
+**Phase 4 (Nov 6):**
+- **4.3 diaries + recap: running.** `bots/diary.mjs` writes `bots/diaries/<bot>.md` from the runner's log lines and each bot's game messages (deaths, level milestones, trades/records, debts, grudges, wagers, team changes, quests, random events). `node bots/recap.mjs [hours]` prints a news-style recap (also `logs/recap-<date>.md`).
+- **4.2 quests: Cook's Assistant verified solo** (`quests.mjs`, task `cooks_assistant`): egg from Fred's pen (the north farm's eggs are in pens bots can't enter), bucket from the north farm dairy, milk from Gillie's dairy cow, wheat field via its gate, mill hopper on the top floor, flour bin. Party version: leader step `{task:'cooks_assistant', party:{Egg:'<bot>', 'Bucket of milk':'<bot>'}}`, helpers `{task:'quest_fetch', item, for:'<leader>'}`, delivered with deal kind `quest`.
+- **Grand Exchange API verified:** actions `gebuy`/`gesell` {item|slot, amount, price}, `gecollect`, `geabort` {slot}; state `ge` (offers). lib: `walkToGE()` (route east of the dark wizards' circle), `openGE()`, `geOffer()`, `geCollect()`. A bot-to-bot buy/sell matched and both sides collected.
+- State now has `questPoints`, `quests` (stage per started quest, 100 = done), `questFlags`; scoreboard counts quest points.
+
 ## Known gotchas
 - After any server restart, the bot runners log bots back in automatically, but deals in flight time out.
 - Dialogue: the interpreter passes `child - 1` to plugins (skill menus send `best + 1`; dialog options use child `idx + 2`).
 - Welcome screen: interface 378, Play button child 140. Character designer: 771, buttons 321 (randomize) and 362 (accept).
 - Draynor has aggressive dark wizards: low-level bots avoid it (fishing uses Lumbridge Swamp until combat 20).
 - `RegionManager.getObject(x, y, z)` argument order (an early bug).
+- Farm cellar at 3230,3286 (trapdoor) has no working exit: bots skip trapdoors, and a bot stuck underground >90s casts Home Teleport (button 192:0).
+- `restart.sh` runs a copy of the jar (`target/server-running.jar`), so rebuilding while the server runs is safe.
 - Kill runners with `pkill -f "node claude_runner.mjs"` (a broader pattern can kill the calling shell).
 
 ## Next steps (in order)
 1. ~~Random events wave 1~~ (done).
-2. Confirm collection completion in-game (everything else from Phases 1–3 is now observed).
-3. Phase 4: market days at the Grand Exchange (needs GE API), quest parties (Cook's Assistant, The Knight's Sword, Druidic Ritual), diaries and recaps.
+2. ~~Confirm Phase 1–3 mechanics~~ (all observed, incl. collection completion by legion20).
+3. Phase 4: market days at the GE (GE API done), verify quest parties, then The Knight's Sword and Druidic Ritual (both pass dangerous areas: need escorts/levels).
 4. Random events waves 2–3, bounded PvP (Phase 5), more training methods from `guides/`, a cross-platform local launcher.
 5. Reset all bots to level 1 and start the real run.
 

@@ -234,7 +234,9 @@ export class Market {
 
         for (const need of this.needsOf(name)) {
             // guildmates first (free), then anyone it isn't feuding with
-            const others = [...this.bots.keys()].filter(o => o !== name && !this.busy.has(o) && this.bots.get(o).bot.s?.online && !this.social.isRival(name, o) && !this.social.isRival(o, name))
+            // on market day, bots at the GE trade only with each other (and nobody drags them away)
+            const md = this.marketDay, here = !!md?.atMarket(name);
+            const others = [...this.bots.keys()].filter(o => o !== name && !this.busy.has(o) && this.bots.get(o).bot.s?.online && !this.social.isRival(name, o) && !this.social.isRival(o, name) && (!md || md.atMarket(o) === here))
                 .sort((a, b) => Number(sameGuild(name, b)) - Number(sameGuild(name, a)));
             for (const other of others) {
                 if (!this.surplusOf(other).some(i => i.name === need)) continue;

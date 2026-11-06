@@ -94,6 +94,7 @@ async function getFlour(bot) {
     const ctl = bot.nearestScenery(o => /hopper controls/i.test(o.name));
     if (ctl) { await bot.act({ type: 'scenery', x: ctl.x, y: ctl.y, id: ctl.id, op: ctl.ops[0] }); await bot.waitIdle({ timeout: 10 }); }
     for (let i = 0; i < 4 && bot.s.z > 0; i++) await climb(bot, 'down');
+    await bot.walkTo(MILL.x, MILL.y, { tol: 2 }); // a trade may have walked us off meanwhile; the flour waits in the bin
     await bot.state(10);
     const bin = bot.nearestScenery(o => /flour bin/i.test(o.name));
     if (!bin) { bot.log('quest: no flour bin in sight'); return false; }
@@ -108,6 +109,10 @@ export const COOKS_ASSISTANT = {
     skills: ['cooking'],
     canRun: bot => (bot.s.quests?.COOKS_ASSISTANT ?? 0) >= 100 ? 'already done' : bot.s.invFree >= 5 || 'need 5 free inventory slots',
     async run(bot, until, step = {}) {
+        bot._questing = true; // market day leaves questing bots alone
+        try { await this.steps(bot, until, step); } finally { bot._questing = false; }
+    },
+    async steps(bot, until, step) {
         const stage = () => bot.s.quests?.COOKS_ASSISTANT ?? 0;
         await toGround(bot);
         if (stage() === 0) { bot.log('quest: starting Cook\'s Assistant'); await talkCook(bot); }
@@ -146,6 +151,10 @@ export const QUEST_FETCH = {
     skills: [],
     canRun: bot => bot.s.invFree >= 2 || 'need 2 free inventory slots',
     async run(bot, until, step = {}) {
+        bot._questing = true;
+        try { await this.steps(bot, until, step); } finally { bot._questing = false; }
+    },
+    async steps(bot, until, step) {
         const item = step.item, leader = step.for;
         if (!GET[item] || !leader) { bot.log(`quest_fetch: bad step ${JSON.stringify(step)}`); return; }
         await toGround(bot);
