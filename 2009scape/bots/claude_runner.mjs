@@ -8,7 +8,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { Bot, LOG_DIR, sleep, summary, watchdog } from './lib.mjs';
+import { Bot, LOG_DIR, sleep, summary, watchdog, rememberDanger } from './lib.mjs';
 import { taskById, RESUPPLY, prepare, clearOut, surplusInBank } from './tasks.mjs';
 import { Market, TEAMS, TRADEABLE } from './market.mjs';
 import { personalityOf, SPOTS } from './social.mjs';
@@ -59,6 +59,13 @@ async function runBot(name, delay) {
             market.social.bumpMood(name, -0.4, 'dying');
             marketDay.noteDeath(name);
             note(name, `Died for the first time, at ${bot.s?.x},${bot.s?.y}.`, { once: 'first-death' }) || note(name, `Died again, at ${bot.s?.x},${bot.s?.y}.`);
+            // danger memory: avoid the spot on long trips, and warn the bots it trusts most
+            if (bot.s && bot.s.y < 6000) {
+                const { x, y } = bot.s;
+                rememberDanger(name, x, y);
+                const friends = [...market.bots.keys()].filter(o => o !== name && market.social.trust(name, o) > 0.1).sort((a, b) => market.social.trust(name, b) - market.social.trust(name, a)).slice(0, 3);
+                for (const f of friends) { rememberDanger(f, x, y, name); market.dm(name, f, `Careful around ${x},${y}. I just died there.`); }
+            }
         } else if (/advanced .* level|reached level/i.test(text)) { market.social.bumpMood(name, 0.1, 'a level-up'); noteLevel(name, text); }
     };
     // random events: gifts cheer a bot up, ambushes and kidnappings shake it

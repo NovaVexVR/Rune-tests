@@ -55,6 +55,8 @@ Last session's container had everything under `/home/user`; a new one starts emp
 
 **Cooking was broken fleet-wide (fixed):** every bot's Cooking was still 1. Two causes: the state's scenery list skipped objects with no right-click options (fires, ranges, anvils) and only read the first object per tile, so a bot never saw the fire it lit; and cooking's "how many?" menu is chatbox 307 (cook all = `continue` child 3), which nothing answered. Now fixed; a test bot went Cooking 1 -> 5 in 9 minutes. The Lumbridge castle range needs Cook's Assistant. **Food run:** a bot about to fight or thieve with no food carried or banked nets and cooks ~6 shrimps first (`catchFood`, max 8 min).
 
+**Danger memory (new):** a death is remembered in `market/dangers.json` (6 h, 24 h if it happens twice nearby); `travel()` routes around the bot's own danger spots, and the dying bot PMs its 3 most trusted bots, who avoid the spot too. Lumbridge never counts, and a zone around a trip's start or end is skipped for that trip.
+
 **Fleet parties:** with the runner left alone, guildbot4+5 and guildbot1+2 each completed Cook's Assistant as parties on their own (17:00, 17:04).
 
 **Fixed (17:xx):** thieving bots kept dying to farmers (a failed pickpocket hits back) with no food; they now eat at half health or rest until healed.

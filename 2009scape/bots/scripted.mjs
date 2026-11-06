@@ -5,7 +5,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { Bot, LOG_DIR, rand, sleep, summary, watchdog } from './lib.mjs';
+import { Bot, LOG_DIR, rand, sleep, summary, watchdog, rememberDanger } from './lib.mjs';
 import { TASKS, RESUPPLY, shopFor, prepare, clearOut, surplusInBank } from './tasks.mjs';
 import { TASK_NEEDS, TRADEABLE } from './market.mjs';
 
@@ -39,6 +39,7 @@ async function runBot(name, startDelay) {
     await sleep(startDelay);
     const bot = new Bot(name, { quiet: true });
     ALL_BOTS.push(bot);
+    bot.onMsg = text => { if (/Oh dear, you are dead/i.test(text) && bot.s && bot.s.y < 6000) rememberDanger(name, bot.s.x, bot.s.y); };
     let lastId = null;
     for (;;) {
         try {

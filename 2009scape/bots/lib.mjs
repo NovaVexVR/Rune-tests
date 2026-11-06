@@ -16,6 +16,24 @@ export const SKILLS = ['attack', 'defence', 'strength', 'hitpoints', 'ranged', '
 export const FOOD = ['Shrimps', 'Anchovies', 'Bread', 'Cooked chicken', 'Cooked meat', 'Sardine', 'Herring', 'Trout', 'Salmon', 'Pike', 'Tuna', 'Lobster', 'Cake', 'Meat pie', 'Swordfish', 'Kebab'];
 // Random event types the server may give bots: the ones with a proven solver (wave 1).
 // Sent to the server on every login, so it survives server restarts. Override: BOT_EVENTS=GENIE,ZOMBIE or BOT_EVENTS=none
+// ---- danger memory: places a bot (or a friend who warned it) died, avoided on long trips for a while ----
+const DANGER_FILE = path.join(path.dirname(new URL(import.meta.url).pathname), 'market', 'dangers.json');
+const loadDangers = () => { try { return JSON.parse(fs.readFileSync(DANGER_FILE, 'utf8')); } catch { return {}; } };
+export function rememberDanger(name, x, y, from = null) {
+    const all = loadDangers();
+    const mine = (all[name] ??= []).filter(d => Date.now() < d.until);
+    const near = mine.find(d => Math.max(Math.abs(d.x - x), Math.abs(d.y - y)) <= 6);
+    // twice in the same place: a lesson that lasts a day; otherwise six hours
+    if (near) { near.until = Date.now() + 24 * 3600_000; near.times = (near.times ?? 1) + 1; }
+    else mine.push({ x, y, from, until: Date.now() + 6 * 3600_000, times: 1 });
+    all[name] = mine;
+    fs.mkdirSync(path.dirname(DANGER_FILE), { recursive: true });
+    fs.writeFileSync(DANGER_FILE, JSON.stringify(all, null, 2));
+}
+export function dangersFor(name) {
+    // Lumbridge itself (the respawn point) never counts: there's nowhere safer to go
+    return (loadDangers()[name] ?? []).filter(d => Date.now() < d.until && Math.max(Math.abs(d.x - 3222), Math.abs(d.y - 3218)) > 15).map(d => ({ x: d.x, y: d.y, r: 6 }));
+}
 export const STUCK_MINUTES = Number(process.env.STUCK_MINUTES ?? 10), HARD_STUCK_MINUTES = Number(process.env.HARD_STUCK_MINUTES ?? 25);
 // Runner-side watchdog (hard): a bot still stuck after HARD_STUCK_MINUTES is logged out; its runner logs it back in.
 export function watchdog(bots, log = console.log) {
@@ -605,7 +623,7 @@ export class Bot {
     }
 
     // Long trip: plan a route on the server's collision map (around DANGER zones), then walk it waypoint by waypoint.
-    async travel(x, y, { avoid = DANGER, tol = 3, timeout = 900 } = {}) {
+    async travel(x, y, { avoid = [...DANGER, ...dangersFor(this.name)], tol = 3, timeout = 900 } = {}) {
         let s = await this.state(8);
         if (dist(s, { x, y }) <= tol && s.z === 0) return true;
         // routes are planned on the ground floor: come down first
@@ -620,6 +638,9 @@ export class Bot {
             }
             s = await this.state(1);
         }
+        // a danger zone around where we are or where we're going can't be avoided: skip it for this trip
+        const inside = (a, p) => Math.max(Math.abs(a.x - p.x), Math.abs(a.y - p.y)) <= a.r;
+        avoid = avoid.filter(a => !inside(a, s) && !inside(a, { x, y }));
         const q = `/route?from=${s.x},${s.y}&to=${x},${y}&z=${s.z}` + (avoid.length ? `&avoid=${avoid.map(a => `${a.x},${a.y},${a.r}`).join(';')}` : '');
         const r = await http('GET', q).catch(e => ({ ok: false, error: e.message }));
         if (!r.ok) { this.log(`travel to ${x},${y}: ${r.error}; walking straight`); return this.walkTo(x, y, { tol, timeout, direct: true }); }
