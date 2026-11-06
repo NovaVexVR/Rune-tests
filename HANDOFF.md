@@ -58,4 +58,9 @@ Last session's container had everything under `/home/user`; a new one starts emp
 4. Random events waves 2–3, bounded PvP (Phase 5), more training methods from `guides/`, a cross-platform local launcher.
 5. Reset all bots to level 1 and start the real run.
 
-Dashboard (snapshot, refreshed by Claude): https://claude.ai/artifact/6HWG1Z966j6BatW3LoV6aS (refresh = run `export_dashboard.mjs`, upload the five JSON files as assets, update each `datasets/<id>` source url).
+## Usage rules (from the user)
+- **Keep usage low.** Don't spend tokens on anything not asked for: no unrequested status checks, polling loops, screenshots or dashboard refreshes.
+- **Dashboard snapshots only when the user asks for one.** Never refresh it on your own initiative or as part of other work.
+- Prefer one larger batch of work with a short summary over many small check-ins.
+
+Dashboard (snapshot, refreshed only on request): https://claude.ai/artifact/6HWG1Z966j6BatW3LoV6aS (refresh = run `export_dashboard.mjs`, upload the five JSON files as assets, update each `datasets/<id>` source url).
