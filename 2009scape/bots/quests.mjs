@@ -97,6 +97,41 @@ async function talkToCook(bot) {
     await bot.state(5);
 }
 
+// Wizards' Tower basement (Sedridor) and the Varrock rune shop (Aubury)
+const TOWER = { outside: { x: 3109, y: 3163 }, door: { x: 3107, y: 3162, id: 11993 }, ladder: { x: 3104, y: 3162 }, sedridor: { x: 3105, y: 9570 } };
+const AUBURY = { x: 3253, y: 3402 };
+const RM_ANSWERS = /any quests for me|sure, no problem|looking for the head wizard|ok, here you are|yes, certainly|sent here with a package/i;
+
+async function toSedridor(bot) {
+    if (bot.s.y < 9000) {
+        // the inner room has an auto-walk door (it shuts behind you): stand outside it, open it, then take the ladder
+        await bot.travel(TOWER.outside.x, TOWER.outside.y, { tol: 1 });
+        await bot.act({ type: 'scenery', x: TOWER.door.x, y: TOWER.door.y, id: TOWER.door.id, op: 'Open' }).catch(e => bot.log(`quest: ${e.message}`));
+        await bot.wait(6);
+        await bot.state(10);
+        const lad = bot.nearestScenery(l => /ladder/i.test(l.name) && l.ops.includes('Climb-down'));
+        if (!lad) { bot.log('quest: no ladder down at the Wizards\' Tower'); return false; }
+        await bot.act({ type: 'scenery', x: lad.x, y: lad.y, id: lad.id, op: 'Climb-down' });
+        await bot.waitIdle({ timeout: 12, cond: s => s.y > 9000 });
+    }
+    await bot.walkTo(TOWER.sedridor.x, TOWER.sedridor.y, { tol: 2, timeout: 90 });
+    await bot.talkTo('Sedridor', { answer: RM_ANSWERS, maxSteps: 60 });
+    await bot.state(5);
+    return true;
+}
+
+async function leaveBasement(bot) {
+    for (let i = 0; i < 5 && bot.s.y > 9000; i++) {
+        await bot.walkTo(3104, 9575, { tol: 2, timeout: 60 }); // out through Sedridor's large door to the ladder
+        await bot.state(10);
+        const lad = bot.nearestScenery(l => /ladder/i.test(l.name) && l.ops.includes('Climb-up'));
+        if (!lad) continue;
+        await bot.act({ type: 'scenery', x: lad.x, y: lad.y, id: lad.id, op: 'Climb-up' });
+        await bot.waitIdle({ timeout: 12, cond: s => s.y < 9000 });
+        await bot.state(10);
+    }
+}
+
 export const QUESTS = {
     cooks_assistant: {
         name: "Cook's Assistant",
@@ -104,6 +139,36 @@ export const QUESTS = {
         items: ['Egg', 'Bucket of milk', 'Pot of flour'],
         async start(bot) { if (stageOf(bot, this.name) === 0) await talkToCook(bot); return stageOf(bot, this.name) > 0; },
         async finish(bot) { await talkToCook(bot); return stageOf(bot, this.name) >= 100; }
+    },
+    rune_mysteries: {
+        name: 'Rune Mysteries',
+        items: [], // nothing to gather: a delivery run between the Duke, the head wizard and Aubury
+        async start(bot) {
+            if (stageOf(bot, this.name) > 0) return true;
+            await bot.travel(3206, 3210, { tol: 3 });
+            await bot.lumbridgeFloor(1);
+            await bot.walkTo(3210, 3222, { tol: 2 });
+            await bot.talkTo('Duke Horacio', { answer: RM_ANSWERS, maxSteps: 40 });
+            await bot.state(5);
+            await bot.lumbridgeFloor(0);
+            return stageOf(bot, this.name) > 0;
+        },
+        async finish(bot) {
+            for (let i = 0; i < 8 && stageOf(bot, this.name) < 100; i++) {
+                const st = stageOf(bot, this.name);
+                if (st === 10 || st === 20 || st === 50) await toSedridor(bot); // the talisman, then the notes
+                else if (st === 30 || st === 40) {
+                    await leaveBasement(bot);
+                    await bot.travel(AUBURY.x, AUBURY.y, { tol: 2 });
+                    await bot.talkTo('Aubury', { answer: RM_ANSWERS, maxSteps: 40 });
+                    await bot.state(5);
+                } else break;
+                if (stageOf(bot, this.name) === st) await bot.talkTo(st === 30 || st === 40 ? 'Aubury' : 'Sedridor', { answer: RM_ANSWERS, maxSteps: 40 }); // some stages take a second chat
+                await bot.state(5);
+            }
+            await leaveBasement(bot);
+            return stageOf(bot, this.name) >= 100;
+        }
     }
 };
 
