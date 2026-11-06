@@ -79,7 +79,35 @@ export async function clearOut(bot) {
 // and thieves carry some food from the bank.
 export async function prepare(bot, taskId) {
     await bot.gearUp({ weapon: !['ranged', 'magic'].includes(taskId) }).catch(() => {});
-    if (['melee', 'ranged', 'magic', 'thieving'].includes(taskId)) await bot.ensureFood(4).catch(() => {});
+    if (['melee', 'ranged', 'magic', 'thieving'].includes(taskId)) {
+        const food = await bot.ensureFood(4).catch(() => 0);
+        if (food < 2) await catchFood(bot, 6).catch(e => bot.log(`food: ${e.message}`)); // nothing banked: catch and cook some
+    }
+}
+
+// A quick food run: net shrimps/anchovies at the swamp and cook them (up to 8 minutes).
+export async function catchFood(bot, n = 6) {
+    if (!bot.has('Small fishing net') || !bot.has('Tinderbox')) return false;
+    const cooked = () => bot.s.inv.filter(i => FOOD.includes(i.name)).length;
+    const raw = () => bot.s.inv.filter(i => /^Raw /.test(i.name)).length;
+    bot.log('food: none carried or banked, catching some first');
+    if (bot.s.invFree < n + 1) await bot.bankItems(i => !KEEP(i.name)); // make room: bank the clutter, keep tools
+    const spot = PLACES.swampFish;
+    await bot.walkTo(spot.x, spot.y, { tol: 5 });
+    const end = now() + 8 * 60_000;
+    while (now() < end) {
+        const s = await bot.state(14);
+        if (await bot.handleInterrupts()) continue;
+        if (cooked() + raw() >= n || s.invFree <= 1) break;
+        const fs = bot.nearestNpc(x => x.name === 'Fishing spot' && x.ops.includes('Net'));
+        if (!fs) { await bot.walkTo(spot.x + rand(-4, 4), spot.y + rand(-4, 4), { tol: 2 }); continue; }
+        await gatherOnce(bot, fs, 'Net', 'npc', 60);
+    }
+    await cookAll(bot);
+    await bot.dropAll(i => /^Burnt/.test(i.name));
+    await bot.state(5);
+    bot.log(`food: caught and cooked, carrying ${cooked()}`);
+    return cooked() > 0;
 }
 
 export const SHOPS = {
@@ -152,7 +180,25 @@ async function lightFires(bot) {
 }
 
 async function cookAll(bot) {
-    for (let attempts = 0; attempts < 6; attempts++) {
+    await cookOnFire(bot);
+    // still raw (no fire would light, no tree nearby): the range in Lumbridge castle's kitchen, which the Cook only
+    // lets you use after Cook's Assistant
+    if (bot.s.inv.some(i => /^Raw /.test(i.name)) && (bot.s.quests?.["Cook's Assistant"] ?? 0) >= 100) {
+        await bot.travel(3209, 3214, { tol: 2 });
+        for (let i = 0; i < 6 && (await bot.state(8)).inv.some(x => /^Raw /.test(x.name)); i++) {
+            const range = bot.nearestScenery(l => /range/i.test(l.name)) ?? { x: 3212, y: 3215, id: 114 }; // no options, so not always listed
+            const item = bot.s.inv.find(x => /^Raw /.test(x.name));
+            if (!item) break;
+            await bot.act({ type: 'useitem', slot: item.slot, x: range.x, y: range.y, id: range.id }).catch(() => {});
+            await bot.wait(2);
+            await cookMenu(bot);
+            await bot.waitIdle({ timeout: 60, quiet: 4 });
+        }
+    }
+}
+
+async function cookOnFire(bot) {
+    for (let attempts = 0; attempts < 12; attempts++) {
         let s = await bot.state(8);
         const raw = s.inv.filter(i => /^Raw /.test(i.name));
         if (!raw.length) return;
@@ -184,8 +230,12 @@ async function cookAll(bot) {
 
 // Skill "make X" menus: press the "make all" style option if one is open.
 async function cookMenu(bot) {
-    const s = await bot.state(3);
-    if (s.dialog?.skillMenu) { await bot.act({ type: 'skillmenu', index: 0 }); return true; }
+    for (let i = 0; i < 4; i++) { // the menu shows once the bot has walked up to the fire or range
+        const s = await bot.state(3);
+        if (s.chatbox === 307) { await bot.act({ type: 'continue', child: 3 }); return true; } // cook all
+        if (s.dialog?.skillMenu) { await bot.act({ type: 'skillmenu', index: 0 }); return true; }
+        await bot.wait(2);
+    }
     return false;
 }
 

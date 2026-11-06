@@ -500,6 +500,8 @@ export class Bot {
             await this.wait(2);
             return true;
         }
+        // cooking's "how many?" menu (chatbox 307): cook all (button 2; the dialogue system adds 1 to the child)
+        if (s.chatbox === 307) { await this.act({ type: 'continue', child: 3 }); await this.wait(2); return true; }
         if (s.dialog && ![372, 311].includes(s.chatbox)) { // 311: the furnace bar menu, left to the smelting task
             if (s.dialog.options.length) {
                 const want = answer ? s.dialog.options.find(o => answer.test(o)) : null;

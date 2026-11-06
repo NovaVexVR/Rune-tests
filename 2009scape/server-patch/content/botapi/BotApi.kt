@@ -636,16 +636,23 @@ object BotRegistry {
             npcs.add(j)
         }
         val scen = ArrayList<JSONObject>()
+        // every object on each tile (a lit fire sits on top of whatever was there); objects with no options are kept
+        // when they're things you use items on (fires, ranges, anvils, hoppers...), since those are what tasks need
+        val useTargets = Regex("fire|range|anvil|hopper|furnace|altar|well|fountain|sink|spinning|loom|pottery|oven|churn|stove", RegexOption.IGNORE_CASE)
         for (dx in -radius..radius) for (dy in -radius..radius) {
-            val obj = RegionManager.getObject(loc.x + dx, loc.y + dy, loc.z) ?: continue
+            val tl = Location(loc.x + dx, loc.y + dy, loc.z)
+            val here = RegionManager.getRegionChunk(tl).objects?.getOrNull(tl.chunkOffsetX)?.getOrNull(tl.chunkOffsetY) ?: continue
+            for (obj in here) {
+            if (obj == null || !obj.isRenderable) continue
             val shown = obj.getChild(p) ?: continue
             val ops = shown.interaction.options.filterNotNull().map { it.name }.filter { it.isNotBlank() && !it.equals("Examine", true) }
-            if (ops.isEmpty() || shown.name == "null") continue
+            if (shown.name == "null" || (ops.isEmpty() && !useTargets.containsMatchIn(shown.name))) continue
             val j = JSONObject()
             j["id"] = obj.id; j["name"] = shown.name; j["x"] = obj.location.x; j["y"] = obj.location.y
             j["dist"] = obj.location.getDistance(loc).toInt()
             j["ops"] = JSONArray().apply { addAll(ops) }
             scen.add(j)
+            }
         }
         val ground = JSONArray()
         for (g in GroundItemManager.getItems()) {

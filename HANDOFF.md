@@ -53,6 +53,8 @@ Last session's container had everything under `/home/user`; a new one starts emp
 
 **Watchdog and clear-outs (new):** a bot with no change of place, xp or hp for 10 min (and not deliberately waiting: party, market, resting) walks back to Lumbridge; after 25 min its runner logs it out and back in. Bots sell to a shop only when their bank is running out of space (85% of its 496 slots): then they sell whole stacks of spare things, smallest first, until under 75% (tools, food, coins, runes, arrows, quest items and gear are never sold). Otherwise goods leave the bank through trades and market days (attendees now bring bank surplus). Miners now keep copper and tin even. **API fix:** bank withdraw/deposit amounts were all treated as "all" (JSON numbers arrive as Long).
 
+**Cooking was broken fleet-wide (fixed):** every bot's Cooking was still 1. Two causes: the state's scenery list skipped objects with no right-click options (fires, ranges, anvils) and only read the first object per tile, so a bot never saw the fire it lit; and cooking's "how many?" menu is chatbox 307 (cook all = `continue` child 3), which nothing answered. Now fixed; a test bot went Cooking 1 -> 5 in 9 minutes. The Lumbridge castle range needs Cook's Assistant. **Food run:** a bot about to fight or thieve with no food carried or banked nets and cooks ~6 shrimps first (`catchFood`, max 8 min).
+
 **Fleet parties:** with the runner left alone, guildbot4+5 and guildbot1+2 each completed Cook's Assistant as parties on their own (17:00, 17:04).
 
 **Fixed (17:xx):** thieving bots kept dying to farmers (a failed pickpocket hits back) with no food; they now eat at half health or rest until healed.
