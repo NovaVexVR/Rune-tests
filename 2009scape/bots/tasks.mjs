@@ -1,6 +1,6 @@
 // Skill-training tasks shared by scripted bots and Claude-directed bots (2009Scape).
 // Each task: { id, skills, canRun(bot) -> true | reason, run(bot, untilMs) }
-import { dist, rand, FOOD } from './lib.mjs';
+import { dist, rand, sleep, FOOD } from './lib.mjs';
 import { faction } from './market.mjs';
 
 export const PLACES = {
@@ -332,8 +332,17 @@ export const TASKS = [
             const start = bot.lvl('thieving') >= 10 ? PLACES.farmers : PLACES.lumbridge;
             await bot.walkTo(start.x, start.y, { tol: 6 });
             while (now() < until) {
-                await bot.state(14);
+                const s = await bot.state(14);
                 if (await bot.handleInterrupts()) continue;
+                // a failed pickpocket gets you hit: at half health eat, or (no food) step away and rest until healed
+                if (s.hp <= Math.ceil(s.maxHp * 0.5)) {
+                    const food = s.inv.find(i => FOOD.includes(i.name) && i.ops.includes('Eat'));
+                    if (food) { await bot.act({ type: 'item', slot: food.slot, op: 'Eat' }); await bot.wait(2); continue; }
+                    bot.log(`thieving: hp ${s.hp}/${s.maxHp} and no food, resting`);
+                    await bot.walkTo(PLACES.lumbridge.x + rand(-3, 3), PLACES.lumbridge.y + rand(-3, 3), { tol: 2 });
+                    while (now() < until && (await bot.state(5)).hp < Math.ceil(bot.s.maxHp * 0.9)) { await bot.handleInterrupts(); await sleep(20_000); }
+                    continue;
+                }
                 const farmerLvl = bot.lvl('thieving') >= 10;
                 const t = bot.nearestNpc(n => (farmerLvl ? /^Farmer$/ : /^(Man|Woman)$/).test(n.name) && n.ops.includes('Pickpocket'));
                 const home = farmerLvl ? PLACES.farmers : PLACES.lumbridge;

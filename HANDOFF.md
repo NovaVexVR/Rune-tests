@@ -49,6 +49,10 @@ Last session's container had everything under `/home/user`; a new one starts emp
 
 **Phase 4.2 quest parties: done.** Cook's Assistant solo (~10 min) and as a 3-bot party (`test_party.mjs`: 3/3 completed, 1 QP and 300 Cooking xp each, 10 party trades). Rune Mysteries solo (16 min, unlocks Runecrafting). Sheep Shearer (shears from Fred's house, shear his sheep but never "The Thing" (NPC 3579), spin on the castle wheel (interface 459, button 19), deliver in batches as bag space allows). Quest points count in the team score (5 levels each). The Knight's Sword and Druidic Ritual are not scripted yet: both need trips through places that kill level-3 bots (ice warriors under Asgarnia, Taverley dungeon), so they wait until combat is higher.
 
+**Fleet parties:** with the runner left alone, guildbot4+5 and guildbot1+2 each completed Cook's Assistant as parties on their own (17:00, 17:04).
+
+**Fixed (17:xx):** thieving bots kept dying to farmers (a failed pickpocket hits back) with no food; they now eat at half health or rest until healed.
+
 **Live 50-bot market day (12:55):** 31 bots travelled to the GE, shouted and called for wants; no haggled deals because everyone wanted knives/tinderboxes and nobody had spares. Expected with fresh characters.
 
 **New training task `smelt`:** mine copper and tin in pairs at the Lumbridge swamp (rock ids tell the ore: copper 11936-11938, tin 11933-11935; wait for the scarce one to respawn), smelt bronze bars at the Lumbridge furnace (the bar menu is chatbox 311; only "make 1", button 16, works here), bank the bars. Bronze bars are tradeable goods now. **`smith`:** takes the bars from the Lumbridge bank to the Varrock west anvils (planned safe route), smiths bronze daggers (anvil menu 300, button 24 = make 1), banks them at home. Verified: 8 daggers, Smithing 1 -> 2, all banked.
