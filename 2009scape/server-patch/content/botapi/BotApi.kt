@@ -66,6 +66,16 @@ object BotRegistry {
     @JvmField val allowedEvents: MutableSet<String> = java.util.Collections.synchronizedSet(HashSet<String>(WAVE1_EVENTS))
     private val jobs = ConcurrentLinkedQueue<() -> Unit>()
     private val IF_OPCODES = intArrayOf(155, 196, 124, 199, 234, 168, 166, 64, 53, 9)
+    // GE screen (interface 105) buttons per offer slot 0..5
+    private val GE_OPEN = intArrayOf(18, 34, 50, 69, 88, 107)
+    private val GE_BUY = intArrayOf(30, 46, 62, 81, 100, 119)
+    private val GE_SELL = intArrayOf(31, 47, 63, 82, 101, 120)
+
+    private fun itemIdByName(name: String): Int {
+        val def = core.cache.def.impl.ItemDefinition.getDefinitions().values
+            .filter { it.name.equals(name, true) && it.isUnnoted }.minByOrNull { it.id } ?: throw BotError("unknown item $name")
+        return def.id
+    }
 
     fun isBot(p: Player?): Boolean = p != null && bots[p.username.lowercase()]?.player === p
 
@@ -332,6 +342,51 @@ object BotRegistry {
                 PacketProcessor.enqueue(Packet.PrivateMessage(p, to, text))
                 "dm $to: $text"
             }
+            // ---- Grand Exchange: the same button/packet sequence the client sends (the GE screen must be open: talk to a clerk, "Exchange") ----
+            "gebuy", "gesell" -> {
+                if (p.interfaceManager.opened?.id != 105) throw BotError("Grand Exchange screen not open")
+                val rec = core.game.ge.GrandExchangeRecords.getInstance(p)
+                val idx = (0 until 6).firstOrNull { rec.getOffer(it) == null } ?: throw BotError("no free GE slot")
+                val amount = (a["amount"] as? Number)?.toInt() ?: 1
+                val price = (a["price"] as? Number)?.toInt() ?: throw BotError("need price (coins each)")
+                if (type == "gebuy") {
+                    val id = (a["id"] as? Number)?.toInt() ?: itemIdByName(a["item"].toString())
+                    PacketProcessor.enqueue(Packet.IfAction(p, 155, 0, 105, GE_BUY[idx], -1))
+                    PacketProcessor.enqueue(Packet.GESetOfferItem(p, id))
+                } else {
+                    val slot = invSlot(p, a)
+                    PacketProcessor.enqueue(Packet.IfAction(p, 155, 0, 105, GE_SELL[idx], -1))
+                    PacketProcessor.enqueue(Packet.IfAction(p, 155, 0, 107, 18, slot))
+                }
+                PacketProcessor.enqueue(Packet.IfAction(p, 155, 0, 105, 170, -1)); PacketProcessor.enqueue(Packet.InputPromptResponse(p, amount))
+                PacketProcessor.enqueue(Packet.IfAction(p, 155, 0, 105, 185, -1)); PacketProcessor.enqueue(Packet.InputPromptResponse(p, price))
+                PacketProcessor.enqueue(Packet.IfAction(p, 155, 0, 105, 190, -1))
+                "${if (type == "gebuy") "buy" else "sell"} offer in slot $idx: $amount @ $price"
+            }
+            "gecollect" -> {
+                // open each slot with something to collect and take it (as items; notes if the bag is too full)
+                if (p.interfaceManager.opened?.id != 105) throw BotError("Grand Exchange screen not open")
+                val rec = core.game.ge.GrandExchangeRecords.getInstance(p)
+                var n = 0
+                for (i in 0 until 6) {
+                    val o = rec.getOffer(i) ?: continue
+                    if (o.withdraw.all { it == null }) continue
+                    PacketProcessor.enqueue(Packet.IfAction(p, 155, 0, 105, GE_OPEN[i], -1))
+                    for (w in 0..1) if (o.withdraw[w] != null) {
+                        val asNotes = a["notes"] == true || p.inventory.freeSlots() < 2
+                        PacketProcessor.enqueue(Packet.IfAction(p, if (asNotes) 155 else 196, if (asNotes) 0 else 1, 105, 209 + 2 * w, -1)); n++
+                    }
+                    PacketProcessor.enqueue(Packet.IfAction(p, 155, 0, 105, 127, -1)) // back to the overview
+                }
+                "collecting $n item stacks"
+            }
+            "geabort" -> {
+                if (p.interfaceManager.opened?.id != 105) throw BotError("Grand Exchange screen not open")
+                val i = (a["slot"] as Number).toInt()
+                PacketProcessor.enqueue(Packet.IfAction(p, 155, 0, 105, GE_OPEN[i], -1))
+                PacketProcessor.enqueue(Packet.IfAction(p, 155, 0, 105, 203, -1))
+                "abort GE slot $i"
+            }
             "forceevent" -> {
                 // testing: spawn a specific random event on this bot
                 val ev = content.global.ame.RandomEvents.valueOf(a["event"].toString().uppercase())
@@ -436,6 +491,22 @@ object BotRegistry {
         o["worn"] = items(p.equipment)
         o["bankCount"] = p.bank.itemCount()
         o["coins"] = p.inventory.getAmount(995)
+        // quests: points, plus the stage of every quest that's been started (100 = complete)
+        o["questPoints"] = p.questRepository.points
+        // per-quest progress flags kept as player attributes (e.g. cooks_assistant:milk_submitted)
+        o["questFlags"] = JSONObject().apply { for ((k0, v) in p.attributes) { val k = k0.removePrefix("/save:"); if (k.startsWith("cooks_assistant:") && v is Boolean) this[k.substringAfter(":")] = v } }
+        o["ge"] = JSONArray().apply {
+            val rec = core.game.ge.GrandExchangeRecords.getInstance(p)
+            for (i in 0 until 6) {
+                val g = rec.getOffer(i) ?: continue
+                add(JSONObject().apply {
+                    this["slot"] = i; this["item"] = core.cache.def.impl.ItemDefinition.forId(g.itemID).name; this["id"] = g.itemID
+                    this["sell"] = g.sell; this["amount"] = g.amount; this["done"] = g.completedAmount; this["price"] = g.offeredValue
+                    this["state"] = g.offerState.name; this["collect"] = g.withdraw.count { it != null }
+                })
+            }
+        }
+        o["quests"] = JSONObject().apply { for (q in content.data.Quests.values()) { val st = try { p.questRepository.getStage(q) } catch (e: Exception) { 0 }; if (st > 0) this[q.name] = st } }
         val re = core.game.system.timer.impl.AntiMacro.getEventNpc(p)
         if (re != null && re.isActive) {
             val type = p.getAttribute<String?>("re-type", null) ?: content.global.ame.RandomEvents.values().firstOrNull { it.npc::class == re::class }?.name ?: "UNKNOWN"

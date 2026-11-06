@@ -14,6 +14,7 @@ export const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 
 export const SKILLS = ['attack', 'defence', 'strength', 'hitpoints', 'ranged', 'prayer', 'magic', 'cooking', 'woodcutting', 'fletching', 'fishing', 'firemaking', 'crafting', 'smithing', 'mining', 'herblore', 'agility', 'thieving', 'slayer', 'farming', 'runecrafting', 'hunter', 'construction', 'summoning'];
 export const FOOD = ['Shrimps', 'Anchovies', 'Bread', 'Cooked chicken', 'Cooked meat', 'Sardine', 'Herring', 'Trout', 'Salmon', 'Pike', 'Tuna', 'Lobster', 'Cake', 'Meat pie', 'Swordfish'];
+export const GE = { x: 3165, y: 3487 };
 const DEBUG_MSG = /^(\[|-{3,}|ID:|Option:|SpawnLoc|Wrapper|RCM|Iface|Slot:|Loc:|Index:|Your debug mode)/;
 
 async function http(method, url, body) {
@@ -124,7 +125,7 @@ export class Bot {
         const s = await this.state(10);
         const ref = target ?? s;
         const g = s.scenery
-            .filter(l => l.ops.includes('Open') && /gate|door/i.test(l.name) && l.dist <= 10)
+            .filter(l => l.ops.includes('Open') && /gate|door/i.test(l.name) && !/trapdoor/i.test(l.name) && l.dist <= 10) // a trapdoor leads into a cellar
             .sort((a, b) => dist(a, ref) + a.dist - (dist(b, ref) + b.dist))[0];
         if (!g) return false;
         this.log(`opening ${g.name} at ${g.x},${g.y}`);
@@ -291,8 +292,28 @@ export class Bot {
             if (await this.handleInterrupts()) continue;
             if (dist(s, { x, y }) <= tol) return true;
             // somehow underground (y > 6000) while heading for the surface: take the nearest way up
+            if (s.y < 6000) this._undergroundSince = null;
             if (s.y > 6000 && y < 6000) {
-                const up = this.nearestScenery(l => l.ops.some(o => /^climb-up$/i.test(o)), s) ?? this.nearestScenery(l => /ladder|stair/i.test(l.name), s);
+                // stuck down here (some cellars have no working way out): Lumbridge Home Teleport
+                this._undergroundSince ??= Date.now();
+                if (Date.now() - this._undergroundSince > 90_000) {
+                    this.log(`stuck underground at ${s.x},${s.y}: casting Home Teleport`);
+                    this._undergroundSince = null;
+                    await this.act({ type: 'button', iface: 192, child: 0 });
+                    await this.waitIdle({ timeout: 25, quiet: 4, cond: st => st.y < 6000 });
+                    continue;
+                }
+                this._deadLadders ??= new Set(); // ladders that "don't seem to lead anywhere"
+                const ok = l => !this._deadLadders.has(`${l.x},${l.y}`);
+                const up = this.nearestScenery(l => ok(l) && l.ops.some(o => /^climb-up$/i.test(o)), s) ?? this.nearestScenery(l => ok(l) && /ladder|stair/i.test(l.name), s);
+                if (this.msgs.slice(-3).some(t => /doesn't seem to lead anywhere/i.test(t)) && this._lastUp) { this._deadLadders.add(this._lastUp); this.msgs.push('(dead ladder noted)'); continue; }
+                if (!up) {
+                    // no usable way up in sight: wander to find another one
+                    await this.act({ type: 'walk', x: s.x + rand(-12, 12), y: s.y + rand(-12, 12) });
+                    await this.waitIdle({ timeout: 12 });
+                    continue;
+                }
+                this._lastUp = `${up.x},${up.y}`;
                 if (up) {
                     this.log(`underground at ${s.x},${s.y}; climbing ${up.name}`);
                     await this.act({ type: 'scenery', x: up.x, y: up.y, id: up.id, op: up.ops.find(o => /climb-up/i.test(o)) ?? up.ops[0] });
@@ -407,6 +428,42 @@ export class Bot {
             await this.wait(4);
         }
         return this.s.z === target;
+    }
+
+    // ---- Grand Exchange (Varrock) ----
+    // Lumbridge -> GE going east of the dark wizards' stone circle south of Varrock (they kill low levels)
+    async walkToGE() {
+        const s = await this.state(5);
+        if (dist(s, GE) <= 12) return true;
+        const route = s.y < 3400 ? [[3240, 3300], [3255, 3335], [3290, 3375], [3290, 3415], [3270, 3428], [3212, 3428], [3175, 3455], [GE.x, GE.y - 8]] : [[GE.x, GE.y - 8]];
+        return this.route(route, { tol: 4, timeout: 240 });
+    }
+
+    async openGE() {
+        if (this.s?.iface === 105) return true;
+        if (!(await this.walkToGE())) return false;
+        await this.state(12);
+        const clerk = this.nearestNpc(n => /grand exchange clerk/i.test(n.name) && n.ops.includes('Exchange'));
+        if (!clerk) return false;
+        await this.act({ type: 'npc', npc: clerk.npc, op: 'Exchange' });
+        await this.waitIdle({ timeout: 20, cond: st => st.iface === 105 });
+        return (await this.state(5)).iface === 105;
+    }
+
+    // price: coins each. Returns the slot's offer once it shows up in the state, or null.
+    async geOffer(kind, item, amount, price) {
+        if (!(await this.openGE())) return null;
+        await this.act({ type: kind === 'buy' ? 'gebuy' : 'gesell', item, amount, price });
+        await this.wait(3);
+        const s = await this.state(3);
+        return s.ge?.find(o => o.item === item && o.sell === (kind === 'sell')) ?? null;
+    }
+
+    async geCollect() {
+        if (!(await this.openGE())) return 0;
+        const n = (this.s.ge ?? []).reduce((t, o) => t + o.collect, 0);
+        if (n) { await this.act({ type: 'gecollect' }); await this.wait(3); await this.state(3); }
+        return n;
     }
 
     // ---- bank: Lumbridge castle top floor (safe for low levels) ----

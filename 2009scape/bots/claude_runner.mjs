@@ -14,7 +14,10 @@ import { Market, TEAMS } from './market.mjs';
 import { personalityOf, SPOTS } from './social.mjs';
 import { council, STATE as POLITICS } from './politics.mjs';
 
-const market = new Market((...a) => console.log(new Date().toISOString(), ...a));
+import { Diary } from './diary.mjs';
+
+const diary = new Diary();
+const market = new Market((...a) => { console.log(new Date().toISOString(), ...a); try { diary.fromLog(a.join(' ')); } catch (e) { console.log('diary error', e.message); } });
 
 const COUNT = Number(process.argv[2] ?? 5);
 const ORDERS = path.join(path.dirname(new URL(import.meta.url).pathname), 'orders');
@@ -46,7 +49,9 @@ async function runBot(name, delay) {
     bot.market = market;
     bot.onPm = pm => market.onPm(name, pm);
     // mood reacts to what happens in-game
+    bot.onRandomEvent = type => diary.note(name, `A random event found me: ${type.toLowerCase().replace(/_/g, ' ')}.`, 'random');
     bot.onMsg = text => {
+        diary.fromGame(name, text);
         if (/Oh dear, you are dead/i.test(text)) market.social.bumpMood(name, -0.4, 'dying');
         else if (/advanced .* level|reached level/i.test(text)) market.social.bumpMood(name, 0.1 * (1 - Math.max(0, market.social.mood(name))), 'a level-up'); // diminishing: low levels come fast
     };
@@ -95,7 +100,7 @@ async function runBot(name, delay) {
                 continue;
             }
             bot.log(`[plan step ${step}] ${item.task} for ${item.minutes}m — ${item.why ?? ''} | ${summary(bot.s)}`);
-            await task.run(bot, Date.now() + (item.minutes ?? 15) * 60_000);
+            await task.run(bot, Date.now() + (item.minutes ?? 15) * 60_000, item); // quests read their step (party, item to fetch)
             writeStep(name, step + 1);
             // habit: now and then, drift to a favorite spot between tasks
             const habits = personalityOf(name).habits;

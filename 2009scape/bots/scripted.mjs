@@ -7,6 +7,8 @@ import path from 'path';
 
 import { Bot, LOG_DIR, rand, sleep, summary } from './lib.mjs';
 import { TASKS, RESUPPLY, shopFor } from './tasks.mjs';
+import { Diary } from './diary.mjs';
+const diary = new Diary();
 import { TASK_NEEDS } from './market.mjs';
 
 const COUNT = Number(process.argv[2] ?? 5);
@@ -36,6 +38,8 @@ function chooseTask(bot, lastId) {
 async function runBot(name, startDelay) {
     await sleep(startDelay);
     const bot = new Bot(name, { quiet: true });
+    bot.onMsg = text => diary.fromGame(name, text);
+    bot.onRandomEvent = type => diary.note(name, `A random event found me: ${type.toLowerCase().replace(/_/g, ' ')}.`, 'random');
     let lastId = null;
     for (;;) {
         try {

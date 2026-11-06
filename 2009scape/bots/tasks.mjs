@@ -1,6 +1,7 @@
 // Skill-training tasks shared by scripted bots and Claude-directed bots (2009Scape).
 // Each task: { id, skills, canRun(bot) -> true | reason, run(bot, untilMs) }
 import { dist, rand, FOOD } from './lib.mjs';
+import { QUESTS } from './quests.mjs';
 import { faction } from './market.mjs';
 
 export const PLACES = {
@@ -395,6 +396,8 @@ export const TREASURY = {
 };
 
 export function taskById(id) {
+    const quest = QUESTS.find(q => q.id === id);
+    if (quest) return quest;
     if (id === 'treasury') return TREASURY;
     if (id === 'fletch') return FLETCH;
     if (id === 'resupply') return RESUPPLY;

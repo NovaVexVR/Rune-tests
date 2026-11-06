@@ -477,7 +477,7 @@ export class Market {
     acceptable(name, trade, deal) {
         const partner = name === deal.buyer ? deal.seller : deal.buyer;
         if (sameGuild(name, partner)) return true;
-        if (['favor', 'repay', 'debtsale', 'bounty', 'wager'].includes(deal.kind)) return true; // agreed contract (IOU / posted bounty)
+        if (['favor', 'repay', 'debtsale', 'bounty', 'wager', 'quest'].includes(deal.kind)) return true; // agreed contract (IOU / posted bounty / quest party)
         const val = list => list.reduce((t, i) => t + (deal.snap?.[name]?.[i.name] ?? this.perceived(name, i.name)) * i.count, 0);
         const give = val(trade.mine), get = val(trade.theirs);
         if (give === 0) return true;

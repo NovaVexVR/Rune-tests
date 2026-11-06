@@ -101,15 +101,16 @@ export function council(market) {
     // ---- 2.1 scoreboard ----
     const scores = {};
     for (const [team, d] of Object.entries(STATE.teams)) {
-        let total = 0, wealth = 0;
+        let total = 0, wealth = 0, quests = 0;
         for (const m of d.members) {
             const s = market.bots.get(m)?.bot.s;
             if (!s?.stats) continue;
             total += s.totalLevel;
+            quests += s.questPoints ?? 0;
             wealth += (s.coins ?? 0) + (s.bank ?? []).reduce((t, i) => t + (i.name === 'Coins' ? i.count : 0), 0);
             wealth += (s.inv ?? []).filter(i => i.name !== 'Coins').reduce((t, i) => t + market.perceived(m, i.name) * i.count, 0);
         }
-        scores[team] = { members: d.members.length, total, wealth: Math.round(wealth), perMember: Math.round(total / Math.max(1, d.members.length)) };
+        scores[team] = { members: d.members.length, total, wealth: Math.round(wealth), perMember: Math.round(total / Math.max(1, d.members.length)), quests };
     }
     fs.appendFileSync(SCORES, JSON.stringify({ t: new Date().toISOString(), scores }) + '\n');
     const ranked = Object.entries(scores).sort((a, b) => b[1].perMember - a[1].perMember);
