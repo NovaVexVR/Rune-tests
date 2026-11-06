@@ -2,17 +2,17 @@
   "role": "[hawk] Team miner: banks ore for future smithing, also fights and fletches",
   "plan": [
     {
-      "task": "mine",
-      "minutes": 45,
-      "why": "copper/tin to bank"
-    },
-    {
       "task": "quest_fetch",
       "item": "Egg",
       "for": "hawkbot1",
       "minutes": 25,
       "why": "quest party: Egg for hawkbot1",
       "once": true
+    },
+    {
+      "task": "mine",
+      "minutes": 45,
+      "why": "copper/tin to bank"
     },
     {
       "task": "melee",
@@ -46,5 +46,6 @@
       "food": "Anchovies",
       "collection": "tools"
     }
-  }
+  },
+  "preempt": true
 }

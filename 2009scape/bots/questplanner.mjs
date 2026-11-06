@@ -21,7 +21,9 @@ function insertStep(name, step) {
     const o = JSON.parse(fs.readFileSync(f, 'utf8'));
     o.plan ??= [];
     if (o.plan.some(p => p.task === step.task && p.once)) return false; // already queued
-    o.plan.splice(Math.min((o.step ?? 0) + 1, o.plan.length), 0, { ...step, once: true });
+    // in at the current position, and ask the runner to drop the current task (it resumes after the quest)
+    o.plan.splice(Math.min(o.step ?? 0, o.plan.length), 0, { ...step, once: true });
+    o.preempt = true;
     fs.writeFileSync(f, JSON.stringify(o, null, 2));
     return true;
 }

@@ -2,11 +2,6 @@
   "role": "Guild vanguard: combat first, gathers food/supplies in between",
   "plan": [
     {
-      "task": "melee",
-      "minutes": 45,
-      "why": "guild fighter"
-    },
-    {
       "task": "cooks_assistant",
       "minutes": 40,
       "party": {
@@ -15,6 +10,11 @@
       },
       "why": "quest party leader (guild)",
       "once": true
+    },
+    {
+      "task": "melee",
+      "minutes": 45,
+      "why": "guild fighter"
     },
     {
       "task": "fish_cook",
@@ -48,5 +48,6 @@
       "food": "Trout",
       "gambles": true
     }
-  }
+  },
+  "preempt": true
 }

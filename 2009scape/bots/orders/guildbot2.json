@@ -2,17 +2,17 @@
   "role": "Guild miner: banks ore for future smithing, also fights and fishes",
   "plan": [
     {
-      "task": "mine",
-      "minutes": 45,
-      "why": "ore stockpile in bank"
-    },
-    {
       "task": "quest_fetch",
       "item": "Egg",
       "for": "guildbot1",
       "minutes": 25,
       "why": "quest party: Egg for guildbot1",
       "once": true
+    },
+    {
+      "task": "mine",
+      "minutes": 45,
+      "why": "ore stockpile in bank"
     },
     {
       "task": "melee",
@@ -45,5 +45,6 @@
       "spot": "riverbank",
       "food": "Shrimps"
     }
-  }
+  },
+  "preempt": true
 }

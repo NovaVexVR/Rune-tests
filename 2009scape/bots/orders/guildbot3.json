@@ -2,17 +2,17 @@
   "role": "Guild woodsman: logs/fires, also mines and fights",
   "plan": [
     {
-      "task": "woodcut_fire",
-      "minutes": 45,
-      "why": "wc/fm"
-    },
-    {
       "task": "quest_fetch",
       "item": "Bucket of milk",
       "for": "guildbot1",
       "minutes": 25,
       "why": "quest party: Bucket of milk for guildbot1",
       "once": true
+    },
+    {
+      "task": "woodcut_fire",
+      "minutes": 45,
+      "why": "wc/fm"
     },
     {
       "task": "melee",
@@ -46,5 +46,6 @@
       "food": "Anchovies",
       "collection": "tools"
     }
-  }
+  },
+  "preempt": true
 }

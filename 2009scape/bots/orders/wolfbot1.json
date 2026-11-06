@@ -2,11 +2,6 @@
   "role": "[wolf] Team fighter: combat first, gathers food between fights",
   "plan": [
     {
-      "task": "melee",
-      "minutes": 45,
-      "why": "strength-first melee (guide)"
-    },
-    {
       "task": "cooks_assistant",
       "minutes": 40,
       "party": {
@@ -15,6 +10,11 @@
       },
       "why": "quest party leader (wolf)",
       "once": true
+    },
+    {
+      "task": "melee",
+      "minutes": 45,
+      "why": "strength-first melee (guide)"
     },
     {
       "task": "fish_cook",
@@ -47,5 +47,6 @@
       "spot": "store",
       "food": "Cooked meat"
     }
-  }
+  },
+  "preempt": true
 }

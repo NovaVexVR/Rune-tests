@@ -66,6 +66,16 @@ async function runBot(name, delay) {
             while (await market.step(b)) {}
             return true;
         }
+        // the quest planner can ask a bot to drop its current task (orders.preempt): stop the task here
+        if (Date.now() - (b._preemptCheck ?? 0) > 60_000) {
+            b._preemptCheck = Date.now();
+            const o = readOrders(name);
+            if (o.preempt) {
+                o.preempt = false;
+                fs.writeFileSync(path.join(ORDERS, `${name}.json`), JSON.stringify(o, null, 2));
+                if (b._currentTask && b._currentTask !== o.plan?.[o.step ?? 0]?.task) throw new Error('PREEMPT'); // already on it? carry on
+            }
+        }
         if (await market.marketDay.attend(b)) return true; // market day at the Grand Exchange
         if (Date.now() - lastSeek > 60_000) {
             lastSeek = Date.now();
@@ -106,6 +116,7 @@ async function runBot(name, delay) {
                 continue;
             }
             bot.log(`[plan step ${step}] ${item.task} for ${item.minutes}m — ${item.why ?? ''} | ${summary(bot.s)}`);
+            bot._currentTask = item.task;
             await task.run(bot, Date.now() + (item.minutes ?? 15) * 60_000, item); // quests read their step (party, item to fetch)
             writeStep(name, step + 1);
             // habit: now and then, drift to a favorite spot between tasks
@@ -121,6 +132,7 @@ async function runBot(name, delay) {
             await bot.state(1);
             fs.appendFileSync(PROGRESS, JSON.stringify({ t: Date.now(), bot: name, kind: 'claude', task: item.task, total: bot.s.totalLevel, combat: bot.s.combat, x: bot.s.x, y: bot.s.y, stats: Object.fromEntries(Object.entries(bot.s.stats).map(([k, v]) => [k, v.level])) }) + '\n');
         } catch (e) {
+            if (e.message === 'PREEMPT') { bot.log('dropping what I was doing for a quest'); continue; }
             bot.log(`error: ${e.stack ?? e}`);
             await sleep(15_000);
         }
