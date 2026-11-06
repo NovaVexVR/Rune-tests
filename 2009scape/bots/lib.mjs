@@ -109,6 +109,8 @@ export class Bot {
     }
 
     async login() {
+        // messages from before this login (replayed history) mustn't count as fresh deaths
+        try { const h = await http('GET', `/bot/${this.name}/state?r=1&since=0`); this._msgFloor = Math.max(0, ...(h.messages ?? []).map(m => m.id)); } catch {}
         await http('POST', '/events', RANDOM_EVENTS).catch(() => {});
         await http('POST', `/bot/${this.name}/login`);
         for (let i = 0; i < 30; i++) {
@@ -128,7 +130,7 @@ export class Bot {
         const s = await http('GET', `/bot/${this.name}/state?r=${r}&since=${this.since}`);
         for (const m of s.messages ?? []) {
             this.since = Math.max(this.since, m.id);
-            if (!DEBUG_MSG.test(m.text)) { this.msgs.push(m.text); this.onMsg?.(m.text); }
+            if (!DEBUG_MSG.test(m.text)) { this.msgs.push(m.text); if (m.id > (this._msgFloor ?? 0)) this.noteDeathMessages(m.text, s); this.onMsg?.(m.text); }
         }
         if (this.msgs.length > 150) this.msgs.splice(0, this.msgs.length - 150);
         for (const pm of s.pms ?? []) {
@@ -456,6 +458,47 @@ export class Bot {
         return have();
     }
 
+    // ---- death recovery: the gravestone keeps a bot's items where it died for a few minutes ----
+    noteDeathMessages(text, s) {
+        if (/Oh dear, you are dead/i.test(text)) {
+            // by the time the message arrives the bot is already back at the respawn point: the last state before it
+            // (this.s, not yet replaced) is where it fell
+            const at = this.s?.online ? this.s : s;
+            if (at.y >= 6000) return;
+            const again = this._deathAt && Date.now() - this._deathAt.t < 10 * 60_000; // died again soon: don't go back a second time
+            this._deathAt = { x: at.x, y: at.y, z: at.z, t: Date.now() };
+            s = at;
+            this.recovery = null;
+            this._noRecovery = again || DANGER.some(d => Math.max(Math.abs(d.x - s.x), Math.abs(d.y - s.y)) <= d.r);
+        }
+        const g = /you have (\d+) minutes? to get your items back/i.exec(text);
+        if (g && this._deathAt && !this._noRecovery) this.recovery = { ...this._deathAt, until: Date.now() + Number(g[1]) * 60_000 - 30_000 };
+    }
+    async recoverItems() {
+        const r = this.recovery;
+        if (!r || this._recovering || this.s?.hp <= 0) return false;
+        if (Date.now() > r.until) { this.recovery = null; return false; }
+        if (dist(this.s, r) <= 3 && this.s.z === r.z) { this.recovery = null; return false; } // died here and never left: nothing to walk to
+        this._recovering = true;
+        try {
+            this.log(`death: going back for my things at ${r.x},${r.y} (${Math.round((r.until - Date.now()) / 1000)}s left)`);
+            await this.travel(r.x, r.y, { tol: 2, timeout: Math.max(30, (r.until - Date.now()) / 1000) });
+            let got = 0;
+            for (let i = 0; i < 30 && Date.now() < r.until + 30_000; i++) {
+                const s = await this.state(6);
+                const it = s.ground?.filter(g => dist(g, r) <= 4).sort((a, b) => a.dist - b.dist)[0];
+                if (!it || s.invFree === 0) break;
+                await this.act({ type: 'ground', x: it.x, y: it.y, id: it.id }).catch(() => {});
+                await this.waitIdle({ timeout: 8 });
+                got++;
+            }
+            this.log(`death: picked up ${got} things from my grave`);
+            this.onRecovered?.(got);
+            await this.gearUp().catch(() => {});
+        } finally { this.recovery = null; this._recovering = false; }
+        return true;
+    }
+
     // Watchdog (soft): no progress for STUCK_MINUTES and not deliberately waiting (this.waiting) -> close whatever is
     // open, come down to the ground floor and walk back to Lumbridge. The runners log a bot out and back in if it's
     // still stuck after HARD_STUCK_MINUTES.
@@ -484,6 +527,7 @@ export class Bot {
         }
         const s = this.s;
         if (await this.unstickIfStuck()) return true;
+        if (await this.recoverItems()) return true;
         if (await this.handleRandomEvent()) return true;
         if (await this.useLamp()) return true;
         if (await this.solveKidnap()) return true;

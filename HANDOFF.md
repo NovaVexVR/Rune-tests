@@ -57,6 +57,8 @@ Last session's container had everything under `/home/user`; a new one starts emp
 
 **Danger memory (new):** a death is remembered in `market/dangers.json` (6 h, 24 h if it happens twice nearby); `travel()` routes around the bot's own danger spots, and the dying bot PMs its 3 most trusted bots, who avoid the spot too. Lumbridge never counts, and a zone around a trip's start or end is skipped for that trip.
 
+**Death recovery (new):** the gravestone keeps a bot's items where it fell for a couple of minutes; on "you have N minutes to get your items back" the bot travels back and picks them up (`recoverItems` in handleInterrupts). Not if it died inside a fixed DANGER zone or died again within 10 min. The death spot is the last state before the message (the message arrives after the respawn); messages from before a login are ignored. Verified: died at 3240,3245, back from Lumbridge in time, 13 of 12 items (+ bones).
+
 **Fleet parties:** with the runner left alone, guildbot4+5 and guildbot1+2 each completed Cook's Assistant as parties on their own (17:00, 17:04).
 
 **Fixed (17:xx):** thieving bots kept dying to farmers (a failed pickpocket hits back) with no food; they now eat at half health or rest until healed.
