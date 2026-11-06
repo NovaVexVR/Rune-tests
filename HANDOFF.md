@@ -51,6 +51,8 @@ Last session's container had everything under `/home/user`; a new one starts emp
 
 **Gear and food (new):** before every task bots wear the best gear they carry (`gearUp`: per slot, metal tier then piece; weapons skipped for ranged/magic; items too high-level are remembered), and fighters/thieves top up to 4 food from the bank (`ensureFood`). Fishers bank cooked fish beyond 6 instead of dropping it, so a food reserve builds up. Smiths make the best bronze armour piece their level and bars allow that they don't own (med helm 3, full helm 7, sq shield 8, chainbody 11, kiteshield 12, platelegs 16, platebody 18), wear it, and bank extras; melee bots "need" a metal helm, body and shield, so the market moves armour from smiths to fighters. Verified: a smith made and wore a bronze med helm; a test bot put on helmet, sword and shield. Banking keeps tools and food.
 
+**Watchdog and clear-outs (new):** a bot with no change of place, xp or hp for 10 min (and not deliberately waiting: party, market, resting) walks back to Lumbridge; after 25 min its runner logs it out and back in. Every 12 h a bot may thin its bank: goods normally leave via trades and market days (attendees now bring bank surplus), and only a good piled past 100 is sold at the general store, by merchants half the time and others a quarter (misers never). Miners now keep copper and tin even. **API fix:** bank withdraw/deposit amounts were all treated as "all" (JSON numbers arrive as Long).
+
 **Fleet parties:** with the runner left alone, guildbot4+5 and guildbot1+2 each completed Cook's Assistant as parties on their own (17:00, 17:04).
 
 **Fixed (17:xx):** thieving bots kept dying to farmers (a failed pickpocket hits back) with no food; they now eat at half health or rest until healed.

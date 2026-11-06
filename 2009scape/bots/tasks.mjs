@@ -1,6 +1,6 @@
 // Skill-training tasks shared by scripted bots and Claude-directed bots (2009Scape).
 // Each task: { id, skills, canRun(bot) -> true | reason, run(bot, untilMs) }
-import { dist, rand, sleep, FOOD } from './lib.mjs';
+import { dist, rand, sleep, FOOD, gearInfo } from './lib.mjs';
 import { faction } from './market.mjs';
 
 export const PLACES = {
@@ -34,7 +34,52 @@ export const BRONZE_PIECES = [
 ];
 
 // what a bot keeps on it when it banks: its tools and some food
-const KEEP = name => /pickaxe$|(^| )axe$|^Hammer$|^Tinderbox$|^Small fishing net$|^Knife$|^Chisel$|^Shears$/.test(name) || FOOD.includes(name);
+const KEEP = name => /pickaxe$|(^| )axe$|^Hammer$|^Tinderbox$|^Small fishing net$|^Knife$|^Chisel$|^Shears$|^Coins$/.test(name) || FOOD.includes(name);
+
+// ---- bank clear-outs ----
+// Bots bank everything. Goods normally leave the bank through trades and market days (marketday.mjs takes surplus
+// from the bank before the trip). The shop is a rare last resort: only when a good has piled up past SHOP_LIMIT does a
+// bot (sometimes; misers never) sell what's above that at the general store, along with things no one has a use for.
+export const RESERVE = 30, SHOP_LIMIT = 100;
+export const CLEAROUT_HOURS = Number(process.env.CLEAROUT_HOURS ?? 12);
+const NEVER_SELL = /^Coins$|rune$|arrow|^Feather$|bones$|^Bucket|^Empty pot$|^Pot of flour$|^Egg$|^Shears$|^Ball of wool$/i;
+export function surplusInBank(bot, tradeable) {
+    return (bot.s.bank ?? []).map(i => {
+        if (KEEP(i.name) || NEVER_SELL.test(i.name) || FOOD.includes(i.name)) return null;
+        if (tradeable.has(i.name)) return i.count > SHOP_LIMIT ? { name: i.name, count: i.count - SHOP_LIMIT } : null;
+        if (gearInfo(i.name)) return null; // gear is kept: gearUp may want it, fighters may buy it
+        return { name: i.name, count: i.count }; // no use to anyone: sell it all
+    }).filter(Boolean);
+}
+export async function clearOut(bot, tradeable, archetype = '') {
+    if (archetype === 'miser') return 0;
+    if (Math.random() > (archetype === 'merchant' ? 0.5 : 0.25)) return 0; // most of the time they just leave it for market day
+    await bot.state(5);
+    let todo = surplusInBank(bot, tradeable);
+    if (!todo.length) return 0;
+    let sold = 0;
+    for (let round = 0; round < 4 && todo.length; round++) {
+        if (!(await bot.openBank())) break;
+        await bot.depositAll(i => !KEEP(i.name));
+        for (const it of todo) {
+            if (bot.s.invFree <= 1) break;
+            const n = Math.min(it.count, bot.s.invFree - 1);
+            await bot.withdraw(it.name, n >= 10 ? 10 : n >= 5 ? 5 : 1);
+            for (let k = n >= 10 ? 10 : n >= 5 ? 5 : 1; k < n && bot.s.invFree > 1; k++) await bot.withdraw(it.name, 1);
+            it.count -= n;
+        }
+        await bot.leaveBank();
+        if (!(await bot.openShop(SHOPS.general))) break;
+        for (const it of bot.s.inv.filter(i => !KEEP(i.name) && !FOOD.includes(i.name) && !NEVER_SELL.test(i.name))) {
+            await bot.sell(it.name, it.count); sold += it.count;
+        }
+        await bot.closeInterfaces();
+        todo = todo.filter(t => t.count > 0);
+    }
+    await bot.state(5);
+    bot.log(`clear-out: sold ${sold} items at the general store, ${bot.s.coins} coins now`);
+    return sold;
+}
 
 // Before any task: wear the best gear carried (no melee weapon swap for ranged/magic), and fighters
 // and thieves carry some food from the bank.
@@ -224,7 +269,10 @@ export const TASKS = [
                     await bot.walkTo(PLACES.swampMine.x, PLACES.swampMine.y, { tol: 6 });
                     continue;
                 }
-                const rock = bot.nearestScenery(l => l.ops.includes('Mine') && /rocks/i.test(l.name));
+                // keep copper and tin even (counting the bank): bronze needs one of each, and banks were filling with copper
+                const have = x => s.inv.filter(i => i.name === x).length + (s.bank?.find(i => i.name === x)?.count ?? 0);
+                const want = have('Copper ore') <= have('Tin ore') ? [11936, 11937, 11938] : [11933, 11934, 11935];
+                const rock = bot.nearestScenery(l => l.ops.includes('Mine') && want.includes(l.id)) ?? bot.nearestScenery(l => l.ops.includes('Mine') && /rocks/i.test(l.name));
                 if (!rock) { await bot.walkTo(PLACES.swampMine.x + rand(-5, 5), PLACES.swampMine.y + rand(-5, 5), { tol: 2 }); continue; }
                 await gatherOnce(bot, rock, 'Mine', 'scenery', 30);
             }
@@ -384,7 +432,8 @@ export const TASKS = [
                     if (food) { await bot.act({ type: 'item', slot: food.slot, op: 'Eat' }); await bot.wait(2); continue; }
                     bot.log(`thieving: hp ${s.hp}/${s.maxHp} and no food, resting`);
                     await bot.walkTo(PLACES.lumbridge.x + rand(-3, 3), PLACES.lumbridge.y + rand(-3, 3), { tol: 2 });
-                    while (now() < until && (await bot.state(5)).hp < Math.ceil(bot.s.maxHp * 0.9)) { await bot.handleInterrupts(); await sleep(20_000); }
+                    bot.waiting = 'resting';
+                    try { while (now() < until && (await bot.state(5)).hp < Math.ceil(bot.s.maxHp * 0.9)) { await bot.handleInterrupts(); await sleep(20_000); } } finally { bot.waiting = null; }
                     continue;
                 }
                 const farmerLvl = bot.lvl('thieving') >= 10;
@@ -439,7 +488,7 @@ async function fightLoop(bot, until, area, names, { pickup = [], stopIf = null }
         if (s.hp <= 3 && !s.inv.some(i => FOOD.includes(i.name))) {
             bot.log('low hp and no food, resting');
             await bot.walkTo(area.x + 10, area.y + 10);
-            await bot.wait(60);
+            bot.waiting = 'resting'; try { await bot.wait(60); } finally { bot.waiting = null; }
             continue;
         }
         if (s.attacking || s.inCombat) { await bot.wait(2); continue; }

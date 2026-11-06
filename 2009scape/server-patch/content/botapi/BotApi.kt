@@ -377,7 +377,7 @@ object BotRegistry {
             "deposit" -> {
                 if (p.interfaceManager.opened?.id != 762) throw BotError("bank not open")
                 val slot = invSlot(p, a)
-                val opc = when (val amt = a["amount"]) { 1 -> 155; 5 -> 196; 10 -> 124; else -> 168 }
+                val opc = when ((a["amount"] as? Number)?.toInt()) { 1 -> 155; 5 -> 196; 10 -> 124; else -> 168 } // JSON numbers arrive as Long: compare as Int (else everything was "all")
                 PacketProcessor.enqueue(Packet.IfAction(p, opc, IF_OPCODES.indexOf(opc), 763, 0, slot))
                 "deposit ${p.inventory.get(slot)?.name}"
             }
@@ -385,7 +385,7 @@ object BotRegistry {
                 if (p.interfaceManager.opened?.id != 762) throw BotError("bank not open")
                 val want = a["item"].toString()
                 val slot = (0 until p.bank.capacity()).firstOrNull { p.bank.get(it)?.name.equals(want, true) } ?: throw BotError("$want not in bank")
-                val opc = when (val amt = a["amount"]) { 1 -> 155; 5 -> 196; 10 -> 124; else -> 168 }
+                val opc = when ((a["amount"] as? Number)?.toInt()) { 1 -> 155; 5 -> 196; 10 -> 124; else -> 168 } // JSON numbers arrive as Long: compare as Int (else everything was "all")
                 PacketProcessor.enqueue(Packet.IfAction(p, opc, IF_OPCODES.indexOf(opc), 762, 73, slot))
                 "withdraw $want"
             }

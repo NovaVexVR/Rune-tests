@@ -15,6 +15,7 @@ import path from 'path';
 import { rand, sleep } from './lib.mjs';
 import { personalityOf, SPOTS } from './social.mjs';
 import { note } from './diary.mjs';
+import { TRADEABLE } from './market.mjs';
 
 const FILE = path.join(path.dirname(new URL(import.meta.url).pathname), 'market', 'marketday.json');
 const EVERY = Number(process.env.MARKET_EVERY_MINUTES ?? 24 * 60) * 60_000;
@@ -86,6 +87,14 @@ export class MarketDay {
         const home = SPOTS[personalityOf(name).habits?.spot] ?? SPOTS.courtyard;
         const startHp = bot.s?.hp;
         this.onTrip.add(name);
+        // bring goods: surplus from the bank (beyond the reserve), as much as the bag allows
+        await bot.state(5);
+        const goods = (bot.s.bank ?? []).filter(i => m.storeValue && TRADEABLE.has(i.name) && i.count > 5).sort((a, b) => b.count * (b.value ?? 1) - a.count * (a.value ?? 1)).slice(0, 4);
+        if (goods.length && (await bot.openBank())) {
+            for (const g of goods) if (bot.s.invFree > 6) await bot.withdraw(g.name, Math.min(10, g.count - 5) >= 10 ? 10 : 5);
+            await bot.leaveBank();
+            bot.log(`[marketday] bringing ${goods.map(g => g.name).join(', ')} to sell`);
+        }
         try {
             const spot = { x: CROWD.x + rand(-5, 5), y: CROWD.y + rand(-3, 3) };
             if (!(await bot.travel(spot.x, spot.y, { timeout: 600 }))) { bot.log('[marketday] could not reach the GE, going home'); await bot.travel(home.x, home.y, { timeout: 600 }); this.onTrip.delete(name); return; }
@@ -93,8 +102,10 @@ export class MarketDay {
             d.arrived.push(name); this.save();
             this.log(`[marketday] ${name} arrived at the GE (hp ${bot.s.hp}/${startHp})`);
             note(name, 'Went to market day at the Grand Exchange.', { once: 'first-market-day' }) || note(name, 'Market day at the Grand Exchange.');
-            while (Date.now() < d.start) { await bot.state(5); await bot.handleInterrupts(); await sleep(3000); }
+            bot.waiting = 'market';
+            try { while (Date.now() < d.start) { await bot.state(5); await bot.handleInterrupts(); await sleep(3000); } } finally { bot.waiting = null; }
             let geDone = false;
+            bot.waiting = 'market'; // standing at the GE all market long isn't being stuck
             while (Date.now() < d.end) {
                 await bot.state(15);
                 if (await bot.handleInterrupts()) continue; // includes stepping through its deals
@@ -105,6 +116,7 @@ export class MarketDay {
                 }
                 await sleep(2500);
             }
+            bot.waiting = null;
             // closing time: settle with the GE
             while (m.dealFor(name)) { await bot.handleInterrupts(); await sleep(1500); }
             await this.closeGeOffers(bot);

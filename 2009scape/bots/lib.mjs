@@ -16,6 +16,18 @@ export const SKILLS = ['attack', 'defence', 'strength', 'hitpoints', 'ranged', '
 export const FOOD = ['Shrimps', 'Anchovies', 'Bread', 'Cooked chicken', 'Cooked meat', 'Sardine', 'Herring', 'Trout', 'Salmon', 'Pike', 'Tuna', 'Lobster', 'Cake', 'Meat pie', 'Swordfish', 'Kebab'];
 // Random event types the server may give bots: the ones with a proven solver (wave 1).
 // Sent to the server on every login, so it survives server restarts. Override: BOT_EVENTS=GENIE,ZOMBIE or BOT_EVENTS=none
+export const STUCK_MINUTES = Number(process.env.STUCK_MINUTES ?? 10), HARD_STUCK_MINUTES = Number(process.env.HARD_STUCK_MINUTES ?? 25);
+// Runner-side watchdog (hard): a bot still stuck after HARD_STUCK_MINUTES is logged out; its runner logs it back in.
+export function watchdog(bots, log = console.log) {
+    return setInterval(async () => {
+        for (const b of bots) {
+            if (!b.s?.online || b.stuckFor() < HARD_STUCK_MINUTES) continue;
+            log(`[watchdog] ${b.name} stuck ${Math.round(b.stuckFor())} min at ${b.s.x},${b.s.y},${b.s.z}: logging it out to restart`);
+            b.lastProgress = Date.now();
+            await b.logout().catch(() => {});
+        }
+    }, 2 * 60_000);
+}
 export const RANDOM_EVENTS = process.env.BOT_EVENTS != null
     ? process.env.BOT_EVENTS.split(',').map(e => e.trim().toUpperCase()).filter(e => e && e !== 'NONE')
     : ['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE', 'STRANGE_PLANT', 'SANDWICH_LADY', 'CERTER', 'DRILL_DEMON', 'FREAKY_FORESTER', 'MAZE',
@@ -107,6 +119,11 @@ export class Bot {
             this.onPm?.(pm);
         }
         if (this.pms.length > 100) this.pms.splice(0, this.pms.length - 100);
+        // watchdog: any change of place, xp or hp counts as progress
+        if (s.online && s.stats) {
+            const key = `${s.x},${s.y},${s.z},${Object.values(s.stats).reduce((t, k) => t + k.xp, 0)},${s.hp}`;
+            if (key !== this._progressKey) { this._progressKey = key; this.lastProgress = Date.now(); }
+        }
         this.s = s;
         return s;
     }
@@ -421,6 +438,25 @@ export class Bot {
         return have();
     }
 
+    // Watchdog (soft): no progress for STUCK_MINUTES and not deliberately waiting (this.waiting) -> close whatever is
+    // open, come down to the ground floor and walk back to Lumbridge. The runners log a bot out and back in if it's
+    // still stuck after HARD_STUCK_MINUTES.
+    stuckFor() { return this.lastProgress && !this.waiting ? (Date.now() - this.lastProgress) / 60_000 : 0; }
+    async unstickIfStuck() {
+        if (this._unsticking || this.stuckFor() < STUCK_MINUTES) return false;
+        this._unsticking = true;
+        try {
+            const s = this.s;
+            this.log(`watchdog: no progress for ${Math.round(this.stuckFor())} min at ${s.x},${s.y},${s.z}; heading back to Lumbridge`);
+            this.stuckCount = (this.stuckCount ?? 0) + 1;
+            this.onStuck?.(s);
+            await this.closeInterfaces().catch(() => {});
+            await this.travel(3222, 3218, { tol: 4, timeout: 300 }).catch(() => {});
+            this.lastProgress = Date.now();
+        } finally { this._unsticking = false; }
+        return true;
+    }
+
     // Level-ups, dialogs, random events, low HP. Returns true if it did something.
     async handleInterrupts({ answer = null } = {}) {
         // market/trading hook (set by the runner); guarded against re-entry while it walks
@@ -429,6 +465,7 @@ export class Bot {
             try { if (await this.hook(this)) return true; } finally { this._inHook = false; }
         }
         const s = this.s;
+        if (await this.unstickIfStuck()) return true;
         if (await this.handleRandomEvent()) return true;
         if (await this.useLamp()) return true;
         if (await this.solveKidnap()) return true;

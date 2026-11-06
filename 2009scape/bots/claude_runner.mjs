@@ -8,15 +8,16 @@
 import fs from 'fs';
 import path from 'path';
 
-import { Bot, LOG_DIR, sleep, summary } from './lib.mjs';
-import { taskById, RESUPPLY, prepare } from './tasks.mjs';
-import { Market, TEAMS } from './market.mjs';
+import { Bot, LOG_DIR, sleep, summary, watchdog } from './lib.mjs';
+import { taskById, RESUPPLY, prepare, clearOut, surplusInBank, CLEAROUT_HOURS } from './tasks.mjs';
+import { Market, TEAMS, TRADEABLE } from './market.mjs';
 import { personalityOf, SPOTS } from './social.mjs';
 import { council, STATE as POLITICS } from './politics.mjs';
 import { MarketDay } from './marketday.mjs';
 import { Parties } from './party.mjs';
 import { note, noteLevel } from './diary.mjs';
 
+const ALL_BOTS = [];
 const market = new Market((...a) => console.log(new Date().toISOString(), ...a));
 const marketDay = new MarketDay(market, (...a) => console.log(new Date().toISOString(), ...a));
 const parties = new Parties(market, (...a) => console.log(new Date().toISOString(), ...a));
@@ -44,6 +45,8 @@ function writeStep(name, step) {
 async function runBot(name, delay) {
     await sleep(delay);
     const bot = new Bot(name, { quiet: true });
+    ALL_BOTS.push(bot);
+    bot.onStuck = s => note(name, `Got stuck at ${s.x},${s.y} and had to find my way back to Lumbridge.`);
     readOrders(name);
     const pers = personalityOf(name);
     bot.log(`personality: ${pers.archetype} ${JSON.stringify(pers)}`);
@@ -95,6 +98,12 @@ async function runBot(name, delay) {
             if (day && marketDay.upcoming() && day.start - Date.now() < 7 * 60_000 && marketDay.wants(name) && !day.arrived.includes(name)) {
                 await marketDay.attend(bot);
                 continue;
+            }
+            // bank clear-out every few hours: keep a reserve, sell the rest
+            if (Date.now() - (bot._lastClearOut ??= Date.now()) > CLEAROUT_HOURS * 3600_000 && surplusInBank(bot, TRADEABLE).length) {
+                bot._lastClearOut = Date.now();
+                const sold = await clearOut(bot, TRADEABLE, personalityOf(name).archetype);
+                if (sold) note(name, `Cleared out the bank: sold ${sold} things at the general store.`);
             }
             // quest party: wait for the rest of the party, then quest together
             if (await parties.join(bot)) continue;
@@ -150,6 +159,7 @@ console.log(`starting Claude-directed bots: ${names.join(', ')}`);
 const POLITICS_MINUTES = Number(process.env.POLITICS_MINUTES ?? 60);
 setInterval(() => { try { council(market); } catch (e) { console.log('council error', e); } }, POLITICS_MINUTES * 60_000);
 setInterval(() => market.social.driftMoods(), 10 * 60_000);
+watchdog(ALL_BOTS, (...a) => console.log(new Date().toISOString(), ...a));
 setInterval(() => { try { marketDay.tick(); } catch (e) { console.log('market day error', e); } }, 60_000);
 setInterval(() => { try { if (!marketDay.upcoming()) parties.tick(); } catch (e) { console.log('party error', e); } }, 5 * 60_000);
 await Promise.all(names.map((n, i) => runBot(n, i * 3000)));

@@ -74,7 +74,9 @@ export class Parties {
         p.joined.set(bot.name, bot);
         bot.log(`[party] joined party #${p.id} (${QUESTS[p.quest].name}), waiting for ${p.members.filter(n => !p.joined.has(n)).join(', ') || 'nobody'}`);
         if (p.joined.size === p.members.length) this.start(p);
-        while (!p.running) { await bot.state(5); await bot.handleInterrupts(); await sleep(3000); if (!this.parties.includes(p)) return false; }
+        bot.waiting = 'party';
+        try { while (!p.running) { await bot.state(5); await bot.handleInterrupts(); await sleep(3000); if (!this.parties.includes(p)) return false; } }
+        finally { bot.waiting = null; }
         await p.running;
         return true;
     }

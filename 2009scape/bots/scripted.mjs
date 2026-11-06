@@ -5,11 +5,13 @@
 import fs from 'fs';
 import path from 'path';
 
-import { Bot, LOG_DIR, rand, sleep, summary } from './lib.mjs';
-import { TASKS, RESUPPLY, shopFor, prepare } from './tasks.mjs';
-import { TASK_NEEDS } from './market.mjs';
+import { Bot, LOG_DIR, rand, sleep, summary, watchdog } from './lib.mjs';
+import { TASKS, RESUPPLY, shopFor, prepare, clearOut, surplusInBank, CLEAROUT_HOURS } from './tasks.mjs';
+import { TASK_NEEDS, TRADEABLE } from './market.mjs';
 
 const COUNT = Number(process.argv[2] ?? 5);
+const ALL_BOTS = [];
+watchdog(ALL_BOTS);
 const PREFIX = process.argv[3] ?? 'scriptbot';
 const PROGRESS = path.join(LOG_DIR, 'progress.jsonl');
 
@@ -36,6 +38,7 @@ function chooseTask(bot, lastId) {
 async function runBot(name, startDelay) {
     await sleep(startDelay);
     const bot = new Bot(name, { quiet: true });
+    ALL_BOTS.push(bot);
     let lastId = null;
     for (;;) {
         try {
@@ -50,6 +53,7 @@ async function runBot(name, startDelay) {
             bot.log(`task -> ${task.id} for ${minutes}m | ${summary(bot.s)}`);
             const shopping = task.canRun(bot) === true ? null : buyableNeeds(bot, task);
             if (shopping) { bot.log(`buying ${shopping.join(', ')} for ${task.id}`); await RESUPPLY.run(bot, Date.now() + 10 * 60_000, shopping); }
+            if (Date.now() - (bot._lastClearOut ??= Date.now()) > CLEAROUT_HOURS * 3600_000 && surplusInBank(bot, TRADEABLE).length) { bot._lastClearOut = Date.now(); await clearOut(bot, TRADEABLE); }
             if (task.canRun(bot) === true) { await prepare(bot, task.id); await task.run(bot, Date.now() + minutes * 60_000); }
             lastId = task.id;
             await bot.state(1);
