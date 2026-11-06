@@ -24,7 +24,7 @@
   ],
   "loop": true,
   "paused": false,
-  "step": 0,
+  "step": 1,
   "personality": {
     "archetype": "miser",
     "greed": 0.73,
@@ -36,7 +36,8 @@
     "habits": {
       "spot": "riverbank",
       "food": "Shrimps",
-      "collection": "tools"
+      "collection": "tools",
+      "collectionDone": "2026-11-06T06:40:21.891Z"
     }
   }
 }

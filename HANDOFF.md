@@ -52,6 +52,8 @@ Last session's container had everything under `/home/user`; a new one starts emp
 - **Grand Exchange API verified:** actions `gebuy`/`gesell` {item|slot, amount, price}, `gecollect`, `geabort` {slot}; state `ge` (offers). lib: `walkToGE()` (route east of the dark wizards' circle), `openGE()`, `geOffer()`, `geCollect()`. A bot-to-bot buy/sell matched and both sides collected.
 - **Market days (4.1) working:** `bots/marketday.mjs`, every `MARKET_DAY_HOURS` (default 6). Day #2 (with haggling): 14 bots, 115 deals completed in ~10 minutes, all got home. Bots don't buy back what they sold or resell what they bought at the same market; max 8 purchases per bot per market.
 - **Random events wave 2 verified and enabled:** Sandwich Lady (reads "Have a X, dear", clicks the fixed tray button) and Certer (state `ifaceModels[..].seen` describes the picture; picks the matching option). State also has `ifaceText` for the open interface.
+- **Random events wave 3 (kidnaps):** solved and enabled: Quiz Master (odd one out by kind), Freaky Forester (pheasant by tail count), Drill Demon (exercise by mat sign), Mime (copy the mime's emote animation), Surprise Exam (same-kind item, then the named door). Not yet: Maze (needs exploration memory; doors oscillate), Candlelight, Evil Bob. Pillory is broken server-side (kidnap teleport into the cage zone is blocked). Safety net: kidnapped > 8 min → `rescue`. 18 event types enabled in total.
+- Perception added to the state: `ifaceText`/`ifaceModels` (with `seen` descriptions), `dialog.models`, npc `anim`, every object on a tile, `shownId` for varying scenery, `sign` for Drill Demon mats and exam doors, `kidnapped`/`kidnapType`.
 - `node bots/health.mjs`: quick check for bots underground / far from home / near the dark wizards / low HP.
 - State now has `questPoints`, `quests` (stage per started quest, 100 = done), `questFlags`; scoreboard counts quest points.
 
@@ -69,7 +71,7 @@ Last session's container had everything under `/home/user`; a new one starts emp
 1. ~~Random events wave 1~~ (done).
 2. ~~Confirm Phase 1–3 mechanics~~ (all observed, incl. collection completion by legion20).
 3. Phase 4: market days at the GE (GE API done), verify quest parties, then The Knight's Sword and Druidic Ritual (both pass dangerous areas: need escorts/levels).
-4. Random events wave 3 (kidnap puzzles), bounded PvP (Phase 5), more training methods from `guides/`, a cross-platform local launcher.
+4. Random events: Maze, Candlelight, Evil Bob; bounded PvP (Phase 5), more training methods from `guides/`, a cross-platform local launcher.
 5. Reset all bots to level 1 and start the real run.
 
 ## Usage rules (from the user)

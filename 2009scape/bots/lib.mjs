@@ -138,7 +138,7 @@ export class Bot {
     // ---- wave 3: kidnap events (the bot is taken somewhere and must solve something to get back) ----
     async handleKidnap() {
         const s = this.s;
-        if (!s.kidnapped) { this._kidnappedAt = null; return false; }
+        if (!s.kidnapped) { this._kidnappedAt = null; this._examDoor = null; this._drill = null; this._pheasant = null; this._maze = null; return false; }
         this._kidnappedAt ??= Date.now();
         const type = s.kidnapType ?? '?';
         if (Date.now() - this._kidnappedAt > 8 * 60_000) {
@@ -164,9 +164,119 @@ export class Bot {
             await this.wait(2);
             return true;
         }
+        // Mime: watch the mime's emote, then repeat it from the emote menu (interface 188)
+        const MIME = { 857: [2, 'think'], 860: [3, 'cry'], 861: [4, 'laugh'], 866: [5, 'dance'], 1130: [6, 'climb rope'], 1129: [7, 'lean'], 1131: [8, 'glass box'], 1128: [9, 'glass wall'] };
+        const mime = this.nearestNpc(n => n.name === 'Mime');
+        if (mime && MIME[mime.anim]) this._mimeSaw = mime.anim;
+        if (s.iface === 188) {
+            const [child, what] = MIME[this._mimeSaw] ?? [2 + Math.floor(Math.random() * 8), 'nothing (guessing)'];
+            this.log(`random event: the mime did ${what}; copying it`);
+            await this.act({ type: 'button', iface: 188, child });
+            this._mimeSaw = null;
+            await this.wait(2);
+            return true;
+        }
+        if (mime) return true; // just watch
+        // Pillory: pick the swinging key whose shape matches the hole in the spinning lock
+        if (s.iface === 189) {
+            const lock = (s.ifaceModels?.['4']?.seen ?? '').replace('lock', 'key');
+            let idx = [5, 6, 7].findIndex(c => s.ifaceModels?.[c]?.seen === lock);
+            if (idx < 0) idx = Math.floor(Math.random() * 3);
+            this.log(`random event: pillory lock is ${s.ifaceModels?.['4']?.seen ?? '?'}; using key ${idx + 1}`);
+            await this.act({ type: 'button', iface: 189, child: 8 + idx });
+            await this.wait(3);
+            return true;
+        }
+        const cage = this.nearestScenery(l => l.name === 'Cage' && l.ops.includes('Unlock') && l.dist <= 1);
+        if (cage && !s.dialog) {
+            await this.act({ type: 'scenery', x: cage.x, y: cage.y, id: cage.id, op: 'Unlock' });
+            await this.wait(3);
+            return true;
+        }
+        if (type === 'SURPRISE_EXAM' || s.iface === 103 || this.nearestNpc(n => /mordaut/i.test(n.name))) return this.solveExam();
+        if (type === 'MAZE' || (s.x >= 2880 && s.x <= 2945 && s.y >= 4540 && s.y <= 4610)) return this.solveMaze();
         if (type === 'FREAKY_FORESTER' || this.nearestNpc(n => n.name === 'Freaky Forester')) return this.solveForester();
         if (type === 'DRILL_DEMON' || (s.x >= 3156 && s.x <= 3170 && s.y >= 4814 && s.y <= 4826)) return this.solveDrill();
         return false;
+    }
+
+    // Surprise Exam: "what comes next?" (same kind of thing as the three shown), then leave by the door he names
+    async solveExam() {
+        const s = this.s;
+        const kind = n => /trowel|secateurs|dibber|rake/i.test(n) ? 'garden' : /salmon|shark|trout|shrimp/i.test(n) ? 'fish'
+            : /rod|net|harpoon/i.test(n) ? 'fishing gear' : /sword|shield|helm|axe/i.test(n) ? 'combat' : n;
+        if (s.iface === 103) {
+            const shown = [6, 7, 8].map(c => s.ifaceModels?.[c]?.seen ?? '');
+            const opts = [10, 11, 12, 13].map(c => s.ifaceModels?.[c]?.seen ?? '');
+            const want = kind(shown.find(Boolean) ?? '');
+            let idx = opts.findIndex(o => o && kind(o) === want);
+            if (idx < 0) idx = Math.floor(Math.random() * 4);
+            this.log(`random event: exam shows ${shown.join(', ')}; next is the ${opts[idx]}`);
+            await this.act({ type: 'button', iface: 103, child: 10 + idx });
+            await this.wait(2);
+            return true;
+        }
+        if (s.dialog) {
+            const m = (s.dialog.text ?? []).join(' ').match(/exit through the (.+?) door/i);
+            if (m) this._examDoor = m[1].toLowerCase();
+            return false;
+        }
+        const door = this._examDoor && this.nearestScenery(l => l.sign === this._examDoor && l.ops.includes('Open'));
+        if (door) {
+            this.log(`random event: exam done; leaving by the ${this._examDoor} door`);
+            await this.act({ type: 'scenery', x: door.x, y: door.y, id: door.id, op: 'Open' });
+            await this.waitIdle({ timeout: 15 });
+            return true;
+        }
+        const examiner = this.nearestNpc(n => /mordaut/i.test(n.name));
+        if (examiner && Date.now() - (this._examTalk ?? 0) > 8000) {
+            this._examTalk = Date.now();
+            await this.act({ type: 'npc', npc: examiner.npc, op: 'Talk-to' });
+            await this.wait(3);
+        }
+        return true;
+    }
+
+    // Maze: head for the shrine in the middle, always trying the unused door nearest the centre
+    async solveMaze() {
+        const s = this.s, CENTRE = { x: 2911, y: 4575 };
+        this._maze ??= { used: {}, bad: new Set() };
+        if (s.dialog) {
+            if ((s.dialog.text ?? []).join(' ').match(/not the right way/i) && this._maze.last) this._maze.bad.add(this._maze.last);
+            return false;
+        }
+        if (s.locked || s.moving) return true;
+        const shrine = this.nearestScenery(l => /strange shrine/i.test(l.name) && l.ops.includes('Touch'));
+        if (shrine) {
+            this.log('random event: found the shrine in the middle of the maze');
+            await this.act({ type: 'scenery', x: shrine.x, y: shrine.y, id: shrine.id, op: 'Touch' });
+            await this.wait(8);
+            this._maze = null;
+            return true;
+        }
+        const key = l => `${l.x},${l.y}`;
+        // 1. walk the open corridors as far toward the centre as this part of the maze allows
+        if (!this._maze.walked) {
+            this._maze.walked = true;
+            await this.act({ type: 'walk', x: CENTRE.x, y: CENTRE.y });
+            await this.waitIdle({ timeout: 20, quiet: 3 });
+            return true;
+        }
+        // 2. then go through the nearest door we haven't used (never straight back through the last one)
+        const doors = s.scenery.filter(l => l.id >= 3628 && l.id <= 3632 && l.ops.includes('Open') && !this._maze.bad.has(key(l)));
+        if (!doors.length) { this._maze.walked = false; await this.act({ type: 'walk', x: s.x + rand(-6, 6), y: s.y + rand(-6, 6) }); await this.wait(4); return true; }
+        const score = l => l.dist + 0.5 * dist(l, CENTRE) + 60 * (this._maze.used[key(l)] ?? 0) + (key(l) === this._maze.last ? 1000 : 0);
+        const d = doors.sort((a, b) => score(a) - score(b))[0];
+        this._maze.last = key(d);
+        this._maze.used[key(d)] = (this._maze.used[key(d)] ?? 0) + 1;
+        const before = { x: s.x, y: s.y };
+        if (process.env.MAZE_DEBUG) this.log(`maze: at ${s.x},${s.y} trying door ${d.x},${d.y}`);
+        await this.act({ type: 'scenery', x: d.x, y: d.y, id: d.id, op: 'Open' });
+        await this.waitIdle({ timeout: 15 });
+        const now = await this.state(12);
+        if (now.x === before.x && now.y === before.y && !now.dialog) this._maze.bad.add(key(d)); // couldn't get to / through it
+        this._maze.walked = false;
+        return true;
     }
 
     // Drill Demon: the sergeant shouts an exercise; do it on the mat whose sign shows it
@@ -250,9 +360,10 @@ export class Bot {
             await this.wait(2);
             return true;
         }
-        const lamp = !this.s.dialog && this.s.inv.find(i => i.id === 2528);
-        if (lamp && !this.s.randomEvent) {
-            await this.act({ type: 'item', slot: lamp.slot, op: 'Rub' });
+        // Genie's lamp (Rub) or the exam's Book of knowledge (Read): both open the skill-choice screen
+        const lamp = !this.s.dialog && this.s.inv.find(i => i.id === 2528 || i.id === 11640);
+        if (lamp && !this.s.randomEvent && !this.s.kidnapped) {
+            await this.act({ type: 'item', slot: lamp.slot, op: lamp.id === 2528 ? 'Rub' : 'Read' });
             await this.wait(2);
             return true;
         }

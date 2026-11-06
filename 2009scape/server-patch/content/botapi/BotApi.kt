@@ -65,7 +65,7 @@ object BotRegistry {
     @JvmField val WAVE1_EVENTS = listOf("GENIE", "DRUNKEN_DWARF", "RICK_TURPENTINE", "STRANGE_PLANT",
         "EVIL_CHICKEN", "RIVER_TROLL", "ROCK_GOLEM", "SHADE", "SWARM", "TREE_SPIRIT", "ZOMBIE",
         "SANDWICH_LADY", "CERTER", // wave 2: read the dialog / recognise the picture
-        "QUIZ_MASTER", "FREAKY_FORESTER", "DRILL_DEMON") // wave 3 (kidnaps) solved so far
+        "QUIZ_MASTER", "FREAKY_FORESTER", "DRILL_DEMON", "MIME", "SURPRISE_EXAM") // wave 3 (kidnaps). MAZE, CANDLELIGHT, EVIL_BOB not solved yet. PILLORY stays off: the kidnap teleport into the cage zone is blocked (server bug)
     @JvmField val allowedEvents: MutableSet<String> = java.util.Collections.synchronizedSet(HashSet<String>(WAVE1_EVENTS))
     private val jobs = ConcurrentLinkedQueue<() -> Unit>()
     private val IF_OPCODES = intArrayOf(155, 196, 124, 199, 234, 168, 166, 64, 53, 9)
@@ -103,6 +103,8 @@ object BotRegistry {
         8833 to "helmet", 8834 to "ring", 8835 to "secateurs", 8836 to "sword", 8837 to "trowel")
     private val modelNames: Map<Int, String> by lazy {
         val m = HashMap<Int, String>(QUIZ_PICTURES)
+        // Pillory: four key/hole shapes (keys 9749+, spinning locks 9753+); a player matches the key to the hole
+        for (k in 0..3) { m[9749 + k] = "key, shape ${k + 1}"; m[9753 + k] = "lock, shape ${k + 1}" }
         for ((id, name) in CERTER_PICTURES) core.cache.def.impl.ItemDefinition.forId(id)?.let { m[it.interfaceModelId] = name }
         for (d in core.cache.def.impl.ItemDefinition.getDefinitions().values)
             if (d.name != null && d.name != "null" && d.isUnnoted && !m.containsKey(d.interfaceModelId)) m[d.interfaceModelId] = d.name.lowercase()
@@ -620,6 +622,7 @@ object BotRegistry {
             j["dist"] = n.location.getDistance(loc).toInt()
             j["level"] = shown.definition.combatLevel
             j["inCombat"] = n.inCombat()
+            n.animator.animation?.let { if (it.id > 0) j["anim"] = it.id } // what it's doing right now (an emote, an attack...)
             j["ops"] = JSONArray().apply { shown.interaction.options.filterNotNull().forEach { add(it.name) } }
             npcs.add(j)
         }
@@ -634,6 +637,8 @@ object BotRegistry {
             j["id"] = obj.id; j["name"] = shown.name; j["x"] = obj.location.x; j["y"] = obj.location.y
             if (varies) j["shownId"] = shown.id
             // Drill Demon: the sign above each exercise mat (what a player reads off the wall)
+            // Surprise Exam: the symbol painted on each exit door
+            mapOf(2188 to "red cross", 2189 to "blue star", 2192 to "purple circle", 2193 to "green square")[obj.id]?.let { j["sign"] = it }
             if (obj.id in 10076..10079) j["sign"] = listOf("jog", "sit ups", "push ups", "star jumps").getOrNull(content.global.ame.events.drilldemon.DrillDemonUtils.getMatTask(obj.id, p))
             j["dist"] = obj.location.getDistance(loc).toInt()
             j["ops"] = JSONArray().apply { addAll(ops) }
