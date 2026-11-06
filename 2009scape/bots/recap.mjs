@@ -37,6 +37,10 @@ for (const d of days) {
     const md = done.filter(r => r.venue === 'market day' && Date.parse(r.t) >= d.start && Date.parse(r.t) <= d.end + 180_000);
     head.push(`**Market day at the Grand Exchange**: ${plural(d.arrived.length, 'bot')} made the trip${d.deaths.length ? `, ${d.deaths.length} died on the way` : ' safely'}; ${plural(md.length, 'deal')} haggled face to face${md.length ? ` (${md.map(r => `${r.item} ${r.price}gp`).join(', ')})` : ''} and ${plural(d.geOffers, 'GE offer')} posted.`);
 }
+const questsDone = by(/^Completed (?!my ).*\. Quest points/);
+const byQuest = {};
+for (const e of questsDone) (byQuest[/^Completed (.+?)( with |\.)/.exec(e.text)?.[1] ?? 'a quest'] ??= []).push(e.bot);
+for (const [qn, who] of Object.entries(byQuest)) head.push(`**Quest done: ${qn}** by ${list(who)}.`);
 const collections = by(/^Completed my .* collection/);
 for (const e of collections) head.push(`**${e.bot}** ${e.text.replace(/^Completed my/, 'completed its').replace(/!$/, '')}.`);
 if (head.length) out.push('## Headlines', '', ...head.map(h => `- ${h}`), '');
@@ -73,7 +77,7 @@ if (levels.length) {
     out.push('## Milestones', '', `- ${plural(levels.length, 'level milestone')}. Highest: ${top.map(({ e }) => `${e.bot} (${e.text.replace(/^Reached |\.$/g, '')})`).join(', ')}.`, '');
 }
 const scores = jsonl('scores.jsonl').at(-1);
-if (scores?.scores) out.push('## Team standings', '', ...Object.entries(scores.scores).sort((a, b) => b[1].perMember - a[1].perMember).map(([t, s], i) => `- ${i + 1}. ${t}: average total level ${s.perMember}, wealth ${s.wealth}gp (${s.members} members)`), '');
+if (scores?.scores) out.push('## Team standings', '', ...Object.entries(scores.scores).sort((a, b) => b[1].perMember - a[1].perMember).map(([t, s], i) => `- ${i + 1}. ${t}: score ${s.perMember} per member, ${s.quests ?? 0} quest points, wealth ${s.wealth}gp (${s.members} members)`), '');
 
 if (out.length <= 4) out.push('A quiet day. Nothing worth printing.');
 const text = out.join('\n');

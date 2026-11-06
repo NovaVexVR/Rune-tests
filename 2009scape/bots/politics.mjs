@@ -103,15 +103,17 @@ export function council(market) {
     // ---- 2.1 scoreboard ----
     const scores = {};
     for (const [team, d] of Object.entries(STATE.teams)) {
-        let total = 0, wealth = 0;
+        let total = 0, wealth = 0, quests = 0;
         for (const m of d.members) {
             const s = market.bots.get(m)?.bot.s;
             if (!s?.stats) continue;
             total += s.totalLevel;
+            quests += s.questPoints ?? 0;
             wealth += (s.coins ?? 0) + (s.bank ?? []).reduce((t, i) => t + (i.name === 'Coins' ? i.count : 0), 0);
             wealth += (s.inv ?? []).filter(i => i.name !== 'Coins').reduce((t, i) => t + market.perceived(m, i.name) * i.count, 0);
         }
-        scores[team] = { members: d.members.length, total, wealth: Math.round(wealth), perMember: Math.round(total / Math.max(1, d.members.length)) };
+        // quest points count toward the score: each is worth 5 total levels
+        scores[team] = { members: d.members.length, total, wealth: Math.round(wealth), quests, perMember: Math.round((total + 5 * quests) / Math.max(1, d.members.length)) };
     }
     fs.appendFileSync(SCORES, JSON.stringify({ t: new Date().toISOString(), scores }) + '\n');
     const ranked = Object.entries(scores).sort((a, b) => b[1].perMember - a[1].perMember);
@@ -119,7 +121,7 @@ export function council(market) {
         const [leader] = ranked[0];
         for (const [t, d] of Object.entries(STATE.teams)) {
             const herald = [...d.members].filter(online).sort((a, b) => social.p(b).sociability - social.p(a).sociability)[0];
-            if (herald) say(herald, `${t}: avg total ${scores[t].perMember}, wealth ${scores[t].wealth}gp${t === leader ? ' - we lead!' : ''}`);
+            if (herald) say(herald, `${t}: score ${scores[t].perMember}, ${scores[t].quests} quest pts, ${scores[t].wealth}gp${t === leader ? ' - we lead!' : ''}`);
         }
         // prestige: outsiders think a little better of the leading team
         for (const [other] of market.bots) if (teamOf(other) !== leader) for (const m of STATE.teams[leader].members) social.adjustTrust(other, m, 0.02);

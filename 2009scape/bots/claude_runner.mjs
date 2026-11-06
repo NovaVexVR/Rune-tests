@@ -14,10 +14,12 @@ import { Market, TEAMS } from './market.mjs';
 import { personalityOf, SPOTS } from './social.mjs';
 import { council, STATE as POLITICS } from './politics.mjs';
 import { MarketDay } from './marketday.mjs';
+import { Parties } from './party.mjs';
 import { note, noteLevel } from './diary.mjs';
 
 const market = new Market((...a) => console.log(new Date().toISOString(), ...a));
 const marketDay = new MarketDay(market, (...a) => console.log(new Date().toISOString(), ...a));
+const parties = new Parties(market, (...a) => console.log(new Date().toISOString(), ...a));
 
 const COUNT = Number(process.argv[2] ?? 5);
 const ORDERS = path.join(path.dirname(new URL(import.meta.url).pathname), 'orders');
@@ -94,6 +96,8 @@ async function runBot(name, delay) {
                 await marketDay.attend(bot);
                 continue;
             }
+            // quest party: wait for the rest of the party, then quest together
+            if (await parties.join(bot)) continue;
             let item = plan[step];
             // politics: the poorest team spends some of its time making money
             const team = POLITICS.teams[market.social.teamOf(name)];
@@ -146,4 +150,5 @@ const POLITICS_MINUTES = Number(process.env.POLITICS_MINUTES ?? 60);
 setInterval(() => { try { council(market); } catch (e) { console.log('council error', e); } }, POLITICS_MINUTES * 60_000);
 setInterval(() => market.social.driftMoods(), 10 * 60_000);
 setInterval(() => { try { marketDay.tick(); } catch (e) { console.log('market day error', e); } }, 60_000);
+setInterval(() => { try { if (!marketDay.upcoming()) parties.tick(); } catch (e) { console.log('party error', e); } }, 5 * 60_000);
 await Promise.all(names.map((n, i) => runBot(n, i * 3000)));

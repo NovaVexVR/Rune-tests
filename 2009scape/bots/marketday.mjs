@@ -29,6 +29,7 @@ export class MarketDay {
         this.log = log;
         this.state = fs.existsSync(FILE) ? JSON.parse(fs.readFileSync(FILE, 'utf8')) : { next: Date.now() + LEAD, days: [] };
         this.shouts = new Map(); // seller -> { item, amount, ask, t }
+        this.onTrip = new Set(); // bots on the way, at the market, or on the way home
         this.offers = new Map(); // `${buyer}>${seller}>${item}` -> time of last haggle (one per pair and item per few minutes)
         this.save();
     }
@@ -69,7 +70,7 @@ export class MarketDay {
 
     noteDeath(name) {
         const d = this.day;
-        if (d && Date.now() < d.end + 15 * 60_000 && d.attending.includes(name)) { d.deaths.push(name); this.save(); this.log(`[marketday] ${name} died on market day`); }
+        if (d && this.onTrip.has(name)) { d.deaths.push(name); this.save(); this.log(`[marketday] ${name} died on market day`); }
     }
 
     // Cut a task short so the bot leaves in time to make the opening.
@@ -84,9 +85,10 @@ export class MarketDay {
         bot.log(`[marketday] heading to the Grand Exchange`);
         const home = SPOTS[personalityOf(name).habits?.spot] ?? SPOTS.courtyard;
         const startHp = bot.s?.hp;
+        this.onTrip.add(name);
         try {
             const spot = { x: CROWD.x + rand(-5, 5), y: CROWD.y + rand(-3, 3) };
-            if (!(await bot.travel(spot.x, spot.y, { timeout: 600 }))) { bot.log('[marketday] could not reach the GE, going home'); return; }
+            if (!(await bot.travel(spot.x, spot.y, { timeout: 600 }))) { bot.log('[marketday] could not reach the GE, going home'); await bot.travel(home.x, home.y, { timeout: 600 }); this.onTrip.delete(name); return; }
             m.away.add(name);
             d.arrived.push(name); this.save();
             this.log(`[marketday] ${name} arrived at the GE (hp ${bot.s.hp}/${startHp})`);
@@ -112,6 +114,7 @@ export class MarketDay {
         }
         bot.log(`[marketday] going home to ${home.label}`);
         await bot.travel(home.x, home.y, { timeout: 600 });
+        this.onTrip.delete(name);
     }
 
     // Sellers call out their asking price for one of their spare goods.

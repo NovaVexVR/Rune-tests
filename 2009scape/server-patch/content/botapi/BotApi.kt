@@ -513,6 +513,12 @@ object BotRegistry {
         o["invFree"] = p.inventory.freeSlots()
         o["worn"] = items(p.equipment)
         o["bankCount"] = p.bank.itemCount()
+        // quests: points, and the stage of every quest started (100 = done)
+        val qr = p.questRepository
+        o["questPoints"] = qr.points
+        o["quests"] = JSONObject().apply {
+            for (q in core.game.node.entity.player.link.quest.QuestRepository.getQuests().keys) { val st = qr.getStage(q); if (st > 0) this[q.questName] = st }
+        }
         // Grand Exchange: the bot's offer slots, and the offer being set up while the GE screen is open
         val geRecs = core.game.ge.GrandExchangeRecords.getInstance(p)
         val ge = JSONArray()
@@ -663,6 +669,26 @@ object BotRegistry {
                         val z = q["z"]?.toInt() ?: 0
                         val avoid = (q["avoid"] ?: "").split(";").filter { it.isNotBlank() }.map { it.split(",").map { n -> n.trim().toInt() } }
                         onGame { planRoute(fx, fy, tx, ty, z, avoid) }
+                    }
+                    // what's around a place: /find?name=dairy cow&x=3250&y=3275[&z=0][&r=30] (scenery and NPCs whose name contains `name`)
+                    parts == listOf("find") -> {
+                        val want = java.net.URLDecoder.decode(q["name"] ?: "", "UTF-8").lowercase()
+                        val cx = q["x"]?.toInt() ?: throw BotError("need x"); val cy = q["y"]?.toInt() ?: throw BotError("need y")
+                        val z = q["z"]?.toInt() ?: 0; val r = minOf(q["r"]?.toInt() ?: 30, 64)
+                        onGame {
+                            val sc = JSONArray(); val np = JSONArray()
+                            for (x in cx - r..cx + r) for (y in cy - r..cy + r) {
+                                val obj = RegionManager.getObject(x, y, z) ?: continue
+                                if (!obj.name.lowercase().contains(want)) continue
+                                sc.add(JSONObject().apply { this["name"] = obj.name; this["id"] = obj.id; this["x"] = x; this["y"] = y; this["ops"] = JSONArray().apply { obj.definition.options?.filterNotNull()?.forEach { add(it) } } })
+                            }
+                            for (n in Repository.npcs) {
+                                if (n == null || !n.isActive || n.location.z != z || maxOf(Math.abs(n.location.x - cx), Math.abs(n.location.y - cy)) > r) continue
+                                if (!n.name.lowercase().contains(want)) continue
+                                np.add(JSONObject().apply { this["name"] = n.name; this["npc"] = n.index; this["x"] = n.location.x; this["y"] = n.location.y })
+                            }
+                            JSONObject().apply { this["scenery"] = sc; this["npcs"] = np }
+                        }
                     }
                     parts == listOf("bots") -> JSONArray().apply {
                         bots.values.forEach { b -> add(JSONObject().apply { this["name"] = b.name; this["online"] = b.player?.isActive == true }) }
