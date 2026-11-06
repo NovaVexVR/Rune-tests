@@ -16,6 +16,7 @@ export const PLACES = {
     draynorTrees: { x: 3087, y: 3244 },
     swampFish: { x: 3243, y: 3151 },
     swampMine: { x: 3229, y: 3148 },
+    furnace: { x: 3226, y: 3254 },
     farmers: { x: 3228, y: 3293 }
 };
 
@@ -193,6 +194,50 @@ export const TASKS = [
                     continue;
                 }
                 const rock = bot.nearestScenery(l => l.ops.includes('Mine') && /rocks/i.test(l.name));
+                if (!rock) { await bot.walkTo(PLACES.swampMine.x + rand(-5, 5), PLACES.swampMine.y + rand(-5, 5), { tol: 2 }); continue; }
+                await gatherOnce(bot, rock, 'Mine', 'scenery', 30);
+            }
+        }
+    },
+    {
+        // mine copper and tin in pairs at the swamp, smelt bronze bars at the Lumbridge furnace, bank the bars
+        id: 'smelt',
+        skills: ['smithing', 'mining'],
+        canRun: bot => ['Bronze pickaxe', 'Iron pickaxe', 'Steel pickaxe'].some(a => bot.has(a)) || 'need a pickaxe',
+        async run(bot, until) {
+            const COPPER = [11936, 11937, 11938], TIN = [11933, 11934, 11935]; // the rocks' ore shows in their colour
+            const n = name => bot.s.inv.filter(i => i.name === name).reduce((t, i) => t + i.count, 0);
+            while (now() < until) {
+                const s = await bot.state(12);
+                if (await bot.handleInterrupts()) continue;
+                const cu = n('Copper ore'), sn = n('Tin ore');
+                if (s.invFree <= 1 || (cu >= 6 && sn >= 6)) {
+                    if (Math.min(cu, sn) > 0) {
+                        await bot.walkTo(PLACES.furnace.x, PLACES.furnace.y, { tol: 2 });
+                        // the bar menu opens in the chatbox (311); "make 1" (button 16) is the one that works here, so repeat it
+                        for (let i = 0; i < 40 && Math.min(n('Copper ore'), n('Tin ore')) > 0; i++) {
+                            const st = await bot.state(6);
+                            if (st.iface === 311 || st.chatbox === 311) { await bot.act({ type: 'button', iface: 311, child: 16 }); await bot.wait(5); continue; }
+                            const f = bot.nearestScenery(l => l.name === 'Furnace' && l.ops.includes('Smelt'));
+                            if (!f) break;
+                            await bot.act({ type: 'scenery', x: f.x, y: f.y, id: f.id, op: 'Smelt' });
+                            await bot.waitIdle({ timeout: 10, cond: x => x.iface === 311 || x.chatbox === 311 });
+                        }
+                        await bot.closeInterfaces();
+                        bot.log(`smelted: ${n('Bronze bar')} bronze bars`);
+                    }
+                    await bot.state(5);
+                    if (n('Bronze bar') >= 10 || bot.s.invFree <= 2) {
+                        if (await bot.openBank()) { await bot.depositAll(i => /^Bronze bar$|ore$/.test(i.name)); await bot.leaveBank(); }
+                    }
+                    await bot.walkTo(PLACES.swampMine.x, PLACES.swampMine.y, { tol: 6 });
+                    continue;
+                }
+                const want = cu <= sn ? COPPER : TIN;
+                let rock = bot.nearestScenery(l => l.ops.includes('Mine') && want.includes(l.id));
+                // the ore we're short of is mined out: wait for it to respawn rather than pile up the other one
+                if (!rock && Math.abs(cu - sn) >= 2) { await bot.wait(4); continue; }
+                rock ??= bot.nearestScenery(l => l.ops.includes('Mine') && [...COPPER, ...TIN].includes(l.id));
                 if (!rock) { await bot.walkTo(PLACES.swampMine.x + rand(-5, 5), PLACES.swampMine.y + rand(-5, 5), { tol: 2 }); continue; }
                 await gatherOnce(bot, rock, 'Mine', 'scenery', 30);
             }

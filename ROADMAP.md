@@ -121,5 +121,5 @@ Bots handle random events as players do; each type is enabled for bots once its 
 
 ## Also planned (from earlier)
 - **Grand Exchange:** *(done)* bot API support for the GE offer screen (`geitem` action, `ge`/`geScreen` state, `geOffer`/`geCollect`/`geAbort` in lib.mjs); bot offers match each other and move the GE price index.
-- **More training:** fly fishing, iron mining, smithing, leather crafting, oak/willow bows, agility, as the guides recommend.
+- **More training:** smelting bronze bars *(done: `smelt` task)*; still to do: smithing at the Varrock anvils, fly fishing, iron mining, leather crafting, oak/willow bows, agility, as the guides recommend.
 - **Run locally:** *(done)* `2009scape/launch.mjs`, one launcher for Windows/Linux/macOS (setup, build, server, bots, clean stop). Tested on Linux; not yet on Windows.

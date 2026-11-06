@@ -386,7 +386,7 @@ export class Bot {
             await this.wait(2);
             return true;
         }
-        if (s.dialog && s.chatbox !== 372) {
+        if (s.dialog && ![372, 311].includes(s.chatbox)) { // 311: the furnace bar menu, left to the smelting task
             if (s.dialog.options.length) {
                 const want = answer ? s.dialog.options.find(o => answer.test(o)) : null;
                 const o = want ?? s.dialog.options.find(o => /^(yes|okay|ok|sure|i'll|continue)/i.test(o)) ?? s.dialog.options[0];
