@@ -51,7 +51,7 @@ Last session's container had everything under `/home/user`; a new one starts emp
 
 **Live 50-bot market day (12:55):** 31 bots travelled to the GE, shouted and called for wants; no haggled deals because everyone wanted knives/tinderboxes and nobody had spares. Expected with fresh characters.
 
-**New training task `smelt`:** mine copper and tin in pairs at the Lumbridge swamp (rock ids tell the ore: copper 11936-11938, tin 11933-11935; wait for the scarce one to respawn), smelt bronze bars at the Lumbridge furnace (the bar menu is chatbox 311; only "make 1", button 16, works here), bank the bars. Bronze bars are tradeable goods now.
+**New training task `smelt`:** mine copper and tin in pairs at the Lumbridge swamp (rock ids tell the ore: copper 11936-11938, tin 11933-11935; wait for the scarce one to respawn), smelt bronze bars at the Lumbridge furnace (the bar menu is chatbox 311; only "make 1", button 16, works here), bank the bars. Bronze bars are tradeable goods now. **`smith`:** takes the bars from the Lumbridge bank to the Varrock west anvils (planned safe route), smiths bronze daggers (anvil menu 300, button 24 = make 1), banks them at home. Verified: 8 daggers, Smithing 1 -> 2, all banked.
 
 **Fixed:** fish_cook bots fetched firewood from the Draynor trees, next to the dark wizards (most fleet deaths). Every walk over 60 tiles now goes by the danger-avoiding route planner.
 

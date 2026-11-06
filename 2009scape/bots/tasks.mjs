@@ -17,6 +17,7 @@ export const PLACES = {
     swampFish: { x: 3243, y: 3151 },
     swampMine: { x: 3229, y: 3148 },
     furnace: { x: 3226, y: 3254 },
+    varrockAnvils: { x: 3187, y: 3423, anvil: { x: 3188, y: 3424 } },
     farmers: { x: 3228, y: 3293 }
 };
 
@@ -240,6 +241,40 @@ export const TASKS = [
                 rock ??= bot.nearestScenery(l => l.ops.includes('Mine') && [...COPPER, ...TIN].includes(l.id));
                 if (!rock) { await bot.walkTo(PLACES.swampMine.x + rand(-5, 5), PLACES.swampMine.y + rand(-5, 5), { tol: 2 }); continue; }
                 await gatherOnce(bot, rock, 'Mine', 'scenery', 30);
+            }
+        }
+    },
+    {
+        // take bronze bars from the bank to the Varrock west anvils, smith daggers, bring them home to the bank
+        id: 'smith',
+        skills: ['smithing'],
+        canRun: bot => !bot.has('Hammer') ? 'need a hammer' : (bot.has('Bronze bar') || bot.s.bank?.some(i => i.name === 'Bronze bar') ? true : 'need bronze bars'),
+        async run(bot, until) {
+            const n = name => bot.s.inv.filter(i => i.name === name).reduce((t, i) => t + i.count, 0);
+            while (now() < until) {
+                await bot.state(10);
+                if (!n('Bronze bar')) {
+                    if (!(await bot.openBank())) return;
+                    await bot.depositAll(i => !/^Hammer$/.test(i.name));
+                    if (!bot.s.bank?.some(i => i.name === 'Bronze bar')) { await bot.leaveBank(); return; }
+                    await bot.withdraw('Bronze bar', 26);
+                    await bot.leaveBank();
+                    if (!n('Bronze bar')) return;
+                }
+                const A = PLACES.varrockAnvils;
+                if (!(await bot.travel(A.x, A.y, { tol: 2 }))) return;
+                for (let i = 0; i < 60 && n('Bronze bar') && now() < until + 5 * 60_000; i++) {
+                    const st = await bot.state(6);
+                    if (await bot.handleInterrupts()) continue;
+                    if (st.iface === 300) { await bot.act({ type: 'button', iface: 300, child: 24 }); await bot.wait(5); continue; } // bronze dagger, make 1
+                    const bar = st.inv.find(x => x.name === 'Bronze bar');
+                    if (!bar) break; // all smithed
+                    await bot.act({ type: 'useitem', slot: bar.slot, x: A.anvil.x, y: A.anvil.y }).catch(e => bot.log(`smith: ${e.message}`));
+                    await bot.waitIdle({ timeout: 10, cond: x => x.iface === 300 });
+                }
+                await bot.closeInterfaces();
+                bot.log(`smithed ${n('Bronze dagger')} bronze daggers; heading home to bank them`);
+                if (await bot.openBank()) { await bot.depositAll(i => !/^Hammer$/.test(i.name)); await bot.leaveBank(); }
             }
         }
     },

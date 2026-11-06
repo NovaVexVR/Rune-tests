@@ -49,12 +49,13 @@ export const TASK_NEEDS = {
     fish_cook: [['Small fishing net'], ['Tinderbox']],
     mine: [['Bronze pickaxe', 'Iron pickaxe', 'Steel pickaxe']],
     smelt: [['Bronze pickaxe', 'Iron pickaxe', 'Steel pickaxe']],
+    smith: [['Hammer']],
     ranged: [['Shortbow'], ['Bronze arrow']],
     magic: [['Air rune'], ['Mind rune']],
     fletch: [['Knife'], ['Bronze axe', 'Iron axe', 'Steel axe']]
 };
-const TRADEABLE = new Set(['Hammer', 'Sardine', 'Herring', 'Trout', 'Bread', 'Cooked chicken', 'Cooked meat', ...Object.values(COLLECTIONS).flat(), ...Object.values(TASK_NEEDS).flat(2), 'Copper ore', 'Tin ore', 'Iron ore', 'Bronze bar', 'Logs', 'Oak logs', 'Willow logs', 'Shrimps', 'Anchovies', 'Bones', 'Feather', 'Cowhide']);
-const STORE_FALLBACK = { 'Small fishing net': 5, 'Bronze axe': 16, 'Bronze pickaxe': 1, Tinderbox: 1, Shortbow: 50, 'Bronze arrow': 1, 'Air rune': 4, 'Mind rune': 3, 'Copper ore': 3, 'Tin ore': 3, 'Iron ore': 17, 'Bronze bar': 8, Logs: 4, 'Oak logs': 20, 'Willow logs': 32, Shrimps: 5, Anchovies: 15, Bones: 1, Feather: 2, Cowhide: 1 };
+const TRADEABLE = new Set(['Hammer', 'Sardine', 'Herring', 'Trout', 'Bread', 'Cooked chicken', 'Cooked meat', ...Object.values(COLLECTIONS).flat(), ...Object.values(TASK_NEEDS).flat(2), 'Copper ore', 'Tin ore', 'Iron ore', 'Bronze bar', 'Bronze dagger', 'Logs', 'Oak logs', 'Willow logs', 'Shrimps', 'Anchovies', 'Bones', 'Feather', 'Cowhide']);
+const STORE_FALLBACK = { 'Small fishing net': 5, 'Bronze axe': 16, 'Bronze pickaxe': 1, Tinderbox: 1, Shortbow: 50, 'Bronze arrow': 1, 'Air rune': 4, 'Mind rune': 3, 'Copper ore': 3, 'Tin ore': 3, 'Iron ore': 17, 'Bronze bar': 8, 'Bronze dagger': 10, Logs: 4, 'Oak logs': 20, 'Willow logs': 32, Shrimps: 5, Anchovies: 15, Bones: 1, Feather: 2, Cowhide: 1 };
 
 export class Market {
     constructor(log = console.log) {
