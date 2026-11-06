@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { Bot, LOG_DIR, rand, sleep, summary } from './lib.mjs';
-import { TASKS, RESUPPLY, shopFor } from './tasks.mjs';
+import { TASKS, RESUPPLY, shopFor, prepare } from './tasks.mjs';
 import { TASK_NEEDS } from './market.mjs';
 
 const COUNT = Number(process.argv[2] ?? 5);
@@ -50,7 +50,7 @@ async function runBot(name, startDelay) {
             bot.log(`task -> ${task.id} for ${minutes}m | ${summary(bot.s)}`);
             const shopping = task.canRun(bot) === true ? null : buyableNeeds(bot, task);
             if (shopping) { bot.log(`buying ${shopping.join(', ')} for ${task.id}`); await RESUPPLY.run(bot, Date.now() + 10 * 60_000, shopping); }
-            if (task.canRun(bot) === true) await task.run(bot, Date.now() + minutes * 60_000);
+            if (task.canRun(bot) === true) { await prepare(bot, task.id); await task.run(bot, Date.now() + minutes * 60_000); }
             lastId = task.id;
             await bot.state(1);
             fs.appendFileSync(PROGRESS, JSON.stringify({ t: Date.now(), bot: name, kind: 'scripted', task: task.id, total: bot.s.totalLevel, combat: bot.s.combat, x: bot.s.x, y: bot.s.y, stats: Object.fromEntries(Object.entries(bot.s.stats).map(([k, v]) => [k, v.level])) }) + '\n');

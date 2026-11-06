@@ -50,12 +50,16 @@ export const TASK_NEEDS = {
     mine: [['Bronze pickaxe', 'Iron pickaxe', 'Steel pickaxe']],
     smelt: [['Bronze pickaxe', 'Iron pickaxe', 'Steel pickaxe']],
     smith: [['Hammer']],
+    // fighters want armour (any helm, body, shield of metal; the first is what they ask for)
+    melee: [['Bronze med helm', 'Bronze full helm', 'Iron med helm', 'Iron full helm', 'Steel med helm', 'Steel full helm'],
+        ['Bronze chainbody', 'Bronze platebody', 'Iron chainbody', 'Iron platebody', 'Steel chainbody', 'Steel platebody'],
+        ['Bronze sq shield', 'Bronze kiteshield', 'Iron sq shield', 'Iron kiteshield', 'Steel sq shield', 'Steel kiteshield']],
     ranged: [['Shortbow'], ['Bronze arrow']],
     magic: [['Air rune'], ['Mind rune']],
     fletch: [['Knife'], ['Bronze axe', 'Iron axe', 'Steel axe']]
 };
-const TRADEABLE = new Set(['Hammer', 'Sardine', 'Herring', 'Trout', 'Bread', 'Cooked chicken', 'Cooked meat', ...Object.values(COLLECTIONS).flat(), ...Object.values(TASK_NEEDS).flat(2), 'Copper ore', 'Tin ore', 'Iron ore', 'Bronze bar', 'Bronze dagger', 'Logs', 'Oak logs', 'Willow logs', 'Shrimps', 'Anchovies', 'Bones', 'Feather', 'Cowhide']);
-const STORE_FALLBACK = { 'Small fishing net': 5, 'Bronze axe': 16, 'Bronze pickaxe': 1, Tinderbox: 1, Shortbow: 50, 'Bronze arrow': 1, 'Air rune': 4, 'Mind rune': 3, 'Copper ore': 3, 'Tin ore': 3, 'Iron ore': 17, 'Bronze bar': 8, 'Bronze dagger': 10, Logs: 4, 'Oak logs': 20, 'Willow logs': 32, Shrimps: 5, Anchovies: 15, Bones: 1, Feather: 2, Cowhide: 1 };
+const TRADEABLE = new Set(['Hammer', 'Sardine', 'Herring', 'Trout', 'Bread', 'Cooked chicken', 'Cooked meat', ...Object.values(COLLECTIONS).flat(), ...Object.values(TASK_NEEDS).flat(2), 'Copper ore', 'Tin ore', 'Iron ore', 'Bronze bar', 'Bronze dagger', 'Bronze med helm', 'Bronze full helm', 'Bronze sq shield', 'Bronze chainbody', 'Bronze kiteshield', 'Bronze platelegs', 'Bronze platebody', 'Logs', 'Oak logs', 'Willow logs', 'Shrimps', 'Anchovies', 'Bones', 'Feather', 'Cowhide']);
+const STORE_FALLBACK = { 'Small fishing net': 5, 'Bronze axe': 16, 'Bronze pickaxe': 1, Tinderbox: 1, Shortbow: 50, 'Bronze arrow': 1, 'Air rune': 4, 'Mind rune': 3, 'Copper ore': 3, 'Tin ore': 3, 'Iron ore': 17, 'Bronze bar': 8, 'Bronze dagger': 10, 'Bronze med helm': 24, 'Bronze full helm': 44, 'Bronze sq shield': 48, 'Bronze chainbody': 60, 'Bronze kiteshield': 68, 'Bronze platelegs': 80, 'Bronze platebody': 160, Logs: 4, 'Oak logs': 20, 'Willow logs': 32, Shrimps: 5, Anchovies: 15, Bones: 1, Feather: 2, Cowhide: 1 };
 
 export class Market {
     constructor(log = console.log) {

@@ -9,7 +9,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { Bot, LOG_DIR, sleep, summary } from './lib.mjs';
-import { taskById, RESUPPLY } from './tasks.mjs';
+import { taskById, RESUPPLY, prepare } from './tasks.mjs';
 import { Market, TEAMS } from './market.mjs';
 import { personalityOf, SPOTS } from './social.mjs';
 import { council, STATE as POLITICS } from './politics.mjs';
@@ -117,6 +117,7 @@ async function runBot(name, delay) {
                 continue;
             }
             bot.log(`[plan step ${step}] ${item.task} for ${item.minutes}m — ${item.why ?? ''} | ${summary(bot.s)}`);
+            await prepare(bot, item.task);
             await task.run(bot, marketDay.deadline(name, Date.now() + (item.minutes ?? 15) * 60_000));
             writeStep(name, step + 1);
             // habit: now and then, drift to a favorite spot between tasks

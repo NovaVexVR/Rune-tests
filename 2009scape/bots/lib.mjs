@@ -20,6 +20,28 @@ export const RANDOM_EVENTS = process.env.BOT_EVENTS != null
     ? process.env.BOT_EVENTS.split(',').map(e => e.trim().toUpperCase()).filter(e => e && e !== 'NONE')
     : ['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE', 'STRANGE_PLANT', 'SANDWICH_LADY', 'CERTER', 'DRILL_DEMON', 'FREAKY_FORESTER', 'MAZE',
        'EVIL_CHICKEN', 'RIVER_TROLL', 'ROCK_GOLEM', 'SHADE', 'SWARM', 'TREE_SPIRIT', 'ZOMBIE'];
+// ---- gear: which slot an item goes in, and how good it is (metal tier x 10 + the piece's rank within its slot) ----
+const TIERS = ['bronze', 'iron', 'steel', 'black', 'mithril', 'adamant', 'rune', 'dragon'];
+const GEAR_SLOTS = [
+    ['weapon', /(2h sword|scimitar|longsword|battleaxe|warhammer|sword|mace|dagger)$/i, ['dagger', 'mace', 'sword', 'warhammer', 'battleaxe', 'longsword', 'scimitar', '2h sword']],
+    ['head', /(full helm|med helm|helmet|helm|coif|hat)$/i, ['hat', 'helmet', 'coif', 'med helm', 'full helm']],
+    ['body', /(platebody|chainbody|body|top)$/i, ['top', 'body', 'chainbody', 'platebody']],
+    ['legs', /(platelegs|plateskirt|chaps|legs|bottoms)$/i, ['bottoms', 'chaps', 'legs', 'plateskirt', 'platelegs']],
+    ['shield', /(kiteshield|sq shield|shield)$/i, ['shield', 'sq shield', 'kiteshield']],
+    ['hands', /(gloves|vambraces)$/i, ['gloves', 'vambraces']],
+    ['feet', /boots$/i, ['boots']]
+];
+export function gearInfo(name) {
+    const n = name.toLowerCase();
+    for (const [slot, re, ranks] of GEAR_SLOTS) {
+        if (!re.test(n)) continue;
+        if (/pickaxe|hatchet|^.* axe$/.test(n) && slot === 'weapon') return null; // tools, not weapons
+        const tier = TIERS.findIndex(t => n.startsWith(t)) + 1; // 0: leather, wood, cloth, event rewards
+        const rank = ranks.reduce((best, r, i) => (n.endsWith(r) ? i : best), 0); // the most specific match (platebody over body)
+        return { slot, score: tier * 10 + rank };
+    }
+    return null;
+}
 // random events: the Sandwich Lady's tray (interface 297) and the Certer's decoy captions (interface 184)
 const SANDWICH_BUTTON = { baguette: 7, 'triangle sandwich': 8, 'square sandwich': 9, sandwich: 9, roll: 10, 'meat pie': 11, kebab: 12, 'chocolate bar': 13 };
 const CERTER_DECOYS = ['an axe', 'an arrow', 'a pair of boots', 'a pair of gloves', 'a staff', 'a bow', 'a feather', 'the disenfr'];
@@ -342,6 +364,50 @@ export class Bot {
         await this.act({ type: 'item', slot: lamp.slot, op: 'Rub' });
         await this.wait(2);
         return true;
+    }
+
+    // Wear the best gear the bot carries, slot by slot (weapons too unless `weapon: false`, e.g. for ranged).
+    // Items it isn't high enough level to wear are remembered and not tried again.
+    async gearUp({ weapon = true } = {}) {
+        this._cantWear ??= new Set();
+        let s = await this.state(1);
+        let changed = 0;
+        for (let pass = 0; pass < 7; pass++) {
+            const worn = Object.fromEntries(s.worn.map(i => [gearInfo(i.name)?.slot, gearInfo(i.name)?.score ?? -1]));
+            const best = s.inv
+                .filter(i => i.ops.some(o => /^(wield|wear)$/i.test(o)) && !this._cantWear.has(i.name))
+                .map(i => ({ i, g: gearInfo(i.name) }))
+                .filter(({ g }) => g && (weapon || g.slot !== 'weapon') && g.score > (worn[g.slot] ?? -1))
+                .sort((a, b) => b.g.score - a.g.score)[0];
+            if (!best) break;
+            const op = best.i.ops.find(o => /^(wield|wear)$/i.test(o));
+            await this.act({ type: 'item', slot: best.i.slot, op });
+            await this.wait(2);
+            s = await this.state(1);
+            if (s.inv.some(i => i.slot === best.i.slot && i.name === best.i.name)) { this._cantWear.add(best.i.name); continue; } // too low a level
+            this.log(`gear: now wearing ${best.i.name}`);
+            changed++;
+        }
+        return changed;
+    }
+
+    // Carry some food: top up from the bank when there's food banked. Returns how much food the bot has.
+    async ensureFood(n = 4) {
+        let s = await this.state(1);
+        const have = () => this.s.inv.filter(i => FOOD.includes(i.name)).reduce((t, i) => t + i.count, 0);
+        if (have() >= n) return have();
+        const banked = (s.bank ?? []).filter(i => FOOD.includes(i.name) && i.name !== this.favoriteFood);
+        if (!banked.length || s.invFree < 2) return have();
+        if (!(await this.openBank())) return have();
+        for (const f of banked) {
+            if (have() >= n) break;
+            const want = Math.min(n - have(), f.count, this.s.invFree);
+            await this.withdraw(f.name, want >= 5 ? 5 : 1);
+            if (want > 1 && want < 5) for (let k = 1; k < want; k++) await this.withdraw(f.name, 1);
+        }
+        await this.leaveBank();
+        this.log(`food: carrying ${have()}`);
+        return have();
     }
 
     // Level-ups, dialogs, random events, low HP. Returns true if it did something.

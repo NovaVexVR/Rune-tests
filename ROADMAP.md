@@ -119,6 +119,10 @@ Bots handle random events as players do; each type is enabled for bots once its 
 - A kill costs the killer trust with everyone and may get it expelled from its team; friends of the victim post a bounty on the killer.
 - Global cap on wilderness fights per in-game day, and a cooldown per bot.
 
+## Gear and supplies *(started)*
+- Bots wear the best gear they have before each task, and fighters carry food from the bank *(done)*.
+- Smiths make bronze armour by level and fighters buy it through the market *(done)*; next: iron/steel bars and armour, buying armour at Varrock's armour shops, and food for bots with an empty bank (buy, fish, or ask teammates).
+
 ## Also planned (from earlier)
 - **Grand Exchange:** *(done)* bot API support for the GE offer screen (`geitem` action, `ge`/`geScreen` state, `geOffer`/`geCollect`/`geAbort` in lib.mjs); bot offers match each other and move the GE price index.
 - **More training:** smelting bronze bars and smithing daggers at the Varrock anvils *(done: `smelt`, `smith`)*; still to do: fly fishing, iron mining, leather crafting, oak/willow bows, agility, as the guides recommend.

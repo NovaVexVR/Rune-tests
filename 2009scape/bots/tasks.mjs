@@ -21,6 +21,28 @@ export const PLACES = {
     farmers: { x: 3228, y: 3293 }
 };
 
+// bronze pieces a smith can make (smithing level, bars, the anvil menu's 'make 1' button), best first
+export const BRONZE_PIECES = [
+    { name: 'Bronze platebody', lvl: 18, bars: 5, button: 248 },
+    { name: 'Bronze platelegs', lvl: 16, bars: 3, button: 240 },
+    { name: 'Bronze kiteshield', lvl: 12, bars: 3, button: 208 },
+    { name: 'Bronze chainbody', lvl: 11, bars: 3, button: 200 },
+    { name: 'Bronze sq shield', lvl: 8, bars: 2, button: 160 },
+    { name: 'Bronze full helm', lvl: 7, bars: 2, button: 152 },
+    { name: 'Bronze med helm', lvl: 3, bars: 1, button: 48 },
+    { name: 'Bronze dagger', lvl: 1, bars: 1, button: 24 }
+];
+
+// what a bot keeps on it when it banks: its tools and some food
+const KEEP = name => /pickaxe$|(^| )axe$|^Hammer$|^Tinderbox$|^Small fishing net$|^Knife$|^Chisel$|^Shears$/.test(name) || FOOD.includes(name);
+
+// Before any task: wear the best gear carried (no melee weapon swap for ranged/magic), and fighters
+// and thieves carry some food from the bank.
+export async function prepare(bot, taskId) {
+    await bot.gearUp({ weapon: !['ranged', 'magic'].includes(taskId) }).catch(() => {});
+    if (['melee', 'ranged', 'magic', 'thieving'].includes(taskId)) await bot.ensureFood(4).catch(() => {});
+}
+
 export const SHOPS = {
     bob: { x: 3229, y: 3203, npcs: ['Bob'], sells: { 'Bronze axe': 16, 'Bronze pickaxe': 1, 'Iron axe': 56, 'Steel axe': 200 } },
     general: { x: 3216, y: 3241, npcs: ['Shopkeeper', 'Shop assistant'], sells: { Tinderbox: 1, Hammer: 1, Chisel: 1, Bucket: 2, 'Empty pot': 1 } }
@@ -166,7 +188,13 @@ export const TASKS = [
                     const food = bot.inv(i => FOOD.includes(i.name));
                     // keep extra cooked food when someone has posted a food bounty we could fill
                     const wantedFood = bot.market ? bot.market.social.openBounties().filter(b => FOOD.includes(b.item) && b.poster !== bot.name).reduce((t, b) => t + b.qty, 0) : 0;
-                    for (const f of food.slice(6 + wantedFood)) { await bot.act({ type: 'item', slot: f.slot, op: 'Drop' }); await bot.wait(1); }
+                    // keep 6 (plus any wanted for a bounty); bank the rest as a reserve for fights and for teammates
+                    if (food.length > 8 + wantedFood && (await bot.openBank())) {
+                        const keep = new Set(food.slice(0, 6 + wantedFood).map(f => f.slot));
+                        for (const f of food.filter(f => !keep.has(f.slot))) { await bot.act({ type: 'deposit', slot: f.slot, amount: 1 }).catch(() => {}); await bot.wait(1); }
+                        await bot.leaveBank();
+                        await bot.walkTo(spot.x, spot.y, { tol: 5 });
+                    } else for (const f of food.slice(6 + wantedFood)) { await bot.act({ type: 'item', slot: f.slot, op: 'Drop' }); await bot.wait(1); }
                     await bot.state();
                     await bot.dropAll(i => /^(Burnt|Raw)/.test(i.name));
                     await bot.walkTo(spot.x, spot.y, { tol: 5 });
@@ -208,6 +236,15 @@ export const TASKS = [
         async run(bot, until) {
             const COPPER = [11936, 11937, 11938], TIN = [11933, 11934, 11935]; // the rocks' ore shows in their colour
             const n = name => bot.s.inv.filter(i => i.name === name).reduce((t, i) => t + i.count, 0);
+            // ore already in the bank comes first
+            await bot.state(5);
+            const bankOre = x => bot.s.bank?.find(i => i.name === x)?.count ?? 0;
+            if (Math.min(bankOre('Copper ore'), bankOre('Tin ore')) >= 3 && (await bot.openBank())) {
+                await bot.depositAll(i => /^Bronze bar$|ore$/.test(i.name));
+                await bot.withdraw('Copper ore', 10);
+                await bot.withdraw('Tin ore', 10);
+                await bot.leaveBank();
+            }
             while (now() < until) {
                 const s = await bot.state(12);
                 if (await bot.handleInterrupts()) continue;
@@ -255,7 +292,7 @@ export const TASKS = [
                 await bot.state(10);
                 if (!n('Bronze bar')) {
                     if (!(await bot.openBank())) return;
-                    await bot.depositAll(i => !/^Hammer$/.test(i.name));
+                    await bot.depositAll(i => !KEEP(i.name));
                     if (!bot.s.bank?.some(i => i.name === 'Bronze bar')) { await bot.leaveBank(); return; }
                     await bot.withdraw('Bronze bar', 26);
                     await bot.leaveBank();
@@ -263,18 +300,23 @@ export const TASKS = [
                 }
                 const A = PLACES.varrockAnvils;
                 if (!(await bot.travel(A.x, A.y, { tol: 2 }))) return;
+                // what to make: the best armour piece its level and bars allow that it doesn't own yet (it wears its own,
+                // the rest go to the bank as goods for fighters), else daggers for the practice
+                const owned = name => bot.has(name) || bot.s.bank?.some(i => i.name === name);
+                const lvl = bot.lvl('smithing');
+                const pick = () => BRONZE_PIECES.find(p => lvl >= p.lvl && n('Bronze bar') >= p.bars && (!owned(p.name) || p.name === 'Bronze dagger')) ?? BRONZE_PIECES.at(-1);
                 for (let i = 0; i < 60 && n('Bronze bar') && now() < until + 5 * 60_000; i++) {
                     const st = await bot.state(6);
                     if (await bot.handleInterrupts()) continue;
-                    if (st.iface === 300) { await bot.act({ type: 'button', iface: 300, child: 24 }); await bot.wait(5); continue; } // bronze dagger, make 1
+                    if (st.iface === 300) { const p = pick(); await bot.act({ type: 'button', iface: 300, child: p.button }); await bot.wait(4 + 2 * p.bars); await bot.gearUp(); continue; } // make 1
                     const bar = st.inv.find(x => x.name === 'Bronze bar');
                     if (!bar) break; // all smithed
                     await bot.act({ type: 'useitem', slot: bar.slot, x: A.anvil.x, y: A.anvil.y }).catch(e => bot.log(`smith: ${e.message}`));
                     await bot.waitIdle({ timeout: 10, cond: x => x.iface === 300 });
                 }
                 await bot.closeInterfaces();
-                bot.log(`smithed ${n('Bronze dagger')} bronze daggers; heading home to bank them`);
-                if (await bot.openBank()) { await bot.depositAll(i => !/^Hammer$/.test(i.name)); await bot.leaveBank(); }
+                bot.log(`smithed: ${bot.s.inv.filter(i => /^Bronze (?!bar)/.test(i.name)).map(i => i.name).join(', ')}; heading home to bank them`);
+                if (await bot.openBank()) { await bot.depositAll(i => !KEEP(i.name)); await bot.leaveBank(); }
             }
         }
     },
@@ -284,7 +326,7 @@ export const TASKS = [
         canRun: () => true,
         async run(bot, until) {
             await bot.state();
-            for (const g of ['Bronze sword', 'Wooden shield']) if (bot.inv(g).length) await bot.equip(g);
+            await bot.gearUp(); // best weapon, shield and armour it carries
             const atk = bot.lvl('attack'), str = bot.lvl('strength'), def = bot.lvl('defence');
             // melee guide: prioritise Strength, keep Attack within ~5 levels, Defence last
             const style = str <= atk + 4 && str < def + 15 ? 1 : atk < str - 4 ? 0 : def + 10 < Math.min(atk, str) ? 3 : 1;
