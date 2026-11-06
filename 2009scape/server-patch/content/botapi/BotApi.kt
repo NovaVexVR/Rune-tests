@@ -126,7 +126,7 @@ object BotRegistry {
      * since bots open those on the way. Tiles inside `avoid` circles (x, y, radius) are off limits.
      * Returns waypoints about 14 tiles apart and the doors on the way.
      */
-    fun planRoute(fx: Int, fy: Int, tx: Int, ty: Int, z: Int, avoid: List<List<Int>>, solid: Set<Int> = emptySet()): JSONObject {
+    fun planRoute(fx: Int, fy: Int, tx: Int, ty: Int, z: Int, avoid: List<List<Int>>, solid: Set<Int> = emptySet(), step: Int = 14): JSONObject {
         val margin = 60
         val x0 = minOf(fx, tx) - margin; val y0 = minOf(fy, ty) - margin
         val w = maxOf(fx, tx) + margin - x0 + 1; val h = maxOf(fy, ty) + margin - y0 + 1
@@ -134,12 +134,15 @@ object BotRegistry {
         val flags = IntArray(w * h) { i -> RegionManager.getClippingFlag(z, x0 + i % w, y0 + i / w) }
         val banned = BooleanArray(w * h) { i -> val x = x0 + i % w; val y = y0 + i / w; avoid.any { (ax, ay, r) -> maxOf(Math.abs(x - ax), Math.abs(y - ay)) <= r } }
         val doorCache = HashMap<Int, Boolean>()
-        // a door: any wall-type object (doors, gates, the maze's walls) on the tile that can be opened
-        fun door(x: Int, y: Int): Boolean = doorCache.getOrPut(x * 65536 + y) {
+        // doors: openable straight-wall objects (doors, gates, the maze's real doors), by tile and the edge they sit on
+        // (rotation 0 west, 1 north, 2 east, 3 south). `door(x, y)` = any door on the tile; `doorOn(x, y, side)` = one on that edge.
+        fun doorsAt(x: Int, y: Int): List<core.game.node.scenery.Scenery> {
             val loc = core.game.world.map.Location(x, y, z)
-            val here = RegionManager.getRegionChunk(loc).objects?.getOrNull(loc.chunkOffsetX)?.getOrNull(loc.chunkOffsetY) ?: return@getOrPut false
-            here.any { o -> o != null && o.isRenderable && o.id !in solid && (o.type in 0..3 || o.type == 9) && o.definition.options?.any { it != null && it.equals("Open", true) } == true }
+            val here = RegionManager.getRegionChunk(loc).objects?.getOrNull(loc.chunkOffsetX)?.getOrNull(loc.chunkOffsetY) ?: return emptyList()
+            return here.filterNotNull().filter { o -> o.isRenderable && o.id !in solid && o.type == 0 && o.definition.options?.any { it != null && it.equals("Open", true) } == true }
         }
+        fun door(x: Int, y: Int): Boolean = doorCache.getOrPut(x * 65536 + y) { doorsAt(x, y).isNotEmpty() }
+        fun doorOn(x: Int, y: Int, side: Int): Boolean = door(x, y) && doorsAt(x, y).any { it.rotation == side }
         fun f(x: Int, y: Int) = if (x < x0 || y < y0 || x >= x0 + w || y >= y0 + h) -1 else flags[(y - y0) * w + (x - x0)]
         val dirs = arrayOf(intArrayOf(0, -1, 0x12c0102), intArrayOf(-1, 0, 0x12c0108), intArrayOf(0, 1, 0x12c0120), intArrayOf(1, 0, 0x12c0180),
             intArrayOf(-1, -1, 0x12c010e), intArrayOf(-1, 1, 0x12c0138), intArrayOf(1, -1, 0x12c0183), intArrayOf(1, 1, 0x12c01e0))
@@ -164,7 +167,10 @@ object BotRegistry {
                 if (ok && d[0] != 0 && d[1] != 0) ok = f(nx, cy) and dirs[if (d[0] < 0) 1 else 3][2] == 0 && f(cx, ny) and dirs[if (d[1] < 0) 0 else 2][2] == 0
                 // a wall with a door/gate in it (orthogonal steps only; solid objects stay blocked)
                 var opened = false
-                if (!ok && (d[0] == 0 || d[1] == 0) && fl and 0x100 == 0 && fl and 0x200000 == 0 && (door(nx, ny) || door(cx, cy))) { ok = true; opened = true; doorsUsed++ }
+                if (!ok && (d[0] == 0 || d[1] == 0) && fl and 0x100 == 0 && fl and 0x200000 == 0) {
+                    val side = if (d[0] < 0) 0 else if (d[1] > 0) 1 else if (d[0] > 0) 2 else 3 // the edge we cross, seen from the current tile
+                    if (doorOn(cx, cy, side) || doorOn(nx, ny, (side + 2) % 4)) { ok = true; opened = true; doorsUsed++ }
+                }
                 if (!ok) continue
                 prev[ni] = cur
                 viaDoor[ni] = opened
@@ -197,10 +203,11 @@ object BotRegistry {
                 val from = if (k == 0) start else tiles[k - 1]
                 val fx2 = x0 + from % w; val fy2 = y0 + from / w
                 if (from != last) emit(from, null)
-                val d = if (door(x, y)) JSONArray().apply { add(x); add(y) } else JSONArray().apply { add(fx2); add(fy2) }
+                val side = if (x < fx2) 0 else if (y > fy2) 1 else if (x > fx2) 2 else 3
+                val d = if (doorOn(x, y, (side + 2) % 4)) JSONArray().apply { add(x); add(y) } else JSONArray().apply { add(fx2); add(fy2) }
                 doors.add(d)
                 emit(t, d)
-            } else if (k == tiles.lastIndex || maxOf(Math.abs(x - lx), Math.abs(y - ly)) >= 14) emit(t, null)
+            } else if (k == tiles.lastIndex || maxOf(Math.abs(x - lx), Math.abs(y - ly)) >= step) emit(t, null)
         }
         return JSONObject().apply { this["ok"] = true; this["length"] = tiles.size; this["path"] = way; this["opens"] = opens; this["doors"] = doors }
     }
@@ -685,7 +692,8 @@ object BotRegistry {
                         val z = q["z"]?.toInt() ?: 0
                         val avoid = (q["avoid"] ?: "").split(";").filter { it.isNotBlank() }.map { it.split(",").map { n -> n.trim().toInt() } }
                         val solid = (q["solid"] ?: "").split(",").mapNotNull { it.trim().toIntOrNull() }.toSet() // object ids that look like doors but never open
-                        onGame { planRoute(fx, fy, tx, ty, z, avoid, solid) }
+                        val step = (q["step"]?.toIntOrNull() ?: 14).coerceIn(1, 30) // waypoint spacing (short in mazes)
+                        onGame { planRoute(fx, fy, tx, ty, z, avoid, solid, step) }
                     }
                     // what's around a place: /find?name=dairy cow&x=3250&y=3275[&z=0][&r=30] (scenery and NPCs whose name contains `name`)
                     parts == listOf("find") -> {

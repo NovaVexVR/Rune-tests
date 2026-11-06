@@ -18,7 +18,7 @@ export const FOOD = ['Shrimps', 'Anchovies', 'Bread', 'Cooked chicken', 'Cooked 
 // Sent to the server on every login, so it survives server restarts. Override: BOT_EVENTS=GENIE,ZOMBIE or BOT_EVENTS=none
 export const RANDOM_EVENTS = process.env.BOT_EVENTS != null
     ? process.env.BOT_EVENTS.split(',').map(e => e.trim().toUpperCase()).filter(e => e && e !== 'NONE')
-    : ['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE', 'STRANGE_PLANT', 'SANDWICH_LADY', 'CERTER',
+    : ['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE', 'STRANGE_PLANT', 'SANDWICH_LADY', 'CERTER', 'DRILL_DEMON', 'FREAKY_FORESTER', 'MAZE',
        'EVIL_CHICKEN', 'RIVER_TROLL', 'ROCK_GOLEM', 'SHADE', 'SWARM', 'TREE_SPIRIT', 'ZOMBIE'];
 // random events: the Sandwich Lady's tray (interface 297) and the Certer's decoy captions (interface 184)
 const SANDWICH_BUTTON = { baguette: 7, 'triangle sandwich': 8, 'square sandwich': 9, sandwich: 9, roll: 10, 'meat pie': 11, kebab: 12, 'chocolate bar': 13 };
@@ -307,7 +307,7 @@ export class Bot {
                 let r = null;
                 for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1], [-1, 1], [1, -1]]) {
                     const tx = shrine.x + dx, ty = shrine.y + dy;
-                    const c = await http('GET', `/route?from=${s.x},${s.y}&to=${tx},${ty}&solid=3626${avoid ? '&avoid=' + avoid : ''}`).catch(() => ({ ok: false }));
+                    const c = await http('GET', `/route?from=${s.x},${s.y}&to=${tx},${ty}&solid=3626&step=4${avoid ? '&avoid=' + avoid : ''}`).catch(() => ({ ok: false }));
                     const endp = c.ok && c.path.at(-1);
                     if (endp && endp[0] === tx && endp[1] === ty && (!r || c.length < r.length)) r = c;
                 }

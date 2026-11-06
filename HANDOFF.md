@@ -54,7 +54,7 @@ Last session's container had everything under `/home/user`; a new one starts emp
 
 **Phase 4.3 diaries/recaps: built** (diary lines verified from the market-day test; `recap.mjs` prints the day's headlines, trade, grudges, milestones, standings).
 
-**Random events wave 2 (partly): done and enabled.** Sandwich Lady (bot remembers the food she names, picks it on interface 297) and Certer (the two wrong captions are always from a fixed decoy list, so the bot picks the other one). Both verified twice in-game. Wave 3 (kidnaps: Surprise Exam/Mysterious Old Man, Drill Demon, Freaky Forester, Maze, Mime, Pillory, Quiz Master, Evil Bob, Candlelight) stays disabled; the 5-minute rescue is the safety net.
+**Random events wave 2 (partly): done and enabled.** Sandwich Lady (bot remembers the food she names, picks it on interface 297) and Certer (the two wrong captions are always from a fixed decoy list, so the bot picks the other one). Both verified twice in-game. **Wave 3 (partly): done and enabled.** Freaky Forester (pheasant with the asked tail count = NPC id 2459-2462, hand in, portal; 41 s), Drill Demon (the exercise signs are drawn client-side, so the bot tries random mats; wrong ones cost nothing; 1-4 min), Maze (planned route through the maze's real doors, `solid=3626` for the fake walls, `step=4` waypoints, one-way doors avoided after a refusal; ~4 min). Still disabled: Surprise Exam, Mime, Pillory, Quiz Master, Evil Bob, Candlelight. Safety net: rescued after 10 min in a kidnap area (15 for the Drill Demon), keyed on the game's saved original location.
 
 ## Known gotchas
 - After any server restart, the bot runners log bots back in automatically, but deals in flight time out.
