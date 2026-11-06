@@ -38,46 +38,40 @@ const KEEP = name => /pickaxe$|(^| )axe$|^Hammer$|^Tinderbox$|^Small fishing net
 
 // ---- bank clear-outs ----
 // Bots bank everything. Goods normally leave the bank through trades and market days (marketday.mjs takes surplus
-// from the bank before the trip). The shop is a rare last resort: only when a good has piled up past SHOP_LIMIT does a
-// bot (sometimes; misers never) sell what's above that at the general store, along with things no one has a use for.
-export const RESERVE = 30, SHOP_LIMIT = 100;
-export const CLEAROUT_HOURS = Number(process.env.CLEAROUT_HOURS ?? 12);
+// from the bank before the trip). A bot only sells to a shop when its bank is running out of space (FULL_AT of its
+// slots in use): then it sells whole stacks of things it can spare, smallest stacks first (they free a slot fastest),
+// until the bank is back under ROOMY_AT. Tools, food, coins, runes, arrows, quest items and gear are never sold.
+export const BANK_SLOTS = 496, FULL_AT = 0.85, ROOMY_AT = 0.75;
 const NEVER_SELL = /^Coins$|rune$|arrow|^Feather$|bones$|^Bucket|^Empty pot$|^Pot of flour$|^Egg$|^Shears$|^Ball of wool$/i;
-export function surplusInBank(bot, tradeable) {
-    return (bot.s.bank ?? []).map(i => {
-        if (KEEP(i.name) || NEVER_SELL.test(i.name) || FOOD.includes(i.name)) return null;
-        if (tradeable.has(i.name)) return i.count > SHOP_LIMIT ? { name: i.name, count: i.count - SHOP_LIMIT } : null;
-        if (gearInfo(i.name)) return null; // gear is kept: gearUp may want it, fighters may buy it
-        return { name: i.name, count: i.count }; // no use to anyone: sell it all
-    }).filter(Boolean);
+export const bankNearlyFull = bot => (bot.s.bank?.length ?? 0) >= BANK_SLOTS * FULL_AT;
+export function surplusInBank(bot) {
+    if (!bankNearlyFull(bot)) return [];
+    const spare = (bot.s.bank ?? []).filter(i => !KEEP(i.name) && !NEVER_SELL.test(i.name) && !FOOD.includes(i.name) && !gearInfo(i.name));
+    const free = Math.ceil((bot.s.bank?.length ?? 0) - BANK_SLOTS * ROOMY_AT); // slots to free
+    return spare.sort((a, b) => a.count - b.count || a.count * (a.value ?? 1) - b.count * (b.value ?? 1)).slice(0, free).map(i => ({ name: i.name, count: i.count }));
 }
-export async function clearOut(bot, tradeable, archetype = '') {
-    if (archetype === 'miser') return 0;
-    if (Math.random() > (archetype === 'merchant' ? 0.5 : 0.25)) return 0; // most of the time they just leave it for market day
+export async function clearOut(bot) {
     await bot.state(5);
-    let todo = surplusInBank(bot, tradeable);
+    let todo = surplusInBank(bot).filter(t => t.count <= 26); // a whole stack has to fit in the bag (stackables count as 1)
     if (!todo.length) return 0;
     let sold = 0;
-    for (let round = 0; round < 4 && todo.length; round++) {
+    for (let round = 0; round < 6 && todo.length; round++) {
         if (!(await bot.openBank())) break;
         await bot.depositAll(i => !KEEP(i.name));
+        const taken = [];
         for (const it of todo) {
-            if (bot.s.invFree <= 1) break;
-            const n = Math.min(it.count, bot.s.invFree - 1);
-            await bot.withdraw(it.name, n >= 10 ? 10 : n >= 5 ? 5 : 1);
-            for (let k = n >= 10 ? 10 : n >= 5 ? 5 : 1; k < n && bot.s.invFree > 1; k++) await bot.withdraw(it.name, 1);
-            it.count -= n;
+            if (it.count > bot.s.invFree - 1) continue; // not enough room for this stack this trip
+            await bot.withdraw(it.name, 'all');
+            taken.push(it);
         }
         await bot.leaveBank();
         if (!(await bot.openShop(SHOPS.general))) break;
-        for (const it of bot.s.inv.filter(i => !KEEP(i.name) && !FOOD.includes(i.name) && !NEVER_SELL.test(i.name))) {
-            await bot.sell(it.name, it.count); sold += it.count;
-        }
+        for (const it of bot.s.inv.filter(i => taken.some(t => t.name === i.name))) { await bot.sell(it.name, it.count); sold += it.count; }
         await bot.closeInterfaces();
-        todo = todo.filter(t => t.count > 0);
+        todo = todo.filter(t => !taken.includes(t));
     }
     await bot.state(5);
-    bot.log(`clear-out: sold ${sold} items at the general store, ${bot.s.coins} coins now`);
+    bot.log(`clear-out: bank nearly full, sold ${sold} things at the general store`);
     return sold;
 }
 

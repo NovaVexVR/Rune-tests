@@ -17,7 +17,7 @@ What's planned for the bot world, in priority order, plus how the built systems 
 
 ### A. Keep the bots alive and running (before the real run)
 1. *(done)* **Stuck-bot watchdog:** flag bots that haven't moved or gained xp in a while, and unstick them (walk home, relog, rescue).
-2. *(done: rare clear-outs, every 12 h; shop only past 100 of a good; surplus goes to market days)* **Bank management:** banks fill now that bots keep everything. Periodic clear-outs: sell junk to shops, post surplus on the GE, give teammates what they need, keep a reserve of food and tools.
+2. *(done: shop sales only when a bank is nearly full; surplus goes to market days)* **Bank management:** banks fill now that bots keep everything. Periodic clear-outs: sell junk to shops, post surplus on the GE, give teammates what they need, keep a reserve of food and tools.
 3. **Food for bots with an empty bank:** buy it, fish it, or ask a teammate, instead of going out without any.
 4. **Danger memory:** each bot remembers where it died, avoids that area for a while, and warns friends by PM, so the list of dangerous places grows by itself.
 5. **Death recovery:** after a death, go back for the dropped items while they're still there (with an escort if it was a fight).

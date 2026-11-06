@@ -9,7 +9,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { Bot, LOG_DIR, sleep, summary, watchdog } from './lib.mjs';
-import { taskById, RESUPPLY, prepare, clearOut, surplusInBank, CLEAROUT_HOURS } from './tasks.mjs';
+import { taskById, RESUPPLY, prepare, clearOut, surplusInBank } from './tasks.mjs';
 import { Market, TEAMS, TRADEABLE } from './market.mjs';
 import { personalityOf, SPOTS } from './social.mjs';
 import { council, STATE as POLITICS } from './politics.mjs';
@@ -99,10 +99,10 @@ async function runBot(name, delay) {
                 await marketDay.attend(bot);
                 continue;
             }
-            // bank clear-out every few hours: keep a reserve, sell the rest
-            if (Date.now() - (bot._lastClearOut ??= Date.now()) > CLEAROUT_HOURS * 3600_000 && surplusInBank(bot, TRADEABLE).length) {
+            // bank running out of space: sell spare stacks at the general store (at most once an hour)
+            if (Date.now() - (bot._lastClearOut ?? 0) > 3600_000 && surplusInBank(bot).length) {
                 bot._lastClearOut = Date.now();
-                const sold = await clearOut(bot, TRADEABLE, personalityOf(name).archetype);
+                const sold = await clearOut(bot);
                 if (sold) note(name, `Cleared out the bank: sold ${sold} things at the general store.`);
             }
             // quest party: wait for the rest of the party, then quest together
