@@ -32,6 +32,11 @@
     "caution": 0.34,
     "loyalty": 0.76,
     "patience": 0.92,
-    "sociability": 0.93
+    "sociability": 0.93,
+    "habits": {
+      "spot": "courtyard",
+      "food": "Trout",
+      "gambles": true
+    }
   }
 }

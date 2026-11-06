@@ -32,6 +32,10 @@
     "caution": 0.37,
     "loyalty": 0.86,
     "patience": 0.45,
-    "sociability": 0.54
+    "sociability": 0.54,
+    "habits": {
+      "spot": "farm",
+      "food": "Shrimps"
+    }
   }
 }

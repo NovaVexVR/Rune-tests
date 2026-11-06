@@ -17,6 +17,7 @@ Last session's container had everything under `/home/user`; a new one starts emp
 4. `cd 2009scape && JAVA11_HOME=/usr/lib/jvm/java-11-openjdk-amd64 ./setup.sh` (clones to `../../2009scape-server`, `git lfs pull` for the cache, applies `server-patch/`, builds with Maven).
    Maven Central rate-limits the proxy's IP (429s get saved as broken `.pom` files, and a dropped connection can hang the build). Fix: a mirror in `~/.m2/settings.xml` pointing `central,maven_central` at `https://maven-central.storage-download.googleapis.com/maven2/`, delete files containing "exceeded rate limits" from `~/.m2`, then `sh mvnw -B package -DskipTests -Dmaven.wagon.rto=60000` in `Server/`. Rebuilds after editing `BotApi.kt`: copy it into the server tree and `sh mvnw -o -q -B package -DskipTests` (~25 s), then `./restart.sh`.
    Then `./restart.sh` (server; waits for "started in"), then `bots/start-bots.sh` (10 scripted + 50 Claude-directed bots).
+   Or all in one: `JAVA11_HOME=/usr/lib/jvm/java-11-openjdk-amd64 node launch.mjs` (cross-platform launcher; Ctrl+C / SIGINT stops server and bots).
 5. Optional viewer: `rt4-client` from GitLab (`./gradlew :client:build`; Maven Central may rate-limit, just retry), run with **Java 21** under `Xvfb :99` (JDK 11 here is headless), `xdotool` for input, `viewer/snap.sh <bot>` screenshots. The spectator account must skip the tutorial via Skippy, then admin `::tele x y z` works.
 
 ## Layout
@@ -68,7 +69,7 @@ Last session's container had everything under `/home/user`; a new one starts emp
 
 ## Next steps (in order)
 1. Check the fleet's first quest parties (runner forms up to `PARTY_MAX`=2 at a time) and the next market day.
-2. Random events wave 3 (kidnap puzzles), bounded PvP (Phase 5), more training methods from `guides/`, more quests (Sheep Shearer, Romeo & Juliet, Imp Catcher; Knight's Sword/Druidic Ritual once combat allows), a cross-platform local launcher.
+2. Rest of random events wave 3 (Mime, Pillory, Quiz Master, Evil Bob, Candlelight, Surprise Exam), bounded PvP (Phase 5), more training methods from `guides/`, more quests (Sheep Shearer, Romeo & Juliet, Imp Catcher; Knight's Sword/Druidic Ritual once combat allows). The launcher (`2009scape/launch.mjs`) is done; untested on Windows itself.
 4. Reset all bots to level 1 and start the real run: clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, and remove test bots (`testbot`, `gebot*`, `mbot*`).
 
 ## Usage rules (from the user)

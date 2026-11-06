@@ -26,6 +26,14 @@ Perceived values (`bots/market.mjs`): each bot starts from store price and adjus
 
 Requirements: git + git-lfs, **JDK 11** (the server targets Java 11), **Node.js 22+**.
 
+### Quick start (any OS): the launcher
+```bash
+cd 2009scape && node launch.mjs
+```
+It checks the requirements, clones/patches/builds the server the first time (and rebuilds when `BotApi.kt` changes), starts the server, waits for it, then starts all the bots. Ctrl+C stops everything. Options: `--server-only`, `--setup`, `--rebuild`. Point it at JDK 11 with `JAVA11_HOME` (or `JAVA_HOME`) if `java` on your PATH is a different version; on Windows run it from a normal terminal (`node launch.mjs`). If Maven Central rate-limits the first build, see HANDOFF.md.
+
+The manual steps below do the same thing.
+
 ### Linux (e.g. CachyOS/Arch)
 ```bash
 sudo pacman -S --needed git git-lfs jdk11-openjdk nodejs

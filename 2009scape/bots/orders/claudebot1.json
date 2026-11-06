@@ -42,6 +42,10 @@
     "caution": 0.17,
     "loyalty": 0.94,
     "patience": 0.9,
-    "sociability": 0.73
+    "sociability": 0.73,
+    "habits": {
+      "spot": "chapel",
+      "food": "Cooked chicken"
+    }
   }
 }
