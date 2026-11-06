@@ -61,7 +61,9 @@ export class Market {
         this.busy = new Set();
         this.seq = 0;
         this.log = log;
-        this.social = new Social(log);
+        this.social = new Social(log, faction);
+        this.lastCallout = {};
+        this.lastHound = {};
         this.memory = {}; // item -> recent trade prices seen by everyone (public ledger)
         if (fs.existsSync(LEDGER)) {
             for (const line of fs.readFileSync(LEDGER, 'utf8').trim().split('\n').filter(Boolean)) {
@@ -156,6 +158,8 @@ export class Market {
         if (!me?.online || (me.x >= 3050 && me.x <= 3160 && me.y >= 3050 && me.y <= 3140)) return;
         this.saveValues(name);
         this.social.sweepDefaults();
+        this.social.expireBounties();
+        this.maybeCallOut(name);
 
         // pay debts first (loyal bots promptly; others when overdue or on a whim)
         for (const iou of this.social.openDebts(name)) {
@@ -174,9 +178,12 @@ export class Market {
             return;
         }
 
+        if (this.seekBounty(name)) return;
+        if (this.seekDebtPurchase(name)) return;
+
         for (const need of this.needsOf(name)) {
-            // guildmates first (free), then anyone
-            const others = [...this.bots.keys()].filter(o => o !== name && !this.busy.has(o) && this.bots.get(o).bot.s?.online)
+            // guildmates first (free), then anyone it isn't feuding with
+            const others = [...this.bots.keys()].filter(o => o !== name && !this.busy.has(o) && this.bots.get(o).bot.s?.online && !this.social.isRival(name, o) && !this.social.isRival(o, name))
                 .sort((a, b) => Number(sameGuild(name, b)) - Number(sameGuild(name, a)));
             for (const other of others) {
                 if (!this.surplusOf(other).some(i => i.name === need)) continue;
@@ -211,6 +218,105 @@ export class Market {
                 return;
             }
         }
+        this.maybePostBounties(name);
+    }
+
+    // ---------- 1.1 call-outs ----------
+    maybeCallOut(name) {
+        if (Date.now() - (this.lastCallout[name] ?? 0) < 10 * 60_000) return;
+        const me = this.bots.get(name).bot.s;
+        for (const rival of this.social.rivalsOf(name)) {
+            const rs = this.bots.get(rival)?.bot.s;
+            if (!rs?.online || dist(me, rs) > 15) continue;
+            this.lastCallout[name] = Date.now();
+            const text = this.social.line(name, 'callout', rival);
+            if (text) this.bots.get(name).bot.act({ type: 'say', text });
+            // bystanders who hear it trust the rival a little less
+            for (const [other, o] of this.bots) {
+                if (other === name || other === rival || !o.bot.s?.online || dist(me, o.bot.s) > 15) continue;
+                this.social.adjustTrust(other, rival, -0.05);
+            }
+            this.social.save();
+            this.log(`[social] ${name} called out ${rival} in public`);
+            return;
+        }
+    }
+
+    // ---------- 1.2 debt collectors ----------
+    seekDebtPurchase(name) {
+        const p = this.social.p(name);
+        if (!['merchant', 'opportunist'].includes(p.archetype) || faction(name) !== 'individual') return false;
+        for (const iou of this.social.ious) {
+            if (iou.status !== 'open' || Date.now() < iou.due || iou.creditor === name || iou.debtor === name) continue;
+            const cred = this.bots.get(iou.creditor);
+            if (!cred?.bot.s?.online || this.busy.has(iou.creditor)) continue;
+            const price = Math.max(1, Math.min(Math.round(iou.owed * 0.8), Math.round(iou.owed * 0.6 * (1 + 0.3 * this.social.trust(name, iou.debtor)))));
+            if (this.coins(name) < price) continue;
+            if (!this.social.willSellDebt(iou.creditor, iou, price)) continue;
+            this.open({ buyer: name, seller: iou.creditor, item: `IOU #${iou.id}`, amount: 1, price, kind: 'debtsale', iouId: iou.id });
+            return true;
+        }
+        return false;
+    }
+
+    // Collectors walk over to overdue debtors and remind them, every 15 minutes or so.
+    async hound(bot) {
+        const name = bot.name;
+        if (Date.now() - (this.lastHound[name] ?? 0) < 15 * 60_000) return false;
+        const iou = this.social.ious.find(i => i.status === 'open' && i.collected && i.creditor === name && Date.now() > i.due - 10 * 60_000);
+        if (!iou) return false;
+        const ds = this.bots.get(iou.debtor)?.bot.s;
+        if (!ds?.online || ds.z !== 0) return false;
+        this.lastHound[name] = Date.now();
+        this.log(`[social] ${name} goes to collect from ${iou.debtor} (IOU #${iou.id})`);
+        await bot.walkTo(ds.x, ds.y, { tol: 3, timeout: 120 });
+        const text = this.social.line(name, 'collect', iou.debtor) ?? `${iou.debtor}, you owe me ${iou.owed}.`;
+        await bot.act({ type: 'say', text });
+        return true;
+    }
+
+    // ---------- 1.3 bounty board ----------
+    // Claim an open bounty this bot can fill from what it already carries.
+    seekBounty(name) {
+        const p = this.social.p(name);
+        const me = this.bots.get(name).bot.s;
+        const wanted = this.wantedBy(name);
+        const options = this.social.openBounties().filter(b => {
+            if (b.poster === name || this.busy.has(b.poster) || !this.bots.get(b.poster)?.bot.s?.online) return false;
+            if (this.social.isRival(name, b.poster) || this.social.isRival(b.poster, name)) return false;
+            if (this.social.trust(name, b.poster) < -0.2 + 0.4 * p.caution - 0.2) return false; // cautious bots only work for people they trust
+            const have = me.inv.filter(i => i.name === b.item).reduce((t, i) => t + i.count, 0);
+            const spare = wanted.has(b.item) ? have - 1 : have;
+            return spare >= b.qty && this.coins(b.poster) >= b.reward;
+        });
+        if (!options.length) return false;
+        // greedy bots chase the best pay; others take the oldest job
+        options.sort((a, b) => (p.greed > 0.5 ? b.reward / b.qty - a.reward / a.qty : a.posted - b.posted));
+        const b = options[0];
+        this.social.setBounty(b, 'claimed', name);
+        this.open({ buyer: b.poster, seller: name, item: b.item, amount: b.qty, price: b.reward, kind: 'bounty', bountyId: b.id });
+        return true;
+    }
+
+    maybePostBounties(name) {
+        const p = this.social.p(name);
+        const s = this.bots.get(name).bot.s;
+        const plan = this.bots.get(name).plan().map(x => x.task);
+        const post = (item, qty) => {
+            const reward = Math.max(qty, Math.round(this.perceived(name, item) * qty * (1 + 0.3 * p.generosity - 0.1 * p.greed)));
+            if (this.coins(name) < reward + 5) return;
+            if (this.social.postBounty(name, item, qty, reward)) {
+                const text = this.social.line(name, 'bounty', '');
+                if (text) this.bots.get(name).bot.act({ type: 'say', text: `${text} ${qty} ${item}, ${reward}gp` });
+            }
+        };
+        // fighters want food
+        if (plan.some(t => ['melee', 'ranged'].includes(t)) && faction(name) === 'individual') {
+            const food = s.inv.filter(i => ['Shrimps', 'Anchovies', 'Trout', 'Salmon'].includes(i.name)).length;
+            if (food < 3) post('Shrimps', 5);
+        }
+        // tools nobody is selling and no shop/free source nearby (e.g. a bow, runes)
+        for (const need of this.needsOf(name)) if (['Shortbow', 'Bronze arrow', 'Air rune', 'Mind rune'].includes(need)) post(need, need.includes('rune') || need.includes('arrow') ? 20 : 1);
     }
 
     open(d) {
@@ -238,12 +344,24 @@ export class Market {
         this.busy.delete(deal.seller);
         if (outcome === 'completed' && deal.kind === 'sale') (this.memory[deal.item] ??= []).push(deal.price / (deal.amount ?? 1));
         if (outcome === 'completed' && deal.kind === 'favor') this.social.createIou(deal.buyer, deal.seller, deal.item, deal.value);
+        if (deal.kind === 'debtsale' && outcome === 'completed') {
+            const iou = this.social.ious.find(i => i.id === deal.iouId);
+            if (iou && iou.status === 'open') this.social.transferIou(iou, deal.buyer, deal.price);
+        }
+        if (deal.kind === 'bounty') {
+            const b = this.social.bounties.find(x => x.id === deal.bountyId);
+            if (b) this.social.setBounty(b, outcome === 'completed' ? 'done' : 'open', outcome === 'completed' ? deal.seller : null);
+            if (outcome === 'completed') { this.social.adjustTrust(deal.buyer, deal.seller, 0.1); this.social.adjustTrust(deal.seller, deal.buyer, 0.05); this.social.save(); }
+        }
+        // a rejected lopsided offer is a strike; two strikes and the rejecting bot holds a grudge
+        const rej = /^rejected by (\w+)/.exec(outcome);
+        if (rej && ['sale'].includes(deal.kind)) this.social.strike(rej[1], rej[1] === deal.buyer ? deal.seller : deal.buyer, 'repeated unfair offers');
         if (outcome === 'completed' && deal.kind === 'repay') {
             const iou = this.social.ious.find(i => i.id === deal.iouId);
             if (iou && iou.status === 'open') this.social.settle(iou, true);
         }
         if (outcome === 'completed') {
-            const event = { sale: 'sale', favor: 'favor', repay: 'repaid' }[deal.kind];
+            const event = { sale: 'sale', favor: 'favor', repay: 'repaid', bounty: 'bountyDone' }[deal.kind];
             const speaker = deal.kind === 'repay' ? deal.buyer : deal.seller;
             const other = speaker === deal.buyer ? deal.seller : deal.buyer;
             const text = event && this.social.line(speaker, event, other);
@@ -258,7 +376,7 @@ export class Market {
     acceptable(name, trade, deal) {
         const partner = name === deal.buyer ? deal.seller : deal.buyer;
         if (sameGuild(name, partner)) return true;
-        if (deal.kind === 'favor' || deal.kind === 'repay') return true; // the IOU is the other half of the exchange
+        if (['favor', 'repay', 'debtsale', 'bounty'].includes(deal.kind)) return true; // agreed contract (IOU / posted bounty)
         const val = list => list.reduce((t, i) => t + (deal.snap?.[name]?.[i.name] ?? this.perceived(name, i.name)) * i.count, 0);
         const give = val(trade.mine), get = val(trade.theirs);
         if (give === 0) return true;
@@ -296,7 +414,7 @@ export class Market {
 
         deal.state = 'trading';
         const t = s.trade;
-        const myItem = isBuyer ? (deal.price > 0 ? 'Coins' : null) : deal.item;
+        const myItem = isBuyer ? (deal.price > 0 ? 'Coins' : null) : deal.kind === 'debtsale' ? null : deal.item;
         const myAmount = isBuyer ? deal.price : deal.amount ?? 1;
         const offered = t.mine.reduce((n, i) => n + (i.name === myItem ? i.count : 0), 0);
         if (myItem && offered < myAmount && !t.myAccepted) {
@@ -309,7 +427,10 @@ export class Market {
             await bot.wait(1);
             return true;
         }
-        const theirsReady = isBuyer ? t.theirs.some(i => i.name === deal.item) : deal.price === 0 || t.theirs.some(i => i.name === 'Coins' && i.count >= deal.price);
+        const theirCount = n => t.theirs.filter(i => i.name === n).reduce((c, i) => c + i.count, 0);
+        const theirsReady = isBuyer
+            ? deal.kind === 'debtsale' || theirCount(deal.item) >= (deal.kind === 'bounty' ? deal.amount : 1)
+            : deal.price === 0 || theirCount('Coins') >= deal.price;
         if (!theirsReady) { await bot.wait(1); return true; }
         if (!this.acceptable(bot.name, t, deal)) {
             await bot.act({ type: 'tradedecline' });

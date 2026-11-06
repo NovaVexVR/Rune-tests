@@ -308,6 +308,12 @@ object BotRegistry {
                 if (bestAmt < 0) PacketProcessor.enqueue(Packet.InputPromptResponse(p, 28))
                 "skill menu option $want x${if (bestAmt < 0) 28 else bestAmt}"
             }
+            "rescue" -> {
+                // operator fix: pull a bot out of a random-event area it was kidnapped into (bots are exempt from new ones)
+                core.game.system.timer.impl.AntiMacro.terminateEventNpc(p)
+                content.global.ame.returnPlayer(p)
+                "rescued to ${p.getAttribute("/save:original-loc", ServerConstants.HOME_LOCATION)}"
+            }
             "player" -> {
                 // e.g. {"type":"player","name":"claudebot2","op":"Trade with"}
                 val other = Repository.getPlayerByName(a["name"].toString()) ?: throw BotError("${a["name"]} not online")

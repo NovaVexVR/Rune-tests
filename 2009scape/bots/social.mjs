@@ -22,6 +22,9 @@ const ORDERS = path.join(ROOT, 'orders');
 fs.mkdirSync(DIR, { recursive: true });
 const IOU_FILE = path.join(DIR, 'ious.json');
 const TRUST_FILE = path.join(DIR, 'trust.json');
+const REL_FILE = path.join(DIR, 'relations.json');
+const BOUNTY_FILE = path.join(DIR, 'bounties.json');
+const GRUDGE_HOURS = 3; // rivalries fade after this long unless renewed
 
 const ARCHETYPES = {
     merchant: { greed: 0.75, generosity: 0.2, caution: 0.5, loyalty: 0.7, patience: 0.6, sociability: 0.7 },
@@ -62,11 +65,98 @@ const load = (f, d) => (fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')
 const save = (f, v) => fs.writeFileSync(f, JSON.stringify(v, null, 2));
 
 export class Social {
-    constructor(log = console.log) {
+    constructor(log = console.log, teamOf = () => 'individual') {
         this.log = log;
+        this.teamOf = teamOf;
         this.ious = load(IOU_FILE, []);
         this.trustMap = load(TRUST_FILE, {});
+        this.rel = load(REL_FILE, {}); // rel[a][b] = { strikes, rival, since, reason }
+        this.bounties = load(BOUNTY_FILE, []);
         this.seq = this.ious.reduce((m, i) => Math.max(m, i.id), 0);
+        this.bseq = this.bounties.reduce((m, b) => Math.max(m, b.id), 0);
+    }
+
+    // ---------- rivalries (1.1) ----------
+    isRival(a, b) {
+        const r = this.rel[a]?.[b];
+        if (!r?.rival) return false;
+        if (Date.now() - r.since > GRUDGE_HOURS * 3600_000) { r.rival = false; r.strikes = 0; save(REL_FILE, this.rel); return false; }
+        return true;
+    }
+
+    rivalsOf(a) {
+        return Object.keys(this.rel[a] ?? {}).filter(b => this.isRival(a, b));
+    }
+
+    markRival(a, b, reason) {
+        this.rel[a] ??= {};
+        const was = this.isRival(a, b);
+        this.rel[a][b] = { ...(this.rel[a][b] ?? {}), rival: true, since: Date.now(), reason, strikes: this.rel[a][b]?.strikes ?? 2 };
+        save(REL_FILE, this.rel);
+        if (!was) this.log(`[social] ${a} now holds a grudge against ${b} (${reason})`);
+    }
+
+    // a strike for a lopsided offer; two strikes make a rival
+    strike(a, b, reason) {
+        this.rel[a] ??= {};
+        const r = (this.rel[a][b] ??= { strikes: 0, rival: false });
+        r.strikes = (r.strikes ?? 0) + 1;
+        save(REL_FILE, this.rel);
+        if (r.strikes >= 2) this.markRival(a, b, reason);
+    }
+
+    clearRival(a, b) {
+        if (this.rel[a]?.[b]) { this.rel[a][b] = { strikes: 0, rival: false }; save(REL_FILE, this.rel); this.log(`[social] ${a} forgives ${b}`); }
+    }
+
+    // does `name` hold a grudge against anyone on `other`'s team?
+    rivalTeam(name, other) {
+        const team = this.teamOf(other);
+        if (team === 'individual') return false;
+        return this.rivalsOf(name).some(r => this.teamOf(r) === team);
+    }
+
+    // ---------- debt collection (1.2) ----------
+    // Creditor sells an overdue IOU to a collector? Impatient creditors and long-overdue debts sell.
+    willSellDebt(creditor, iou, price) {
+        const overdueMin = (Date.now() - iou.due) / 60_000;
+        const p = this.p(creditor);
+        return price >= iou.owed * 0.4 && (overdueMin > 10 || Math.random() > p.patience);
+    }
+
+    transferIou(iou, collector, price) {
+        this.log(`[social] ${collector} bought IOU #${iou.id} (${iou.debtor} owes ${iou.owed}) from ${iou.creditor} for ${price} coins`);
+        iou.history = [...(iou.history ?? []), { from: iou.creditor, to: collector, price, t: Date.now() }];
+        iou.creditor = collector;
+        iou.collected = true;
+        iou.due = Math.max(iou.due, Date.now() + 15 * 60_000); // a fresh grace period before default
+        save(IOU_FILE, this.ious);
+    }
+
+    // ---------- bounty board (1.3) ----------
+    openBounties() {
+        return this.bounties.filter(b => b.status === 'open');
+    }
+
+    postBounty(poster, item, qty, reward, minutes = 60) {
+        if (this.bounties.some(b => b.poster === poster && b.item === item && ['open', 'claimed'].includes(b.status))) return null;
+        const b = { id: ++this.bseq, poster, item, qty, reward, status: 'open', posted: Date.now(), deadline: Date.now() + minutes * 60_000 };
+        this.bounties.push(b);
+        save(BOUNTY_FILE, this.bounties);
+        this.log(`[social] bounty #${b.id}: ${poster} wants ${qty} ${item}, pays ${reward} coins`);
+        return b;
+    }
+
+    setBounty(b, status, claimant = b.claimant) {
+        b.status = status;
+        b.claimant = claimant;
+        if (status === 'done') b.done = Date.now();
+        save(BOUNTY_FILE, this.bounties);
+        this.log(`[social] bounty #${b.id} ${status}${claimant ? ` (${claimant})` : ''}`);
+    }
+
+    expireBounties() {
+        for (const b of this.bounties) if (['open', 'claimed'].includes(b.status) && Date.now() > b.deadline) this.setBounty(b, 'expired');
     }
 
     p(name) {
@@ -86,7 +176,7 @@ export class Social {
     askFactor(name, other) {
         const p = this.p(name);
         // personality markup, plus up to +25% for partners it distrusts
-        return (1 + 0.4 * p.greed - 0.25 * p.generosity) * (1 + 0.25 * Math.max(0, -this.trust(name, other)));
+        return (1 + 0.4 * p.greed - 0.25 * p.generosity) * (1 + 0.25 * Math.max(0, -this.trust(name, other))) * (this.rivalTeam(name, other) ? 1.3 : 1);
     }
 
     bidFactor(name, other) {
@@ -141,8 +231,10 @@ export class Social {
             const onTime = iou.settled <= iou.due;
             this.adjustTrust(iou.creditor, iou.debtor, onTime ? 0.15 : 0.05);
             this.adjustTrust(iou.debtor, iou.creditor, 0.05);
+            if (this.rel[iou.creditor]?.[iou.debtor]?.rival) this.clearRival(iou.creditor, iou.debtor);
         } else {
             this.adjustTrust(iou.creditor, iou.debtor, -0.5);
+            this.markRival(iou.creditor, iou.debtor, `defaulted on IOU #${iou.id}`);
             // reputation: everyone who has dealt in IOUs hears about it
             const known = new Set([...Object.keys(this.trustMap), ...this.ious.flatMap(i => [i.debtor, i.creditor])]);
             for (const other of known) if (other !== iou.creditor && other !== iou.debtor) this.adjustTrust(other, iou.debtor, -0.1);
@@ -170,7 +262,11 @@ export class Social {
             favor: { philanthropist: `Pay me back whenever, ${other}.`, merchant: `Interest is fair, ${other}. Don't be late.`, gambler: `I'm betting on you, ${other}.`, default: `You owe me one.` },
             repaid: { loyalist: `Paid in full, as promised.`, default: `We're square, ${other}.` },
             defaulted: { miser: `${other} is a thief.`, loyalist: `I trusted you, ${other}.`, default: `Never again, ${other}.` },
-            refuse: { miser: `No credit. Coins first.`, default: `Not on credit, sorry.` }
+            refuse: { miser: `No credit. Coins first.`, default: `Not on credit, sorry.` },
+            callout: { miser: `Watch your coins around ${other}. Thief.`, loyalist: `${other} broke their word to me.`, merchant: `Don't do business with ${other}.`, default: `${other} can't be trusted!` },
+            collect: { merchant: `${other}, I own your debt now. Pay up.`, opportunist: `Tick tock, ${other}. You owe me.`, default: `${other}, time to pay what you owe.` },
+            bounty: { philanthropist: `Paying well for some help!`, miser: `Paying fair. Not a coin more.`, default: `Bounty posted. Anyone?` },
+            bountyDone: { default: `Job done for ${other}.` }
         }[event];
         if (!L) return null;
         return (L[p.archetype] ?? L.default).slice(0, 80);

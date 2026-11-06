@@ -1,3 +1,17 @@
+diff --git a/Server/src/main/core/game/system/timer/impl/AntiMacro.kt b/Server/src/main/core/game/system/timer/impl/AntiMacro.kt
+index 4f9ba87..9134928 100644
+--- a/Server/src/main/core/game/system/timer/impl/AntiMacro.kt
++++ b/Server/src/main/core/game/system/timer/impl/AntiMacro.kt
+@@ -39,7 +39,8 @@ class AntiMacro : PersistTimer(0, "antimacro", isAuto = true), Commands {
+     }
+ 
+     override fun onRegister(entity: Entity) {
+-        if (entity !is Player || entity.isArtificial)
++        // bots driven through the bot API are exempt, like the game's own AI players
++        if (entity !is Player || entity.isArtificial || content.botapi.BotRegistry.isBot(entity))
+             entity.timers.removeTimer(this)
+         if (entity is Player && entity.rights == Rights.ADMINISTRATOR)
+             paused = true
 diff --git a/Server/src/main/core/net/packet/PacketRepository.java b/Server/src/main/core/net/packet/PacketRepository.java
 index e2656b0..3535a41 100644
 --- a/Server/src/main/core/net/packet/PacketRepository.java

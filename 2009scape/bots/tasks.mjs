@@ -160,7 +160,9 @@ export const TASKS = [
                 if (s.invFree === 0) {
                     await cookAll(bot);
                     const food = bot.inv(i => FOOD.includes(i.name));
-                    for (const f of food.slice(6)) { await bot.act({ type: 'item', slot: f.slot, op: 'Drop' }); await bot.wait(1); }
+                    // keep extra cooked food when someone has posted a food bounty we could fill
+                    const wantedFood = bot.market ? bot.market.social.openBounties().filter(b => FOOD.includes(b.item) && b.poster !== bot.name).reduce((t, b) => t + b.qty, 0) : 0;
+                    for (const f of food.slice(6 + wantedFood)) { await bot.act({ type: 'item', slot: f.slot, op: 'Drop' }); await bot.wait(1); }
                     await bot.state();
                     await bot.dropAll(i => /^(Burnt|Raw)/.test(i.name));
                     await bot.walkTo(spot.x, spot.y, { tol: 5 });

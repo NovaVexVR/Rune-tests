@@ -49,7 +49,11 @@ async function runBot(name, delay) {
             while (await market.step(b)) {}
             return true;
         }
-        if (Date.now() - lastSeek > 60_000) { lastSeek = Date.now(); await market.seek(b.name); }
+        if (Date.now() - lastSeek > 60_000) {
+            lastSeek = Date.now();
+            await market.seek(b.name);
+            if (!market.dealFor(b.name) && (await market.hound(b))) return true; // debt collectors pay debtors a visit
+        }
         return false;
     };
     for (;;) {

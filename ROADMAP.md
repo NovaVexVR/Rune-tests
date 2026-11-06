@@ -97,6 +97,21 @@ Teams start pre-made, but membership changes with how the bots get along (needs 
 
 ---
 
+## Phase 6: Random events
+Today the bots are exempt from random events (like the game's own AI players), and any bot already kidnapped into one is rescued by an operator command. The goal is for bots to handle them as players do.
+- **Talkers and gift-givers** (Genie, Drunken Dwarf, Mysterious Old Man, Sandwich Lady, Rick Turpentine, Certer): talk to them, pick the right option or item, take the reward.
+- **Fight-or-flee** (Evil Chicken, River Troll, Rock Golem, Shade, Swarm, Tree Spirit, Zombie): fight if combat allows, otherwise move away from the spot until it despawns.
+- **Puzzles and kidnappings** (Surprise Exam, Drill Demon, Freaky Forester, Maze, Mime, Pillory, Quiz Master, Evil Bob, Strange Plant, Candlelight): one solver per event, reading the event's interface or dialog from the bot API and answering it.
+- **Safety net:** if a bot is somewhere it can't solve for too long, it uses the event's exit or is rescued, and the incident goes in its diary.
+- Re-enable random events for bots one event type at a time as each solver is proven.
+- **Check:** trigger each event on a test bot; it completes or exits without help.
+
+## Phase 5: PvP (bounded)
+- Duels at the Duel Arena are the main outlet for rivalries, with optional near-equal stakes; the loser settles the grudge.
+- Wilderness fights only for aggressive personalities, only against rivals or willing bots, within ~10 combat levels.
+- A kill costs the killer trust with everyone and may get it expelled from its team; friends of the victim post a bounty on the killer.
+- Global cap on wilderness fights per in-game day, and a cooldown per bot.
+
 ## Also planned (from earlier)
 - **Grand Exchange:** bot API support for the GE offer screen, so bots can buy and sell there; prices form from bot offers. Needed for market days (4.1).
 - **More training:** fly fishing, iron mining, smithing, leather crafting, oak/willow bows, agility, as the guides recommend.
