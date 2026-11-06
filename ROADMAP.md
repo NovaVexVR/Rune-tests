@@ -1,21 +1,64 @@
 # Roadmap
 
-What's planned for the bot world, in build order. Each item lists what it does, how it fits the
-existing code, and how it's checked in-game before it counts as done.
+What's planned for the bot world, in priority order, plus how the built systems work.
 
-**Note:** bots will be reset to fresh level-1 characters once the systems are developed; until then, test scenarios are set up by hand to prove each mechanic.
+**Note:** bots will be reset to fresh level-1 characters for the real run (milestone below); until then, test scenarios are set up by hand to prove each mechanic.
 
-**Already built:** bot API, 60 bots (10 scripted, 10 individualists, four 5-bot teams, one 20-bot
-legion), shops and banking, per-bot perceived prices, team treasurers, personalities, trust, and
-favors/IOUs (`bots/social.mjs`, report with `node bots/social_report.mjs`).
+## Done
+- **Core:** bot API (real client packets, no admin), 60 bots (10 scripted, 10 individualists, four 5-bot teams, a 20-bot legion), shops, banking, cross-platform launcher (`launch.mjs`; tested on Linux, not yet on Windows).
+- **Economy:** per-bot perceived prices, team treasurers, trade-window deals, favors/IOUs, debt collectors, bounties, wagers, collections, Grand Exchange API, market days at the GE.
+- **Society:** personalities, trust, grudges and call-outs, scoreboard, taxes and mutiny, leaving and recruiting, private messages, habits, mood, diaries and recaps.
+- **Getting around:** server-side route planner (`/route`) that avoids danger zones and opens doors; `travel()` for long trips.
+- **Quests:** Cook's Assistant (solo and as a party), Rune Mysteries, Sheep Shearer; quest parties with roles; quest points in the team score.
+- **Random events:** waves 1 and 2, and Freaky Forester, Drill Demon and Maze from wave 3, all enabled for bots; kidnap safety net.
+- **Training and gear:** smelting and smithing (bronze bars, daggers, armour by level); bots wear the best gear they carry, carry food from the bank, and bank their resources instead of dropping them.
+
+## Planned, in priority order
+
+### A. Keep the bots alive and running (before the real run)
+1. **Stuck-bot watchdog:** flag bots that haven't moved or gained xp in a while, and unstick them (walk home, relog, rescue).
+2. **Bank management:** banks fill now that bots keep everything. Periodic clear-outs: sell junk to shops, post surplus on the GE, give teammates what they need, keep a reserve of food and tools.
+3. **Food for bots with an empty bank:** buy it, fish it, or ask a teammate, instead of going out without any.
+4. **Danger memory:** each bot remembers where it died, avoids that area for a while, and warns friends by PM, so the list of dangerous places grows by itself.
+5. **Death recovery:** after a death, go back for the dropped items while they're still there (with an escort if it was a fight).
+6. **Regular test runs** of the staged tests (`test_events`, `test_social`, `test_party`, `test_ge`, `test_marketday`, `test_duel`), so server changes can't silently break mechanics.
+
+### B. A real economy
+7. **Team stash:** the treasurer keeps shared goods (food, armour, tools) as well as coins, and hands them out to members who need them.
+8. **Reasons to trade:** crafting chains (wool to balls of wool, cowhide to leather to leather armour, ore to bars to armour) and selling surplus to shops, so market days have real supply and demand. The first live market day had none: everyone wanted a knife and nobody had one.
+9. **Iron and steel:** iron mining and smelting (iron ore fails half the time), steel bars with coal, iron and steel armour; buying armour at the Varrock shops.
+10. **More training methods** from the guides: fly fishing, leather crafting, oak/willow bows, agility.
+11. **Use what quests unlock:** the Lumbridge range after Cook's Assistant (fewer burnt fish), Runecrafting after Rune Mysteries (essence via Aubury, air runes for magic training), prayer from buried bones.
+
+### Milestone: reset to level 1 and start the real run
+Clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, remove the test bots (`testbot`, `qbot*`, `pbot*`, `mbot*`, `gebot*`, `dbot*`), and start the fleet with `launch.mjs`. Everything below is built while the real run goes on.
+
+### C. Progression
+12. **Escorts and apprenticeships:** stronger teammates escort or train weaker ones; needed for the next quests.
+13. **More quests:** The Knight's Sword and Druidic Ritual (both need escorts past ice warriors / Taverley dungeon), Romeo & Juliet, Imp Catcher.
+14. **Careers and life goals:** each bot picks a career (smith, fisher, crafter, fighter) and a long-term goal from its personality (full steel armour, a skill to 50, a quest list), and its plan bends toward it. Diaries and recaps follow the goal.
+
+### D. Society
+15. **Public notice board** for bounties, prices and reputations, readable in the recaps.
+16. **Team alliances and feuds** that go beyond single-bot grudges, with team-level trust.
+17. **Disputes and justice:** a respected bot (or the most trusted per team) arbitrates defaults and fines repeat offenders.
+18. **Newcomers:** new bots join over time as fresh characters; teams recruit and mentor them.
+19. **PvP (Phase 5):** fix the duel blocker (bots reach the arena but "Fight" starts no combat), wire duels into grudges, then bounded wilderness fights (details below).
+20. **Events:** weekly fishing contests, smithing fairs, and duel tournaments once duels work, announced in chat and covered in the recap.
+21. **Rest of random events wave 3:** Surprise Exam, Mime, Pillory, Quiz Master, Evil Bob, Candlelight (need item models or animations).
+
+### E. Operations and outreach
+22. **Daily director pass:** Claude reads the recap and rewrites some bots' plans (`orders/`).
+23. **Economy charts:** coins in circulation, prices over time, who's rich and who's poor, on the dashboard.
+24. **Test the launcher on Windows.**
+25. **Human players** joining the server and trading or chatting with bots.
 
 ---
 
+# Reference: how the built systems work
+
 ## Phase 1: Reputation and conflict
 Builds directly on trust and IOUs.
-
-### Done: Phase 3 (habits, collectors, mood), Phase 1 (rivalries, debt collectors, bounties) and Phase 2 (scoreboard, taxes/mutiny, leaving/recruiting), plus private messages between bots and caps that scale with the bot population (`capFor` in politics.mjs). Every mechanic has now been seen working in-game (the last ones via `test_social.mjs`).
-### Also done: random events wave 1, the Grand Exchange bot API, long-distance route planning (`/route`, `travel()`), market days (4.1) and diaries/recaps (4.3).
 
 ### 1.1 Rivalries and grudges
 - A bot that is defaulted on (or loses a trade it judged unfair twice) marks the other bot as a **rival** in `market/relations.json`.
@@ -113,48 +156,8 @@ Bots handle random events as players do; each type is enabled for bots once its 
 
 ---
 
-## Phase 5: PvP (bounded)
+## Phase 5: PvP (bounded) *(planned, item 19)*
 - Duels at the Duel Arena are the main outlet for rivalries, with optional near-equal stakes; the loser settles the grudge.
 - Wilderness fights only for aggressive personalities, only against rivals or willing bots, within ~10 combat levels.
 - A kill costs the killer trust with everyone and may get it expelled from its team; friends of the victim post a bounty on the killer.
 - Global cap on wilderness fights per in-game day, and a cooldown per bot.
-
-## Gear and supplies *(started)*
-- Bots wear the best gear they have before each task, and fighters carry food from the bank *(done)*.
-- Smiths make bronze armour by level and fighters buy it through the market *(done)*; next: iron/steel bars and armour, buying armour at Varrock's armour shops, and food for bots with an empty bank (buy, fish, or ask teammates).
-
-## Planned: next features
-From watching the fleet run; roughly in priority order (bank clear-outs and the team stash first).
-
-### Economy and supplies
-- **Reasons to trade:** crafting chains (wool to balls of wool, cowhide to leather to leather armour, ore to bars to armour) and selling surplus to shops, so market days have real supply and demand. The first live market day had none: everyone wanted a knife and nobody had one.
-- **Bank management:** now that bots bank everything, banks will fill. Periodic clear-outs: sell junk to shops, post surplus on the GE, give teammates what they need, keep a small reserve of food and tools.
-- **Team stash:** the treasurer keeps shared goods (food, armour, tools) as well as coins, and hands them out to members who need them.
-- **Food for bots with an empty bank:** buy it, fish it, or ask a teammate, instead of going out without any.
-- **Iron and steel:** iron mining and smelting (iron ore fails half the time), steel bars with coal, iron/steel armour; buying armour at the Varrock shops.
-
-### Survival and progression
-- **Danger memory:** each bot remembers where it died, avoids that area for a while, and warns friends by PM, so the list of dangerous places grows by itself.
-- **Death recovery:** after a death, go back for the dropped items while they're still there (with an escort if it was a fight).
-- **Escorts and apprenticeships:** stronger teammates escort or train weaker ones. This is what unlocks The Knight's Sword and Druidic Ritual.
-- **Careers and life goals:** each bot picks a career (smith, fisher, crafter, fighter) and a long-term goal from its personality (full steel armour, a skill to 50, a quest list), and its plan bends toward it. Diaries and recaps follow the goal.
-- **Use what quests unlock:** the Lumbridge range after Cook's Assistant (fewer burnt fish), Runecrafting after Rune Mysteries (essence via Aubury, air runes for magic training), prayer from buried bones.
-
-### Society
-- **Team alliances and feuds** that go beyond single-bot grudges, with team-level trust.
-- **A public notice board** for bounties, prices and reputations, readable in the recaps.
-- **Disputes and justice:** a respected bot (or the most trusted per team) arbitrates defaults and fines repeat offenders.
-- **Newcomers:** new bots join over time as fresh characters, and teams recruit and mentor them.
-- **Events:** weekly fishing contests, smithing fairs and duel tournaments (once duels work), announced in chat and covered in the recap.
-- **Human players** joining the server and trading or chatting with bots.
-
-### Operations
-- **Stuck-bot watchdog:** flag bots that haven't moved or gained xp in a while, and unstick them.
-- **Regular test runs** of the staged tests (`test_events`, `test_social`, `test_party`, `test_ge`, `test_marketday`, `test_duel`), so server changes can't silently break mechanics.
-- **Daily director pass:** Claude reads the recap and rewrites some bots' plans (`orders/`).
-- **Economy charts:** coins in circulation, prices over time, who's rich and who's poor, on the dashboard.
-
-## Also planned (from earlier)
-- **Grand Exchange:** *(done)* bot API support for the GE offer screen (`geitem` action, `ge`/`geScreen` state, `geOffer`/`geCollect`/`geAbort` in lib.mjs); bot offers match each other and move the GE price index.
-- **More training:** smelting bronze bars and smithing daggers at the Varrock anvils *(done: `smelt`, `smith`)*; still to do: fly fishing, iron mining, leather crafting, oak/willow bows, agility, as the guides recommend.
-- **Run locally:** *(done)* `2009scape/launch.mjs`, one launcher for Windows/Linux/macOS (setup, build, server, bots, clean stop). Tested on Linux; not yet on Windows.

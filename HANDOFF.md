@@ -78,9 +78,7 @@ Last session's container had everything under `/home/user`; a new one starts emp
 - Personalities live in `orders/<bot>.json`; bots without an orders file (test bots) get a seeded one. A tools collector won't sell a Knife or Hammer, which can make a staged trade test look broken.
 
 ## Next steps (in order)
-1. Check the fleet's first quest parties (runner forms up to `PARTY_MAX`=2 at a time) and the next market day.
-2. Rest of random events wave 3 (Mime, Pillory, Quiz Master, Evil Bob, Candlelight, Surprise Exam), bounded PvP (Phase 5), more training methods from `guides/`, more quests (Sheep Shearer, Romeo & Juliet, Imp Catcher; Knight's Sword/Druidic Ritual once combat allows). The launcher (`2009scape/launch.mjs`) is done; untested on Windows itself.
-4. Reset all bots to level 1 and start the real run: clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, and remove test bots (`testbot`, `gebot*`, `mbot*`).
+Follow the numbered list in `ROADMAP.md` ("Planned, in priority order"): section A first (watchdog, bank clear-outs, food, danger memory, death recovery, regular tests), then B (team stash, reasons to trade, iron/steel, training, quest unlocks), then the reset-to-level-1 milestone. Open threads: the duel "Fight" blocker (item 19) and confirming in the fleet that thieving bots rest and fishers bank their catch.
 
 ## Usage rules (from the user)
 - **Keep usage low.** Don't spend tokens on anything not asked for: no unrequested status checks, polling loops, screenshots or dashboard refreshes.
