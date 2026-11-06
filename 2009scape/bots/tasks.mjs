@@ -108,7 +108,8 @@ async function lightFires(bot) {
         }
     }
     await bot.state();
-    await bot.dropAll(i => LOGS.includes(i.name));
+    // logs it can't burn (yet) are a resource: bank them once the bag is filling up
+    if (bot.s.invFree <= 4) await bot.bankItems(i => LOGS.includes(i.name));
 }
 
 async function cookAll(bot) {
@@ -120,7 +121,8 @@ async function cookAll(bot) {
         if (!fire) {
             if (!bot.has('Tinderbox')) return;
             if (!s.inv.some(i => i.name === 'Logs')) {
-                if (s.invFree === 0) { await bot.act({ type: 'item', slot: raw[raw.length - 1].slot, op: 'Drop' }); await bot.wait(1); }
+                // bag full and no firewood: bank the cooked food (or, if none, the raw fish) to make room, rather than dropping any
+                if (s.invFree === 0) { const cooked = s.inv.some(i => FOOD.includes(i.name)); await bot.bankItems(i => (cooked ? FOOD.includes(i.name) : /^Raw /.test(i.name)), { back: { x: s.x, y: s.y } }); continue; }
                 const tree = bot.nearestScenery(l => l.name === 'Tree' && l.ops.includes('Chop down'));
                 // firewood: the Lumbridge trees (never Draynor's, next to the dark wizards, at low combat)
                 const wood = bot.s.combat >= 20 ? PLACES.draynorTrees : PLACES.lumbridgeTrees;
@@ -189,14 +191,15 @@ export const TASKS = [
                     // keep extra cooked food when someone has posted a food bounty we could fill
                     const wantedFood = bot.market ? bot.market.social.openBounties().filter(b => FOOD.includes(b.item) && b.poster !== bot.name).reduce((t, b) => t + b.qty, 0) : 0;
                     // keep 6 (plus any wanted for a bounty); bank the rest as a reserve for fights and for teammates
-                    if (food.length > 8 + wantedFood && (await bot.openBank())) {
+                    await bot.dropAll(i => /^Burnt/.test(i.name)); // burnt fish is the only thing worth binning
+                    if (food.length > 6 + wantedFood && (await bot.openBank())) {
                         const keep = new Set(food.slice(0, 6 + wantedFood).map(f => f.slot));
                         for (const f of food.filter(f => !keep.has(f.slot))) { await bot.act({ type: 'deposit', slot: f.slot, amount: 1 }).catch(() => {}); await bot.wait(1); }
+                        await bot.depositAll(i => /^Raw /.test(i.name)); // couldn't cook it now: cook it another day, or trade it
                         await bot.leaveBank();
                         await bot.walkTo(spot.x, spot.y, { tol: 5 });
-                    } else for (const f of food.slice(6 + wantedFood)) { await bot.act({ type: 'item', slot: f.slot, op: 'Drop' }); await bot.wait(1); }
+                    } else if (bot.s.inv.some(i => /^Raw /.test(i.name))) await bot.bankItems(i => /^Raw /.test(i.name), { back: spot });
                     await bot.state();
-                    await bot.dropAll(i => /^(Burnt|Raw)/.test(i.name));
                     await bot.walkTo(spot.x, spot.y, { tol: 5 });
                     continue;
                 }
@@ -217,8 +220,7 @@ export const TASKS = [
                 if (await bot.handleInterrupts()) continue;
                 if (s.invFree <= 1) {
                     // ore has trade value (smithing later / other bots): bank it at Lumbridge
-                    if (await bot.openBank()) { await bot.depositAll(i => /ore$|^Clay$|^Coal$|^Uncut/.test(i.name)); await bot.leaveBank(); }
-                    else await bot.dropAll(i => /ore$|^Clay$|^Coal$/.test(i.name));
+                    if (!(await bot.bankItems(i => /ore$|^Clay$|^Coal$|^Uncut/.test(i.name)))) { await bot.wait(10); continue; } // never drop ore: try the bank again
                     await bot.walkTo(PLACES.swampMine.x, PLACES.swampMine.y, { tol: 6 });
                     continue;
                 }
@@ -417,7 +419,8 @@ export const FLETCH = {
                 if (bot.s.dialog?.skillMenu) await bot.act({ type: 'skillmenu', index: Math.min(option, bot.s.dialog.skillMenu.length - 1) });
                 await bot.waitIdle({ timeout: 90, quiet: 4 });
                 await bot.state();
-                await bot.dropAll(i => /^(Logs|Shortbow \(u\)|Longbow \(u\))$/.test(i.name)); // keep arrow shafts (stackable, sellable)
+                // unstrung bows and spare logs are goods: bank them (arrow shafts stack, so they stay in the bag)
+                if (bot.s.invFree <= 4) await bot.bankItems(i => /^(Logs|Oak logs|Shortbow \(u\)|Longbow \(u\))$/.test(i.name));
                 continue;
             }
             const tree = bot.nearestScenery(l => l.name === 'Tree' && l.ops.includes('Chop down'));
@@ -444,7 +447,7 @@ async function fightLoop(bot, until, area, names, { pickup = [], stopIf = null }
         if (loot) { await bot.act({ type: 'ground', x: loot.x, y: loot.y, id: loot.id }); await bot.waitIdle({ timeout: 8 }); continue; }
         const bones = s.inv.find(i => i.name === 'Bones');
         if (bones) { await bot.act({ type: 'item', slot: bones.slot, op: 'Bury' }); await bot.wait(2); continue; }
-        if (s.invFree <= 2) await bot.dropAll(i => /^(Raw chicken|Raw beef|Cowhide|Goblin mail|Chef's hat)$/.test(i.name));
+        if (s.invFree <= 2) { await bot.bankItems(i => /^(Raw chicken|Raw beef|Cowhide|Goblin mail|Chef's hat|Feather)$/.test(i.name) || (/^(Bronze|Iron)/.test(i.name) && !i.ops.some(o => /wield|wear/i.test(o))), { back: area }); continue; }
         const t = bot.nearestNpc(n => names.includes(n.name) && !n.inCombat && n.ops.includes('Attack'));
         if (!t) { await bot.walkTo(area.x + rand(-5, 5), area.y + rand(-5, 5), { tol: 2 }); continue; }
         const xpBefore = combatXp(bot.s);

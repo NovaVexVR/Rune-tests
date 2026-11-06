@@ -369,8 +369,9 @@ export class Bot {
     // Wear the best gear the bot carries, slot by slot (weapons too unless `weapon: false`, e.g. for ranged).
     // Items it isn't high enough level to wear are remembered and not tried again.
     async gearUp({ weapon = true } = {}) {
-        this._cantWear ??= new Set();
+        this._cantWear ??= new Map(); // item -> total level when it was too high-level; tried again once the bot levels up
         let s = await this.state(1);
+        for (const [name, lvl] of this._cantWear) if (s.totalLevel > lvl) this._cantWear.delete(name);
         let changed = 0;
         for (let pass = 0; pass < 7; pass++) {
             const worn = Object.fromEntries(s.worn.map(i => [gearInfo(i.name)?.slot, gearInfo(i.name)?.score ?? -1]));
@@ -384,11 +385,21 @@ export class Bot {
             await this.act({ type: 'item', slot: best.i.slot, op });
             await this.wait(2);
             s = await this.state(1);
-            if (s.inv.some(i => i.slot === best.i.slot && i.name === best.i.name)) { this._cantWear.add(best.i.name); continue; } // too low a level
+            if (s.inv.some(i => i.slot === best.i.slot && i.name === best.i.name)) { this._cantWear.set(best.i.name, s.totalLevel); continue; } // too low a level, for now
             this.log(`gear: now wearing ${best.i.name}`);
             changed++;
         }
         return changed;
+    }
+
+    // Bank what matches `pred` (bots bank their resources rather than dropping them). Returns false if the bank
+    // couldn't be reached, in which case the caller keeps the items and tries again later.
+    async bankItems(pred, { back = null } = {}) {
+        if (!(await this.openBank())) return false;
+        await this.depositAll(pred);
+        await this.leaveBank();
+        if (back) await this.walkTo(back.x, back.y, { tol: 5 });
+        return true;
     }
 
     // Carry some food: top up from the bank when there's food banked. Returns how much food the bot has.
