@@ -7,6 +7,14 @@
       "why": "wc/fm"
     },
     {
+      "task": "quest_fetch",
+      "item": "Bucket of milk",
+      "for": "guildbot1",
+      "minutes": 25,
+      "why": "quest party: Bucket of milk for guildbot1",
+      "once": true
+    },
+    {
       "task": "melee",
       "minutes": 20,
       "why": "combat"

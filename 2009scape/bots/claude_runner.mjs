@@ -16,6 +16,7 @@ import { council, STATE as POLITICS } from './politics.mjs';
 
 import { Diary } from './diary.mjs';
 import { MarketDay } from './marketday.mjs';
+import { planQuests } from './questplanner.mjs';
 
 const diary = new Diary();
 const market = new Market((...a) => { console.log(new Date().toISOString(), ...a); try { diary.fromLog(a.join(' ')); } catch (e) { console.log('diary error', e.message); } });
@@ -37,6 +38,8 @@ function readOrders(name) {
 function writeStep(name, step) {
     const f = path.join(ORDERS, `${name}.json`);
     const o = JSON.parse(fs.readFileSync(f, 'utf8'));
+    // one-off steps (quests the planner slotted in) leave the plan once they've run; the next step slides into place
+    if (o.plan?.[step - 1]?.once) { o.plan.splice(step - 1, 1); step -= 1; }
     o.step = step;
     fs.writeFileSync(f, JSON.stringify(o, null, 2));
 }
@@ -134,5 +137,9 @@ console.log(`starting Claude-directed bots: ${names.join(', ')}`);
 // team council (scoreboard, mutiny, leaving, recruiting) every POLITICS_MINUTES
 const POLITICS_MINUTES = Number(process.env.POLITICS_MINUTES ?? 60);
 setInterval(() => { try { council(market); } catch (e) { console.log('council error', e); } }, POLITICS_MINUTES * 60_000);
+// quests: the planner slots quest steps into plans every QUEST_PLAN_MINUTES (first pass 5 minutes after start)
+const QUEST_PLAN_MINUTES = Number(process.env.QUEST_PLAN_MINUTES ?? 20);
+setTimeout(() => { try { planQuests(market); } catch (e) { console.log('quest planner error', e); } }, 5 * 60_000);
+setInterval(() => { try { planQuests(market); } catch (e) { console.log('quest planner error', e); } }, QUEST_PLAN_MINUTES * 60_000);
 setInterval(() => market.social.driftMoods(), 10 * 60_000);
 await Promise.all(names.map((n, i) => runBot(n, i * 3000)));

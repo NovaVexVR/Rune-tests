@@ -98,6 +98,12 @@ export class Diary {
             const loser = m[4] === m[1] ? m[2] : m[1];
             this.note(m[4], `Won ${m[3]}gp from ${loser} on a coin flip.`, 'wager');
             this.note(loser, `Lost ${m[3]}gp to ${m[4]} on a coin flip.`, 'wager');
+        } else if ((m = line.match(/\[quest\] (\w+) party: (\S+) leads(?: with (.+))?/))) {
+            const helpers = m[3] ? m[3].split(', ') : [];
+            this.note(m[2], `Leading a ${m[1]} quest party for Cook's Assistant${helpers.length ? ` with ${helpers.join(' and ')}` : ''}.`, 'quest');
+            for (const h of helpers) this.note(h, `Joined ${m[2]}'s quest party for Cook's Assistant.`, 'quest');
+        } else if ((m = line.match(/\[quest\] (\S+) takes on (.+)/))) {
+            this.note(m[1], `Took on a quest: ${m[2]}.`, 'quest');
         } else if ((m = line.match(/\[marketday\] (\S+) sets off for market day #(\d+)/))) {
             this.note(m[1], `Set off for market day #${m[2]} at the Grand Exchange.`, 'market');
         } else if ((m = line.match(/\[marketday\] (\S+) put 1 (.+) on the GE for (\d+)gp/))) {

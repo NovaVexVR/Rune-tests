@@ -12,6 +12,14 @@
       "why": "shafts->bows (guide)"
     },
     {
+      "task": "quest_fetch",
+      "item": "Bucket of milk",
+      "for": "hawkbot1",
+      "minutes": 25,
+      "why": "quest party: Bucket of milk for hawkbot1",
+      "once": true
+    },
+    {
       "task": "melee",
       "minutes": 20,
       "why": "combat"

@@ -7,6 +7,14 @@
       "why": "copper/tin to bank"
     },
     {
+      "task": "quest_fetch",
+      "item": "Egg",
+      "for": "hawkbot1",
+      "minutes": 25,
+      "why": "quest party: Egg for hawkbot1",
+      "once": true
+    },
+    {
       "task": "melee",
       "minutes": 20,
       "why": "combat"

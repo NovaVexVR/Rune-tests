@@ -7,6 +7,14 @@
       "why": "ore stockpile in bank"
     },
     {
+      "task": "quest_fetch",
+      "item": "Egg",
+      "for": "guildbot1",
+      "minutes": 25,
+      "why": "quest party: Egg for guildbot1",
+      "once": true
+    },
+    {
       "task": "melee",
       "minutes": 20,
       "why": "combat"

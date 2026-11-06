@@ -7,6 +7,16 @@
       "why": "guild fighter"
     },
     {
+      "task": "cooks_assistant",
+      "minutes": 40,
+      "party": {
+        "Egg": "guildbot2",
+        "Bucket of milk": "guildbot3"
+      },
+      "why": "quest party leader (guild)",
+      "once": true
+    },
+    {
       "task": "fish_cook",
       "minutes": 20,
       "why": "food"

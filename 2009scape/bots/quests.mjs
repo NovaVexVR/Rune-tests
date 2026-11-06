@@ -119,7 +119,7 @@ async function getFlour(bot) {
 export const COOKS_ASSISTANT = {
     id: 'cooks_assistant',
     skills: ['cooking'],
-    canRun: bot => (bot.s.quests?.COOKS_ASSISTANT ?? 0) >= 100 ? 'already done' : bot.s.invFree >= 5 || 'need 5 free inventory slots',
+    canRun: bot => (bot.s.quests?.COOKS_ASSISTANT ?? 0) >= 100 ? 'already done' : true, // banks clutter itself if the bag is full
     async run(bot, until, step = {}) {
         bot._questing = true; // market day leaves questing bots alone
         try { await this.steps(bot, until, step); } finally { bot._questing = false; }
@@ -162,7 +162,7 @@ const GET = { Egg: bot => pickUp(bot, 'Egg', FRED), 'Bucket of milk': getMilk, '
 export const QUEST_FETCH = {
     id: 'quest_fetch',
     skills: [],
-    canRun: bot => bot.s.invFree >= 2 || 'need 2 free inventory slots',
+    canRun: () => true,
     async run(bot, until, step = {}) {
         bot._questing = true;
         try { await this.steps(bot, until, step); } finally { bot._questing = false; }
@@ -171,6 +171,7 @@ export const QUEST_FETCH = {
         const item = step.item, leader = step.for;
         if (!GET[item] || !leader) { bot.log(`quest_fetch: bad step ${JSON.stringify(step)}`); return; }
         await toGround(bot);
+        await makeRoom(bot, 3);
         if (!has(bot, item)) await GET[item](bot);
         if (!has(bot, item)) { bot.log(`quest_fetch: couldn't get ${item}`); return; }
         bot.log(`quest_fetch: bringing ${item} to ${leader}`);

@@ -7,6 +7,16 @@
       "why": "strength-first melee (guide)"
     },
     {
+      "task": "cooks_assistant",
+      "minutes": 40,
+      "party": {
+        "Egg": "hawkbot2",
+        "Bucket of milk": "hawkbot3"
+      },
+      "why": "quest party leader (hawk)",
+      "once": true
+    },
+    {
       "task": "fish_cook",
       "minutes": 20,
       "why": "food"
