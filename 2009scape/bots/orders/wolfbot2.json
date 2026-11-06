@@ -2,14 +2,6 @@
   "role": "[wolf] Team miner: banks ore for future smithing, also fights and fletches",
   "plan": [
     {
-      "task": "quest_fetch",
-      "item": "Egg",
-      "for": "wolfbot1",
-      "minutes": 25,
-      "why": "quest party: Egg for wolfbot1",
-      "once": true
-    },
-    {
       "task": "mine",
       "minutes": 45,
       "why": "copper/tin to bank"
@@ -46,5 +38,5 @@
       "food": "Trout"
     }
   },
-  "preempt": true
+  "preempt": false
 }

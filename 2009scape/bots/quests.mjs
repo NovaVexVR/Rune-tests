@@ -128,7 +128,8 @@ export const COOKS_ASSISTANT = {
         const stage = () => bot.s.quests?.COOKS_ASSISTANT ?? 0;
         await toGround(bot);
         await makeRoom(bot, 5);
-        if (stage() === 0) { bot.log('quest: starting Cook\'s Assistant'); await talkCook(bot); }
+        // a party member's trade can interrupt the conversation: try a few times
+        for (let i = 0; i < 3 && stage() === 0; i++) { bot.log('quest: starting Cook\'s Assistant'); await talkCook(bot); await bot.handleInterrupts(); }
         if (stage() === 0) { bot.log('quest: the cook did not give us the quest'); return; }
         const given = k => !!bot.s.questFlags?.[k + '_submitted'] || !!bot.s.questFlags?.all_submitted; // already handed to the cook
         // party: helpers fetch some ingredients and trade them over; the leader does the rest
@@ -250,7 +251,7 @@ export const SHEEP_SHEARER = {
         const stage = () => bot.s.quests?.SHEEP_SHEARER ?? 0;
         const delivered = () => Number(bot.s.questFlags?.['num-balls-of-wool-delivered'] ?? 0);
         await toGround(bot);
-        if (stage() === 0) { bot.log('quest: starting Sheep Shearer'); await talkFred(bot); }
+        for (let i = 0; i < 3 && stage() === 0; i++) { bot.log('quest: starting Sheep Shearer'); await talkFred(bot); await bot.handleInterrupts(); }
         if (stage() === 0) { bot.log('quest: Fred did not give us the quest'); return; }
         await makeRoom(bot, 12);
         while (Date.now() < until && stage() < 90) {

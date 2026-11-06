@@ -2,16 +2,6 @@
   "role": "[wolf] Team fighter: combat first, gathers food between fights",
   "plan": [
     {
-      "task": "cooks_assistant",
-      "minutes": 40,
-      "party": {
-        "Egg": "wolfbot2",
-        "Bucket of milk": "wolfbot3"
-      },
-      "why": "quest party leader (wolf)",
-      "once": true
-    },
-    {
       "task": "melee",
       "minutes": 45,
       "why": "strength-first melee (guide)"
@@ -48,5 +38,5 @@
       "food": "Cooked meat"
     }
   },
-  "preempt": true
+  "preempt": false
 }

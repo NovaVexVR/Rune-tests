@@ -2,14 +2,6 @@
   "role": "[wolf] Team woodsman/fletcher: logs, fires, arrow shafts and bows",
   "plan": [
     {
-      "task": "quest_fetch",
-      "item": "Bucket of milk",
-      "for": "wolfbot1",
-      "minutes": 25,
-      "why": "quest party: Bucket of milk for wolfbot1",
-      "once": true
-    },
-    {
       "task": "woodcut_fire",
       "minutes": 30,
       "why": "wc/fm"
@@ -47,5 +39,5 @@
       "collection": "tools"
     }
   },
-  "preempt": true
+  "preempt": false
 }

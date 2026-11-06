@@ -2,6 +2,14 @@
   "role": "Guild treasurer: earns coins, collects spare coins from members, buys missing tools for members, banks the pool",
   "plan": [
     {
+      "task": "quest_fetch",
+      "item": "Egg",
+      "for": "guildbot4",
+      "minutes": 25,
+      "why": "quest party: Egg for guildbot4",
+      "once": true
+    },
+    {
       "task": "treasury",
       "minutes": 40,
       "why": "equip the guild + manage pool"
@@ -39,5 +47,6 @@
       "collection": "logs",
       "gambles": true
     }
-  }
+  },
+  "preempt": false
 }

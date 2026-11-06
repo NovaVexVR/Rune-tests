@@ -7,14 +7,6 @@
       "why": "wc/fm"
     },
     {
-      "task": "quest_fetch",
-      "item": "Bucket of milk",
-      "for": "hawkbot1",
-      "minutes": 25,
-      "why": "quest party: Bucket of milk for hawkbot1",
-      "once": true
-    },
-    {
       "task": "fletch",
       "minutes": 30,
       "why": "shafts->bows (guide)"
@@ -46,5 +38,5 @@
       "food": "Anchovies"
     }
   },
-  "preempt": true
+  "preempt": false
 }

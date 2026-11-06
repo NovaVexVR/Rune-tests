@@ -2,6 +2,15 @@
   "role": "Guild cook: food for the guild, also fights and chops",
   "plan": [
     {
+      "task": "cooks_assistant",
+      "minutes": 40,
+      "party": {
+        "Egg": "guildbot5"
+      },
+      "why": "quest party leader (guild)",
+      "once": true
+    },
+    {
       "task": "fish_cook",
       "minutes": 45,
       "why": "food"
@@ -37,5 +46,6 @@
       "spot": "store",
       "food": "Cooked chicken"
     }
-  }
+  },
+  "preempt": false
 }

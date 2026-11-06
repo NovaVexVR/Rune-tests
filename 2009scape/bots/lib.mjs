@@ -542,7 +542,13 @@ export class Bot {
         if (s.dialog && s.chatbox !== 372) {
             if (s.dialog.options.length) {
                 const want = answer ? s.dialog.options.find(o => answer.test(o)) : null;
-                const o = want ?? s.dialog.options.find(o => /^(yes|okay|ok|sure|i'll|continue)/i.test(o)) ?? s.dialog.options[0];
+                // a menu we've already answered recently means we're going round in circles: take the way out
+                const sig = s.dialog.options.join('|');
+                this._menus ??= new Map();
+                const seen = (this._menus.get(sig) ?? []).filter(t => Date.now() - t < 120_000);
+                this._menus.set(sig, [...seen, Date.now()]);
+                const exit = seen.length >= 1 ? (s.dialog.options.find(o => /information i need|that's all|thanks|goodbye|bye|no thanks|nothing|never ?mind|not right now|leave|no\b/i.test(o)) ?? s.dialog.options.at(-1)) : null;
+                const o = want ?? exit ?? s.dialog.options.find(o => /^(yes|okay|ok|sure|i'll|continue)/i.test(o)) ?? s.dialog.options[0];
                 await this.act({ type: 'choose', option: o });
             } else {
                 await this.act({ type: 'continue' });
