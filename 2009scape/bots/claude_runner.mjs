@@ -13,8 +13,11 @@ import { taskById, RESUPPLY } from './tasks.mjs';
 import { Market, TEAMS } from './market.mjs';
 import { personalityOf, SPOTS } from './social.mjs';
 import { council, STATE as POLITICS } from './politics.mjs';
+import { MarketDay } from './marketday.mjs';
+import { note, noteLevel } from './diary.mjs';
 
 const market = new Market((...a) => console.log(new Date().toISOString(), ...a));
+const marketDay = new MarketDay(market, (...a) => console.log(new Date().toISOString(), ...a));
 
 const COUNT = Number(process.argv[2] ?? 5);
 const ORDERS = path.join(path.dirname(new URL(import.meta.url).pathname), 'orders');
@@ -47,11 +50,15 @@ async function runBot(name, delay) {
     bot.onPm = pm => market.onPm(name, pm);
     // mood reacts to what happens in-game
     bot.onMsg = text => {
-        if (/Oh dear, you are dead/i.test(text)) market.social.bumpMood(name, -0.4, 'dying');
-        else if (/advanced .* level|reached level/i.test(text)) market.social.bumpMood(name, 0.1, 'a level-up');
+        if (/Oh dear, you are dead/i.test(text)) {
+            market.social.bumpMood(name, -0.4, 'dying');
+            marketDay.noteDeath(name);
+            note(name, `Died for the first time, at ${bot.s?.x},${bot.s?.y}.`, { once: 'first-death' }) || note(name, `Died again, at ${bot.s?.x},${bot.s?.y}.`);
+        } else if (/advanced .* level|reached level/i.test(text)) { market.social.bumpMood(name, 0.1, 'a level-up'); noteLevel(name, text); }
     };
     // random events: gifts cheer a bot up, ambushes and kidnappings shake it
     bot.onRandomEvent = type => {
+        note(name, type === 'RESCUED' ? 'Got stuck in a random event and had to be pulled out.' : `Random event: ${type.toLowerCase().replace(/_/g, ' ')}.`);
         if (['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE', 'STRANGE_PLANT'].includes(type)) market.social.bumpMood(name, 0.05, `a ${type.toLowerCase().replace('_', ' ')} visit`);
         else market.social.bumpMood(name, type === 'RESCUED' ? -0.2 : -0.05, type === 'RESCUED' ? 'being stuck in a random event' : `a ${type.toLowerCase().replace('_', ' ')} ambush`);
     };
@@ -81,6 +88,12 @@ async function runBot(name, delay) {
                 if (o.loop && plan.length) step = 0;
                 else { await sleep(10000); continue; }
             }
+            // market day at the Grand Exchange: go if it's about to open (and the bot wants to)
+            const day = marketDay.day;
+            if (day && marketDay.upcoming() && day.start - Date.now() < 7 * 60_000 && marketDay.wants(name) && !day.arrived.includes(name)) {
+                await marketDay.attend(bot);
+                continue;
+            }
             let item = plan[step];
             // politics: the poorest team spends some of its time making money
             const team = POLITICS.teams[market.social.teamOf(name)];
@@ -100,7 +113,7 @@ async function runBot(name, delay) {
                 continue;
             }
             bot.log(`[plan step ${step}] ${item.task} for ${item.minutes}m — ${item.why ?? ''} | ${summary(bot.s)}`);
-            await task.run(bot, Date.now() + (item.minutes ?? 15) * 60_000);
+            await task.run(bot, marketDay.deadline(name, Date.now() + (item.minutes ?? 15) * 60_000));
             writeStep(name, step + 1);
             // habit: now and then, drift to a favorite spot between tasks
             const habits = personalityOf(name).habits;
@@ -132,4 +145,5 @@ console.log(`starting Claude-directed bots: ${names.join(', ')}`);
 const POLITICS_MINUTES = Number(process.env.POLITICS_MINUTES ?? 60);
 setInterval(() => { try { council(market); } catch (e) { console.log('council error', e); } }, POLITICS_MINUTES * 60_000);
 setInterval(() => market.social.driftMoods(), 10 * 60_000);
+setInterval(() => { try { marketDay.tick(); } catch (e) { console.log('market day error', e); } }, 60_000);
 await Promise.all(names.map((n, i) => runBot(n, i * 3000)));

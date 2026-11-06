@@ -120,6 +120,78 @@ object BotRegistry {
         return name
     }
 
+    /**
+     * Breadth-first search (8 directions) over the server's clipping flags, using the same masks as
+     * SmartPathfinder. A move blocked only by a wall counts as passable where a door or gate stands,
+     * since bots open those on the way. Tiles inside `avoid` circles (x, y, radius) are off limits.
+     * Returns waypoints about 14 tiles apart and the doors on the way.
+     */
+    fun planRoute(fx: Int, fy: Int, tx: Int, ty: Int, z: Int, avoid: List<List<Int>>): JSONObject {
+        val margin = 60
+        val x0 = minOf(fx, tx) - margin; val y0 = minOf(fy, ty) - margin
+        val w = maxOf(fx, tx) + margin - x0 + 1; val h = maxOf(fy, ty) + margin - y0 + 1
+        if (w * h > 700 * 700) throw BotError("route too long")
+        val flags = IntArray(w * h) { i -> RegionManager.getClippingFlag(z, x0 + i % w, y0 + i / w) }
+        val banned = BooleanArray(w * h) { i -> val x = x0 + i % w; val y = y0 + i / w; avoid.any { (ax, ay, r) -> maxOf(Math.abs(x - ax), Math.abs(y - ay)) <= r } }
+        val doorCache = HashMap<Int, Boolean>()
+        fun door(x: Int, y: Int): Boolean = doorCache.getOrPut(x * 65536 + y) {
+            val o = RegionManager.getObject(x, y, z) ?: return@getOrPut false
+            Regex("door|gate", RegexOption.IGNORE_CASE).containsMatchIn(o.name) && o.definition.options?.any { it != null && it.equals("Open", true) } == true
+        }
+        fun f(x: Int, y: Int) = if (x < x0 || y < y0 || x >= x0 + w || y >= y0 + h) -1 else flags[(y - y0) * w + (x - x0)]
+        val dirs = arrayOf(intArrayOf(0, -1, 0x12c0102), intArrayOf(-1, 0, 0x12c0108), intArrayOf(0, 1, 0x12c0120), intArrayOf(1, 0, 0x12c0180),
+            intArrayOf(-1, -1, 0x12c010e), intArrayOf(-1, 1, 0x12c0138), intArrayOf(1, -1, 0x12c0183), intArrayOf(1, 1, 0x12c01e0))
+        val prev = IntArray(w * h) { -1 }
+        val start = (fy - y0) * w + (fx - x0); val goal = (ty - y0) * w + (tx - x0)
+        prev[start] = start
+        val queue = java.util.ArrayDeque<Int>(); queue.add(start)
+        var doorsUsed = 0
+        while (queue.isNotEmpty()) {
+            val cur = queue.poll()
+            if (cur == goal) break
+            val cx = x0 + cur % w; val cy = y0 + cur / w
+            for (d in dirs) {
+                val nx = cx + d[0]; val ny = cy + d[1]
+                if (nx < x0 || ny < y0 || nx >= x0 + w || ny >= y0 + h) continue
+                val ni = (ny - y0) * w + (nx - x0)
+                if (prev[ni] != -1 || banned[ni]) continue
+                val fl = f(nx, ny)
+                if (fl == -1) continue
+                var ok = fl and d[2] == 0
+                if (ok && d[0] != 0 && d[1] != 0) ok = f(nx, cy) and dirs[if (d[0] < 0) 1 else 3][2] == 0 && f(cx, ny) and dirs[if (d[1] < 0) 0 else 2][2] == 0
+                // a wall with a door/gate in it (orthogonal steps only; solid objects stay blocked)
+                if (!ok && (d[0] == 0 || d[1] == 0) && fl and 0x100 == 0 && fl and 0x200000 == 0 && (door(nx, ny) || door(cx, cy))) { ok = true; doorsUsed++ }
+                if (!ok) continue
+                prev[ni] = cur
+                queue.add(ni)
+            }
+        }
+        // the exact target may be a solid tile (a booth, a tree): settle for the closest reachable tile within 6
+        var end = goal
+        if (prev[goal] == -1) {
+            var best = Int.MAX_VALUE
+            for (i in prev.indices) if (prev[i] != -1) {
+                val d = maxOf(Math.abs(x0 + i % w - tx), Math.abs(y0 + i / w - ty))
+                if (d < best) { best = d; end = i }
+            }
+            if (best > 6) return JSONObject().apply { this["ok"] = false; this["error"] = "no route" }
+        }
+        val tiles = ArrayList<Int>()
+        var c = end
+        while (c != start) { tiles.add(c); c = prev[c] }
+        tiles.reverse()
+        val way = JSONArray(); val doors = JSONArray()
+        var last = start
+        for ((k, t) in tiles.withIndex()) {
+            val x = x0 + t % w; val y = y0 + t / w
+            val lx = x0 + last % w; val ly = y0 + last / w
+            val atDoor = door(x, y)
+            if (atDoor) doors.add(JSONArray().apply { add(x); add(y) })
+            if (k == tiles.lastIndex || atDoor || maxOf(Math.abs(x - lx), Math.abs(y - ly)) >= 14) { way.add(JSONArray().apply { add(x); add(y) }); last = t }
+        }
+        return JSONObject().apply { this["ok"] = true; this["length"] = tiles.size; this["path"] = way; this["doors"] = doors }
+    }
+
     fun logout(name: String) {
         val p = get(name).player ?: return
         p.details.session.disconnect()
@@ -583,6 +655,14 @@ object BotRegistry {
                             this["enabled"] = JSONArray().apply { addAll(allowedEvents.sorted()) }
                             this["all"] = JSONArray().apply { content.global.ame.RandomEvents.values().forEach { add(it.name) } }
                         }
+                    }
+                    // long-distance route planning over the real collision map: /route?from=x,y&to=x,y[&z=0][&avoid=x,y,r;x,y,r]
+                    parts == listOf("route") -> {
+                        fun xy(v: String?) = (v ?: throw BotError("need from= and to=")).split(",").map { it.trim().toInt() }
+                        val (fx, fy) = xy(q["from"]); val (tx, ty) = xy(q["to"])
+                        val z = q["z"]?.toInt() ?: 0
+                        val avoid = (q["avoid"] ?: "").split(";").filter { it.isNotBlank() }.map { it.split(",").map { n -> n.trim().toInt() } }
+                        onGame { planRoute(fx, fy, tx, ty, z, avoid) }
                     }
                     parts == listOf("bots") -> JSONArray().apply {
                         bots.values.forEach { b -> add(JSONObject().apply { this["name"] = b.name; this["online"] = b.player?.isActive == true }) }

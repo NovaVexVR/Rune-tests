@@ -49,6 +49,7 @@ Use the 2009Scape client ([rt4-client](https://gitlab.com/2009scape/rt4-client))
 ### Useful commands
 - `node bots/status.mjs`: level table for every bot
 - edit `bots/orders/<bot>.json`: change a Claude-directed bot's plan (re-read live)
+- `node bots/recap.mjs`: news-style recap of the last day from the bots' diaries (`bots/diaries/`) and the trade ledger
 - `bots/GUIDE.md`: the leveling plan the bots follow, built from the 2009Scape wiki guides in `guides/`
 
 `saves/` holds the bots' character saves so they keep their progress; `setup.sh` copies them into the server.

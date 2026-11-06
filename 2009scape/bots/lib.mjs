@@ -22,6 +22,8 @@ export const RANDOM_EVENTS = process.env.BOT_EVENTS != null
        'EVIL_CHICKEN', 'RIVER_TROLL', 'ROCK_GOLEM', 'SHADE', 'SWARM', 'TREE_SPIRIT', 'ZOMBIE'];
 // experience-lamp interface (134) skill buttons
 const LAMP_BUTTON = { attack: 29, strength: 30, defence: 31, ranged: 32, prayer: 33, hitpoints: 34, magic: 35, agility: 36, herblore: 37, thieving: 38, crafting: 39, fletching: 40, mining: 41, smithing: 42, fishing: 43, firemaking: 44, cooking: 45, woodcutting: 46, runecrafting: 47, slayer: 48, hunter: 49, farming: 50, construction: 51, summoning: 52 };
+// Places low-level bots keep away from on long trips: the dark wizards' circle south of Varrock, the Draynor wizards
+export const DANGER = [{ x: 3227, y: 3369, r: 18 }, { x: 3095, y: 3232, r: 14 }];
 // Grand Exchange: centre of the building, and interface 105 buttons per offer slot (0-5)
 export const GE = { x: 3165, y: 3487 };
 const GE_BUY = [30, 46, 62, 81, 100, 119], GE_SELL = [31, 47, 63, 82, 101, 120], GE_BOX = [18, 34, 50, 69, 88, 107];
@@ -347,6 +349,29 @@ export class Bot {
             await this.waitIdle({ timeout: 25, quiet: 1 });
         }
         return false;
+    }
+
+    // Long trip: plan a route on the server's collision map (around DANGER zones), then walk it waypoint by waypoint.
+    async travel(x, y, { avoid = DANGER, tol = 3, timeout = 900 } = {}) {
+        const s = await this.state(1);
+        if (dist(s, { x, y }) <= tol) return true;
+        const q = `/route?from=${s.x},${s.y}&to=${x},${y}&z=${s.z}` + (avoid.length ? `&avoid=${avoid.map(a => `${a.x},${a.y},${a.r}`).join(';')}` : '');
+        const r = await http('GET', q).catch(e => ({ ok: false, error: e.message }));
+        if (!r.ok) { this.log(`travel to ${x},${y}: ${r.error}; walking straight`); return this.walkTo(x, y, { tol, timeout }); }
+        const end = Date.now() + timeout * 1000;
+        for (const [wx, wy] of r.path) {
+            const left = Math.max(30, (end - Date.now()) / 1000);
+            if (!(await this.walkTo(wx, wy, { tol: 2, timeout: Math.min(120, left) }))) {
+                // knocked off the path (a fight, a random event, a closed door): re-plan from here once
+                if (this._replanned) { this._replanned = false; return false; }
+                this._replanned = true;
+                const ok = await this.travel(x, y, { avoid, tol, timeout: left });
+                this._replanned = false;
+                return ok;
+            }
+            if (Date.now() > end) return false;
+        }
+        return dist(await this.state(1), { x, y }) <= tol || this.walkTo(x, y, { tol, timeout: 60 });
     }
 
     async route(points, opts) {

@@ -98,6 +98,8 @@ function makeHabits(name, p) {
     return h;
 }
 
+import { note } from './diary.mjs';
+
 const load = (f, d) => (fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : d);
 const save = (f, v) => fs.writeFileSync(f, JSON.stringify(v, null, 2));
 
@@ -133,6 +135,7 @@ export class Social {
         save(REL_FILE, this.rel);
         if (!was) {
             this.log(`[social] ${a} now holds a grudge against ${b} (${reason})`);
+            note(a, `Holding a grudge against ${b}: ${reason}.`);
             this.onGrudge?.(a, b, reason);
         }
     }
@@ -303,6 +306,8 @@ export class Social {
         } else {
             this.adjustTrust(iou.creditor, iou.debtor, -0.5);
             this.markRival(iou.creditor, iou.debtor, `defaulted on IOU #${iou.id}`);
+            note(iou.creditor, `${iou.debtor} never paid back the ${iou.owed}gp they owed me. Betrayed.`);
+            note(iou.debtor, `Defaulted on my ${iou.owed}gp debt to ${iou.creditor}.`);
             this.bumpMood(iou.creditor, -0.3, `${iou.debtor} defaulting`);
             // reputation: everyone who has dealt in IOUs hears about it
             const known = new Set([...Object.keys(this.trustMap), ...this.ious.flatMap(i => [i.debtor, i.creditor])]);

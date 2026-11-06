@@ -20,6 +20,7 @@ import path from 'path';
 
 import { dist, sleep } from './lib.mjs';
 import { Social, COLLECTIONS, personalityOf } from './social.mjs';
+import { note, record } from './diary.mjs';
 import { teamOf, treasurerOfTeam, onContribution, onHelped } from './politics.mjs';
 
 const DIR = path.join(path.dirname(new URL(import.meta.url).pathname), 'market');
@@ -59,6 +60,7 @@ export class Market {
         this.bots = new Map(); // name -> { bot, plan() }
         this.deals = new Map();
         this.busy = new Set();
+        this.away = new Set(); // bots at a market day: only the market-day haggling trades with them
         // deal ids continue from the ledger so they stay unique across restarts
         this.seq = fs.existsSync(LEDGER) ? fs.readFileSync(LEDGER, 'utf8').trim().split('\n').filter(Boolean).reduce((m, l) => Math.max(m, JSON.parse(l).id ?? 0), 0) : 0;
         this.log = log;
@@ -94,6 +96,11 @@ export class Market {
         for (const iou of this.social.openDebts(name)) {
             if (iou.creditor === pm.from) { iou.reminded = Date.now(); this.social.saveIous?.(); }
         }
+    }
+
+    // in a deal, or away at a market day (where only market-day haggling trades with it)
+    isBusy(name) {
+        return this.busy.has(name) || this.away.has(name);
     }
 
     register(bot, planFn) {
@@ -194,7 +201,7 @@ export class Market {
 
     // Look for a deal that fills one of this bot's needs (and, for the guild, pool coins).
     async seek(name) {
-        if (this.busy.has(name)) return;
+        if (this.isBusy(name)) return;
         const me = this.bots.get(name).bot.s;
         if (!me?.online || (me.x >= 3050 && me.x <= 3160 && me.y >= 3050 && me.y <= 3140)) return;
         this.saveValues(name);
@@ -213,7 +220,7 @@ export class Market {
         // pay debts first (loyal bots promptly; others when overdue or on a whim)
         for (const iou of this.social.openDebts(name)) {
             const cred = this.bots.get(iou.creditor);
-            if (!cred?.bot.s?.online || this.busy.has(iou.creditor)) continue;
+            if (!cred?.bot.s?.online || this.isBusy(iou.creditor)) continue;
             if (this.social.wantsToRepay(name, iou, this.coins(name))) {
                 this.open({ buyer: iou.creditor, seller: name, item: 'Coins', amount: iou.owed, price: 0, kind: 'repay', iouId: iou.id });
                 return;
@@ -222,7 +229,7 @@ export class Market {
 
         // guild members send spare coins to the treasurer
         const tre = treasurerOf(name);
-        if (tre && name !== tre && this.coins(name) > COIN_FLOAT + 20 && this.bots.get(tre)?.bot.s?.online && !this.busy.has(tre)) {
+        if (tre && name !== tre && this.coins(name) > COIN_FLOAT + 20 && this.bots.get(tre)?.bot.s?.online && !this.isBusy(tre)) {
             this.open({ buyer: tre, seller: name, item: 'Coins', amount: this.coins(name) - COIN_FLOAT, price: 0, kind: 'gift' });
             return;
         }
@@ -234,7 +241,7 @@ export class Market {
 
         for (const need of this.needsOf(name)) {
             // guildmates first (free), then anyone it isn't feuding with
-            const others = [...this.bots.keys()].filter(o => o !== name && !this.busy.has(o) && this.bots.get(o).bot.s?.online && !this.social.isRival(name, o) && !this.social.isRival(o, name))
+            const others = [...this.bots.keys()].filter(o => o !== name && !this.isBusy(o) && this.bots.get(o).bot.s?.online && !this.social.isRival(name, o) && !this.social.isRival(o, name))
                 .sort((a, b) => Number(sameGuild(name, b)) - Number(sameGuild(name, a)));
             for (const other of others) {
                 if (!this.surplusOf(other).some(i => i.name === need)) continue;
@@ -258,7 +265,7 @@ export class Market {
                 // guild buyers draw on the treasury
                 const payer = tre && this.coins(name) < price ? null : name;
                 if (!payer) {
-                    if (this.bots.has(tre) && this.coins(tre) >= price && !this.busy.has(tre) && name !== tre) {
+                    if (this.bots.has(tre) && this.coins(tre) >= price && !this.isBusy(tre) && name !== tre) {
                         this.open({ buyer: name, seller: tre, item: 'Coins', amount: price, price: 0, kind: 'gift' });
                         return;
                     }
@@ -281,6 +288,7 @@ export class Market {
         o.personality.habits.collectionDone = new Date().toISOString();
         fs.writeFileSync(f, JSON.stringify(o, null, 2));
         this.log(`[character] ${name} completed its ${col.name} collection!`);
+        note(name, `Completed my ${col.name} collection!`);
         this.social.bumpMood(name, 0.3, 'completing a collection');
         const text = this.social.line(name, 'collection', '');
         if (text) this.bots.get(name).bot.act({ type: 'say', text });
@@ -291,7 +299,7 @@ export class Market {
         const h = personalityOf(name).habits ?? {};
         if (!h.gambles || this.coins(name) < 20 || Date.now() - (this.lastWager?.[name] ?? 0) < 30 * 60_000) return false;
         const me = this.bots.get(name).bot.s;
-        const other = [...this.bots.keys()].find(o => o !== name && !this.busy.has(o) && personalityOf(o).habits?.gambles && this.coins(o) >= 20
+        const other = [...this.bots.keys()].find(o => o !== name && !this.isBusy(o) && personalityOf(o).habits?.gambles && this.coins(o) >= 20
             && this.bots.get(o).bot.s?.online && dist(me, this.bots.get(o).bot.s) <= 25 && !this.social.isRival(name, o) && !this.social.isRival(o, name));
         if (!other) return false;
         (this.lastWager ??= {})[name] = Date.now();
@@ -331,7 +339,7 @@ export class Market {
         for (const iou of this.social.ious) {
             if (iou.status !== 'open' || Date.now() < iou.due || iou.creditor === name || iou.debtor === name) continue;
             const cred = this.bots.get(iou.creditor);
-            if (!cred?.bot.s?.online || this.busy.has(iou.creditor)) continue;
+            if (!cred?.bot.s?.online || this.isBusy(iou.creditor)) continue;
             const price = Math.max(1, Math.min(Math.round(iou.owed * 0.8), Math.round(iou.owed * 0.6 * (1 + 0.3 * this.social.trust(name, iou.debtor)))));
             if (this.coins(name) < price) continue;
             if (!this.social.willSellDebt(iou.creditor, iou, price)) continue;
@@ -348,7 +356,7 @@ export class Market {
         const iou = this.social.ious.find(i => i.status === 'open' && i.collected && i.creditor === name && Date.now() > i.due - 10 * 60_000);
         if (!iou) return false;
         const ds = this.bots.get(iou.debtor)?.bot.s;
-        if (!ds?.online || ds.z !== 0) return false;
+        if (!ds?.online || ds.z !== 0 || this.away.has(iou.debtor) || this.away.has(name)) return false;
         this.lastHound[name] = Date.now();
         this.log(`[social] ${name} goes to collect from ${iou.debtor} (IOU #${iou.id})`);
         await bot.walkTo(ds.x, ds.y, { tol: 3, timeout: 120 });
@@ -365,7 +373,7 @@ export class Market {
         const me = this.bots.get(name).bot.s;
         const wanted = this.wantedBy(name);
         const options = this.social.openBounties().filter(b => {
-            if (b.poster === name || this.busy.has(b.poster) || !this.bots.get(b.poster)?.bot.s?.online) return false;
+            if (b.poster === name || this.isBusy(b.poster) || !this.bots.get(b.poster)?.bot.s?.online) return false;
             if (this.social.isRival(name, b.poster) || this.social.isRival(b.poster, name)) return false;
             if (this.social.trust(name, b.poster) < -0.2 + 0.4 * p.caution - 0.2) return false; // cautious bots only work for people they trust
             const have = me.inv.filter(i => i.name === b.item).reduce((t, i) => t + i.count, 0);
@@ -461,6 +469,7 @@ export class Market {
             const iou = this.social.ious.find(i => i.id === deal.iouId);
             if (iou && iou.status === 'open') this.social.settle(iou, true);
         }
+        if (outcome === 'completed') this.diary(deal);
         if (outcome === 'completed') {
             const event = { sale: 'sale', favor: 'favor', repay: 'repaid', bounty: 'bountyDone', wager: 'wagerWin' }[deal.kind];
             const speaker = deal.kind === 'repay' || deal.kind === 'wager' ? deal.buyer : deal.seller;
@@ -468,9 +477,33 @@ export class Market {
             const text = event && this.social.line(speaker, event, other);
             if (text) this.bots.get(speaker)?.bot.act({ type: 'say', text }).catch?.(() => {});
         }
-        const rec = { t: new Date().toISOString(), id: deal.id, buyer: deal.buyer, seller: deal.seller, item: deal.item, amount: deal.amount ?? 1, price: deal.price, kind: deal.kind, ask: deal.ask, bid: deal.bid, outcome };
+        const rec = { t: new Date().toISOString(), id: deal.id, buyer: deal.buyer, seller: deal.seller, item: deal.item, amount: deal.amount ?? 1, price: deal.price, kind: deal.kind, ask: deal.ask, bid: deal.bid, venue: deal.venue, outcome };
         fs.appendFileSync(LEDGER, JSON.stringify(rec) + '\n');
         this.log(`[market] deal #${deal.id} ${outcome}`);
+    }
+
+    // diary lines for a completed deal
+    diary(d) {
+        const n = d.amount ?? 1, what = `${n > 1 ? n + ' ' : ''}${d.item}`, where = d.venue ? ` at the ${d.venue}` : '';
+        if (d.kind === 'sale') {
+            if (record(d.buyer, 'biggest-buy', d.price)) note(d.buyer, `Biggest purchase yet: ${what} from ${d.seller} for ${d.price}gp${where}.`);
+            if (record(d.seller, 'biggest-sale', d.price)) note(d.seller, `Biggest sale yet: ${what} to ${d.buyer} for ${d.price}gp${where}.`);
+        } else if (d.kind === 'favor') {
+            note(d.buyer, `Borrowed ${what} from ${d.seller} on an IOU.`);
+            note(d.seller, `Lent ${what} to ${d.buyer} on an IOU.`);
+        } else if (d.kind === 'repay') {
+            note(d.seller, `Paid off my ${n}gp debt to ${d.buyer}.`);
+            note(d.buyer, `${d.seller} paid me back ${n}gp.`);
+        } else if (d.kind === 'debtsale') {
+            const iou = this.social.ious.find(i => i.id === d.iouId);
+            note(d.buyer, `Bought ${d.seller}'s claim on ${iou?.debtor ?? 'a debtor'} for ${d.price}gp. Time to collect.`);
+            note(d.seller, `Sold my claim on ${iou?.debtor ?? 'a debtor'} to ${d.buyer} for ${d.price}gp.`);
+        } else if (d.kind === 'bounty') {
+            note(d.seller, `Delivered ${what} to ${d.buyer} for a ${d.price}gp bounty.`);
+        } else if (d.kind === 'wager') {
+            note(d.buyer, `Won ${n}gp from ${d.seller} on a coin flip.`);
+            note(d.seller, `Lost ${n}gp to ${d.buyer} on a coin flip.`);
+        }
     }
 
     // Each side judges the open trade window with its OWN perceived values.
@@ -507,7 +540,7 @@ export class Market {
                 else await bot.wait(3);
                 return true;
             }
-            if (isBuyer && dist(s, ps) > 2) { await bot.walkTo(ps.x, ps.y, { tol: 2, timeout: 60 }); return true; }
+            if (isBuyer && dist(s, ps) > 2) { await (dist(s, ps) > 40 ? bot.travel(ps.x, ps.y, { tol: 2, timeout: 240 }) : bot.walkTo(ps.x, ps.y, { tol: 2, timeout: 60 })); return true; }
             if (dist(s, ps) <= 3) { await bot.act({ type: 'player', name: partner.name, op: 'Trade with' }); await bot.wait(3); }
             else await bot.wait(2);
             return true;

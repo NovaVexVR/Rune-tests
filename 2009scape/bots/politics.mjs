@@ -40,6 +40,8 @@ export const taxRate = (social, team) => {
     return tre ? Math.round((0.05 + 0.25 * social.p(tre).greed) * 100) / 100 : 0;
 };
 
+import { note } from './diary.mjs';
+
 function event(log, text) {
     STATE.history.push({ t: new Date().toISOString(), text });
     if (STATE.history.length > 300) STATE.history.splice(0, STATE.history.length - 300);
@@ -140,6 +142,8 @@ export function council(market) {
             rewritePlansForSwap(cand, tre);
             for (const m of others) social.adjustTrust(m, cand, 0.1);
             event(log, `MUTINY in ${team}: members (avg trust ${avg.toFixed(2)}) voted out ${tre}; ${cand} is the new treasurer`);
+            note(tre, `Voted out as ${team}'s treasurer. ${cand} takes over.`);
+            note(cand, `Elected treasurer of ${team} after the vote against ${tre}.`);
             if (online(cand)) say(cand, `The ${team} treasury is mine now. No more skimming.`);
         }
     }
@@ -158,6 +162,7 @@ export function council(market) {
                 delete rec.lowSince;
                 for (const mate of d.members) social.adjustTrust(mate, m, -0.3);
                 event(log, `${m} LEFT ${team} (satisfaction ${sat}); now an individualist`);
+                note(m, `Quit ${team}. Going my own way.`);
                 if (tre && online(tre)) market.dm(m, tre, `I quit ${team}. You took too much.`);
                 if (online(m)) say(m, `I'm done with ${team}. Going my own way.`);
             }
@@ -177,6 +182,7 @@ export function council(market) {
             const inviter = d.treasurer && online(d.treasurer) ? d.treasurer : d.members.find(online);
             if (inviter) market.dm(inviter, c, `${team} wants you. Join us?`);
             event(log, `${team} invited ${c} (trust ${theirTrust.toFixed(2)}/${myTrust.toFixed(2)}): ${accepts ? 'accepted' : 'declined'}`);
+            note(c, accepts ? `Joined ${team}.` : `Turned down an invitation to join ${team}.`);
             if (inviter) market.dm(c, inviter, accepts ? `Count me in.` : `Thanks, but I work alone.`);
             if (!accepts) { STATE.cooldown[c] = now + 2 * 3600_000; continue; }
             d.members.push(c);
