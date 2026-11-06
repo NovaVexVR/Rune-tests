@@ -518,6 +518,7 @@ object BotRegistry {
                 val j = JSONObject()
                 j["slot"] = i; j["id"] = it.id; j["name"] = it.name; j["count"] = it.amount
                 j["value"] = if (it.id == 995) 1 else it.definition.value
+                if (!it.definition.isUnnoted) j["noted"] = true
                 j["ops"] = JSONArray().apply { it.interaction.options.filterNotNull().forEach { op -> add(op.name) } }
                 arr.add(j)
             }
@@ -632,7 +633,8 @@ object BotRegistry {
             val ops = shown.interaction.options.filterNotNull().map { it.name }.filter { it.isNotBlank() && !it.equals("Examine", true) }
             // scenery that looks different per player (signs, levers, bins...) is listed even without options: it's something to look at
             val varies = obj.definition.childrenIds != null
-            if ((ops.isEmpty() && !varies) || shown.name == "null") continue
+            // fires have no options of their own (you use food on them), but they matter: list them too
+            if ((ops.isEmpty() && !varies && shown.name != "Fire") || shown.name == "null") continue
             val j = JSONObject()
             j["id"] = obj.id; j["name"] = shown.name; j["x"] = obj.location.x; j["y"] = obj.location.y
             if (varies) j["shownId"] = shown.id

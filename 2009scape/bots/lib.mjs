@@ -15,6 +15,7 @@ export const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 export const SKILLS = ['attack', 'defence', 'strength', 'hitpoints', 'ranged', 'prayer', 'magic', 'cooking', 'woodcutting', 'fletching', 'fishing', 'firemaking', 'crafting', 'smithing', 'mining', 'herblore', 'agility', 'thieving', 'slayer', 'farming', 'runecrafting', 'hunter', 'construction', 'summoning'];
 export const FOOD = ['Shrimps', 'Anchovies', 'Bread', 'Cooked chicken', 'Cooked meat', 'Sardine', 'Herring', 'Trout', 'Salmon', 'Pike', 'Tuna', 'Lobster', 'Cake', 'Meat pie', 'Swordfish'];
 export const GE = { x: 3165, y: 3487 };
+const TOOLS = /axe|pickaxe|tinderbox|fishing net|knife|hammer|shears|chisel|needle|rod/i;
 const DEBUG_MSG = /^(\[|-{3,}|ID:|Option:|SpawnLoc|Wrapper|RCM|Iface|Slot:|Loc:|Index:|Your debug mode)/;
 
 async function http(method, url, body) {
@@ -91,8 +92,23 @@ export class Bot {
     count(name, s = this.s) {
         return this.inv(name, s).reduce((t, i) => t + i.count, 0);
     }
+    // usable (unnoted) copies only: a noted tool can't be used
     has(name, s = this.s) {
-        return this.count(name, s) > 0 || s.worn.some(i => i.name === name);
+        return this.inv(name, s).some(i => !i.noted) || s.worn.some(i => i.name === name);
+    }
+
+    // A failed random event notes everything you carry. Swap noted tools/food for usable ones at the bank.
+    async unnoteTools() {
+        const s = this.s;
+        const noted = s.inv.filter(i => i.noted && (TOOLS.test(i.name) || FOOD.includes(i.name)));
+        if (!noted.length || Date.now() - (this._unnoteTried ?? 0) < 20 * 60_000) return false;
+        this._unnoteTried = Date.now();
+        this.log(`my ${noted.map(i => i.name).join(', ')} got noted; swapping them at the bank`);
+        if (!(await this.openBank())) return false;
+        await this.depositAll(i => i.noted && (TOOLS.test(i.name) || FOOD.includes(i.name)));
+        for (const it of noted) await this.withdraw(it.name, TOOLS.test(it.name) ? 1 : Math.min(it.count, 10));
+        await this.leaveBank();
+        return true;
     }
     lvl(skill) {
         return this.s.stats[skill].level;
@@ -444,7 +460,9 @@ export class Bot {
         if (ev.type === 'EVIL_CHICKEN') this._chickenAt = Date.now();
         const TALK = ['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE', 'SANDWICH_LADY', 'CERTER'];
         const HOSTILE = ['EVIL_CHICKEN', 'RIVER_TROLL', 'ROCK_GOLEM', 'SHADE', 'SWARM', 'TREE_SPIRIT', 'ZOMBIE'];
-        if (this._lastEvent !== ev.type + ev.npc) { this._lastEvent = ev.type + ev.npc; this.log(`random event: ${ev.type} (${ev.name})`); this.onRandomEvent?.(ev.type); }
+        // an event we've been at for 3 minutes without resolving: stop letting it block the bot's work
+        if (this._lastEvent === ev.type + ev.npc && Date.now() - (this._eventSince ?? 0) > 3 * 60_000) return false;
+        if (this._lastEvent !== ev.type + ev.npc) { this._lastEvent = ev.type + ev.npc; this._eventSince = Date.now(); this.log(`random event: ${ev.type} (${ev.name})`); this.onRandomEvent?.(ev.type); }
         if (this.s.dialog) return false; // let the dialog handler click through what the NPC says
         if (TALK.includes(ev.type)) {
             if (Date.now() - (this._reTalk ?? 0) < 6000) return false;
@@ -464,6 +482,11 @@ export class Bot {
         if (ev.type === 'STRANGE_PLANT') {
             if (Date.now() - (this._rePick ?? 0) < 5000) return false;
             this._rePick = Date.now();
+            if (this.msgs.slice(-2).some(t => /can't reach/i.test(t))) { // spawned behind something: step next to it
+                await this.act({ type: 'walk', x: ev.x + rand(-1, 1), y: ev.y + rand(-1, 1) });
+                await this.waitIdle({ timeout: 8 });
+                this.msgs.push('(stepped closer)');
+            }
             await this.act({ type: 'npc', npc: ev.npc, op: 'Pick' });
             await this.wait(2);
             return true;
@@ -498,6 +521,7 @@ export class Bot {
         }
         const s = this.s;
         if (await this.handleRandomEvent()) return true;
+        if (!this._inHook && s.inv?.some(i => i.noted) && (await this.unnoteTools())) return true;
         const unreachable = s.messages?.some(m => /can't reach that/i.test(m.text));
         if (unreachable && !this._gateCooldown) {
             this._gateCooldown = true;
