@@ -123,8 +123,8 @@ Bots handle random events as players do; each type is enabled for bots once its 
 - Bots wear the best gear they have before each task, and fighters carry food from the bank *(done)*.
 - Smiths make bronze armour by level and fighters buy it through the market *(done)*; next: iron/steel bars and armour, buying armour at Varrock's armour shops, and food for bots with an empty bank (buy, fish, or ask teammates).
 
-## Proposed (not started)
-Ideas from watching the fleet run; roughly in priority order.
+## Planned: next features
+From watching the fleet run; roughly in priority order (bank clear-outs and the team stash first).
 
 ### Economy and supplies
 - **Reasons to trade:** crafting chains (wool to balls of wool, cowhide to leather to leather armour, ore to bars to armour) and selling surplus to shops, so market days have real supply and demand. The first live market day had none: everyone wanted a knife and nobody had one.
