@@ -80,7 +80,7 @@ Teams start pre-made, but membership changes with how the bots get along (needs 
 ## RuneScape random events
 Bots handle random events as players do; each type is enabled for bots once its solver is proven (`RANDOM_EVENTS` in lib.mjs, sent to the server on login).
 - **Wave 1 (done, enabled):** Genie (XP lamp rubbed on the bot's best skill), Drunken Dwarf, Rick Turpentine, Strange Plant, and the hostile Evil Chicken, River Troll, Rock Golem, Shade, Swarm, Tree Spirit and Zombie (fight while healthy, flee when hurt). Verified with `test_events.mjs`.
-- **Talkers and gift-givers, wave 2** (Sandwich Lady, Certer, Mysterious Old Man): need the bot to "see" the item models on their interfaces.
+- **Wave 2 (done, enabled):** Sandwich Lady (the food she names in dialogue -> its button on her tray) and Certer (rule out the decoy captions). Neither needed item models after all.
 - **Fight-or-flee** (Evil Chicken, River Troll, Rock Golem, Shade, Swarm, Tree Spirit, Zombie): fight if combat allows, otherwise move away from the spot until it despawns.
 - **Puzzles and kidnappings** (Surprise Exam, Drill Demon, Freaky Forester, Maze, Mime, Pillory, Quiz Master, Evil Bob, Strange Plant, Candlelight): one solver per event, reading the event's interface or dialog from the bot API and answering it.
 - **Safety net:** if a bot is somewhere it can't solve for too long, it uses the event's exit or is rescued, and the incident goes in its diary.

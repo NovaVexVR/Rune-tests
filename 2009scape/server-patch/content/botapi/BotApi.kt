@@ -578,6 +578,8 @@ object BotRegistry {
         // interfaces / dialog
         val chat = p.interfaceManager.chatbox?.id
         o["iface"] = p.interfaceManager.opened?.id
+        // text on the open main interface (child -> text), e.g. the Certer's three answers
+        p.interfaceManager.opened?.id?.let { oid -> val t = synchronized(bot) { bot.strings[oid]?.toMap() }; if (!t.isNullOrEmpty()) o["ifaceText"] = JSONObject().apply { t.forEach { (k, v) -> this[k.toString()] = strip(v) } } }
         o["chatbox"] = chat
         if (chat != null && chat != 137) {
             val d = JSONObject()

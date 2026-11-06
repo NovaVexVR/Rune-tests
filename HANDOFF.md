@@ -20,7 +20,7 @@ Last session's container had everything under `/home/user`; a new one starts emp
 5. Optional viewer: `rt4-client` from GitLab (`./gradlew :client:build`; Maven Central may rate-limit, just retry), run with **Java 21** under `Xvfb :99` (JDK 11 here is headless), `xdotool` for input, `viewer/snap.sh <bot>` screenshots. The spectator account must skip the tutorial via Skippy, then admin `::tele x y z` works.
 
 ## Layout
-- `2009scape/server-patch/content/botapi/BotApi.kt`: HTTP bot API on `127.0.0.1:8899` (login/logout/state/act, `/events`, `/bots`, `/route`). Actions: walk, scenery, npc, ground, item, useitem, spellnpc, button, style, continue, choose, skillmenu, input, close, say, dm, player, tradeoffer/accept/decline, buy/sell, deposit/withdraw, geitem, rescue, forceevent. State includes `randomEvent`, `ge` (offer slots) and `geScreen` (offer being set up). `GET /route?from=x,y&to=x,y&avoid=x,y,r;...` plans a walk over the real collision map (BFS, doors/gates passable) and returns waypoints.
+- `2009scape/server-patch/content/botapi/BotApi.kt`: HTTP bot API on `127.0.0.1:8899` (login/logout/state/act, `/events`, `/bots`, `/route`, `/find`). Actions: walk, scenery, npc, ground, item, useitem, spellnpc, button, style, continue, choose, skillmenu, input, close, say, dm, player, tradeoffer/accept/decline, buy/sell, deposit/withdraw, geitem, rescue, forceevent. State includes `randomEvent`, `ge` (offer slots), `geScreen` (offer being set up), `quests` (stage per started quest, 100 = done), `questPoints`, and `ifaceText` (text on the open interface). `GET /find?name=&x=&y=&z=&r=` lists scenery/NPCs by name around a point. `GET /route?from=x,y&to=x,y&avoid=x,y,r;...` plans a walk over the real collision map (BFS, doors/gates passable) and returns waypoints.
 - `server-patch/core-changes.patch`: PacketRepository (capture game messages, interface text, PMs for bots), AntiMacro (random events gated per type for API bots), `default.conf` (built-in bots off).
 - `2009scape/bots/`:
   - `lib.mjs`: Bot client (walking with door/gate handling, `travel()` for long trips on a planned route around `DANGER` zones, dialogs, onboarding via Skippy, shops, Lumbridge bank via castle stairs, Grand Exchange `geOpen/geOffer/geCollect/geAbort`, random events wave 1 incl. XP lamps, `RANDOM_EVENTS` enabled on every login).
@@ -28,12 +28,13 @@ Last session's container had everything under `/home/user`; a new one starts emp
   - `scripted.mjs`: 10 autonomous bots, task rotation every 50–70 min.
   - `claude_runner.mjs`: 50 Claude-directed bots following `orders/<bot>.json` plans; runs market, council (`POLITICS_MINUTES`), mood drift, market days, diaries.
   - `marketday.mjs`: daily market at the Grand Exchange (`MARKET_EVERY_MINUTES`, `MARKET_MINUTES`, `MARKET_LEAD_MINUTES`): travel, shouted offers, haggling, GE offers, trip home.
+  - `quests.mjs` (quest scripts: Cook's Assistant, Rune Mysteries; per-item gatherers) and `party.mjs` (quest parties: roles, pooled containers, gather for all, hand out through the trade window, everyone hands in; formed by the runner every 5 min, `PARTY_MAX` at once).
   - `diary.mjs` (`bots/diaries/<bot>.md`, milestones in `diaries/.marks.json`) and `recap.mjs` (news-style recap of the last day to `bots/recaps/<date>.md`).
   - `market.mjs`: perceived values, deals (sale, gift, favor, repay, debtsale, bounty, wager), trade-window flow, collections, call-outs, debt collection, bounty posting/claiming, DMs.
   - `social.mjs`: personalities + habits, trust, IOUs, rivalries, bounties state, mood, chat lines.
   - `politics.mjs`: dynamic teams (`market/teams.json`), scoreboard, taxes/mutiny, leaving/recruiting, scaling caps (`capFor`).
   - `status.mjs`, `social_report.mjs`, `export_dashboard.mjs` (dashboard snapshot JSON), `test_task.mjs`.
-  - In-game tests with staged setups (`setup` edits saves while bots are logged out, then `run`): `test_events.mjs` (random events), `test_social.mjs` (collector, hounding, repayment, wager, collection, call-out, death mood), `test_ge.mjs` (GE buy/sell/collect), `test_marketday.mjs` (compressed market day).
+  - In-game tests with staged setups (`setup` edits saves while bots are logged out, then `run`): `test_events.mjs` (random events), `test_social.mjs` (collector, hounding, repayment, wager, collection, call-out, death mood), `test_ge.mjs` (GE buy/sell/collect), `test_marketday.mjs` (compressed market day), `test_party.mjs` (3-bot Cook's Assistant party).
 - Runtime state (not in git): `bots/market/*.json(l)` (incl. `marketday.json`), `bots/logs/`, `bots/diaries/`, `bots/recaps/`, server saves in `Server/data/players/`.
 
 ## Status
@@ -45,9 +46,15 @@ Last session's container had everything under `/home/user`; a new one starts emp
 
 **Grand Exchange API: done** (`test_ge.mjs`): offers placed through the GE screen, matched bot-to-bot, collected.
 
+**Phase 4.2 quest parties: done.** Cook's Assistant solo (~10 min) and as a 3-bot party (`test_party.mjs`: 3/3 completed, 1 QP and 300 Cooking xp each, 10 party trades). Rune Mysteries solo (16 min, unlocks Runecrafting). Quest points count in the team score (5 levels each). The Knight's Sword and Druidic Ritual are not scripted yet: both need trips through places that kill level-3 bots (ice warriors under Asgarnia, Taverley dungeon), so they wait until combat is higher.
+
+**Live 50-bot market day (12:55):** 31 bots travelled to the GE, shouted and called for wants; no haggled deals because everyone wanted knives/tinderboxes and nobody had spares. Expected with fresh characters.
+
+**Fixed:** fish_cook bots fetched firewood from the Draynor trees, next to the dark wizards (most fleet deaths). Every walk over 60 tiles now goes by the danger-avoiding route planner.
+
 **Phase 4.3 diaries/recaps: built** (diary lines verified from the market-day test; `recap.mjs` prints the day's headlines, trade, grudges, milestones, standings).
 
-Wave 2–3 random events remain disabled for bots (they never get them).
+**Random events wave 2 (partly): done and enabled.** Sandwich Lady (bot remembers the food she names, picks it on interface 297) and Certer (the two wrong captions are always from a fixed decoy list, so the bot picks the other one). Both verified twice in-game. Wave 3 (kidnaps: Surprise Exam/Mysterious Old Man, Drill Demon, Freaky Forester, Maze, Mime, Pillory, Quiz Master, Evil Bob, Candlelight) stays disabled; the 5-minute rescue is the safety net.
 
 ## Known gotchas
 - After any server restart, the bot runners log bots back in automatically, but deals in flight time out.
@@ -60,9 +67,8 @@ Wave 2–3 random events remain disabled for bots (they never get them).
 - Personalities live in `orders/<bot>.json`; bots without an orders file (test bots) get a seeded one. A tools collector won't sell a Knife or Hammer, which can make a staged trade test look broken.
 
 ## Next steps (in order)
-1. Phase 4.2 quest parties: Cook's Assistant first (egg, bucket of milk, pot of flour via the windmill), then The Knight's Sword and Druidic Ritual. `travel()` and `/route` now handle the walking.
-2. Watch one real market day with the full runner (are attendance odds and the 50-min lead right at 50 bots?).
-3. Random events waves 2–3, bounded PvP (Phase 5), more training methods from `guides/`, a cross-platform local launcher.
+1. Check the fleet's first quest parties (runner forms up to `PARTY_MAX`=2 at a time) and the next market day.
+2. Random events wave 3 (kidnap puzzles), bounded PvP (Phase 5), more training methods from `guides/`, more quests (Sheep Shearer, Romeo & Juliet, Imp Catcher; Knight's Sword/Druidic Ritual once combat allows), a cross-platform local launcher.
 4. Reset all bots to level 1 and start the real run: clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, and remove test bots (`testbot`, `gebot*`, `mbot*`).
 
 ## Usage rules (from the user)

@@ -18,8 +18,11 @@ export const FOOD = ['Shrimps', 'Anchovies', 'Bread', 'Cooked chicken', 'Cooked 
 // Sent to the server on every login, so it survives server restarts. Override: BOT_EVENTS=GENIE,ZOMBIE or BOT_EVENTS=none
 export const RANDOM_EVENTS = process.env.BOT_EVENTS != null
     ? process.env.BOT_EVENTS.split(',').map(e => e.trim().toUpperCase()).filter(e => e && e !== 'NONE')
-    : ['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE', 'STRANGE_PLANT',
+    : ['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE', 'STRANGE_PLANT', 'SANDWICH_LADY', 'CERTER',
        'EVIL_CHICKEN', 'RIVER_TROLL', 'ROCK_GOLEM', 'SHADE', 'SWARM', 'TREE_SPIRIT', 'ZOMBIE'];
+// random events: the Sandwich Lady's tray (interface 297) and the Certer's decoy captions (interface 184)
+const SANDWICH_BUTTON = { baguette: 7, 'triangle sandwich': 8, 'square sandwich': 9, sandwich: 9, roll: 10, 'meat pie': 11, kebab: 12, 'chocolate bar': 13 };
+const CERTER_DECOYS = ['an axe', 'an arrow', 'a pair of boots', 'a pair of gloves', 'a staff', 'a bow', 'a feather', 'the disenfr'];
 // experience-lamp interface (134) skill buttons
 const LAMP_BUTTON = { attack: 29, strength: 30, defence: 31, ranged: 32, prayer: 33, hitpoints: 34, magic: 35, agility: 36, herblore: 37, thieving: 38, crafting: 39, fletching: 40, mining: 41, smithing: 42, fishing: 43, firemaking: 44, cooking: 45, woodcutting: 46, runecrafting: 47, slayer: 48, hunter: 49, farming: 50, construction: 51, summoning: 52 };
 // Places low-level bots keep away from on long trips: the dark wizards' circle south of Varrock, the Draynor wizards
@@ -149,9 +152,30 @@ export class Bot {
     async handleRandomEvent() {
         const ev = this.s.randomEvent;
         if (!ev) return false;
-        const TALK = ['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE'];
+        const TALK = ['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE', 'SANDWICH_LADY', 'CERTER'];
         const HOSTILE = ['EVIL_CHICKEN', 'RIVER_TROLL', 'ROCK_GOLEM', 'SHADE', 'SWARM', 'TREE_SPIRIT', 'ZOMBIE'];
         if (this._lastEvent !== ev.type + ev.npc) { this._lastEvent = ev.type + ev.npc; this.log(`random event: ${ev.type} (${ev.name})`); this.onRandomEvent?.(ev.type); }
+        // Sandwich Lady: remember what she offers ("Have a kebab, dear."), then pick it on her tray (interface 297)
+        const offer = this.s.dialog?.text?.join(' ').match(/Have an? (.+?), dear/i);
+        if (offer) this._sandwich = offer[1].toLowerCase();
+        if (this.s.iface === 297) {
+            const child = SANDWICH_BUTTON[this._sandwich] ?? 7;
+            this.log(`random event: sandwich lady offers ${this._sandwich}, taking button ${child}`);
+            await this.act({ type: 'button', iface: 297, child });
+            await this.wait(2);
+            return true;
+        }
+        // Certer: three captions under a picture; the wrong ones are never things in the picture set (axes, bows, boots...)
+        if (this.s.iface === 184) {
+            const t = this.s.ifaceText ?? {};
+            const opts = [1, 2, 3].map(c => t[c] ?? '');
+            let pick = opts.findIndex(o => o && !CERTER_DECOYS.some(d => o.toLowerCase().startsWith(d)));
+            if (pick < 0) pick = 0;
+            this.log(`random event: certer options ${JSON.stringify(opts)}, answering "${opts[pick]}"`);
+            await this.act({ type: 'button', iface: 184, child: 8 + pick });
+            await this.wait(2);
+            return true;
+        }
         if (this.s.dialog) return false; // let the dialog handler click through what the NPC says
         if (TALK.includes(ev.type)) {
             if (Date.now() - (this._reTalk ?? 0) < 6000) return false;
@@ -304,7 +328,9 @@ export class Bot {
     }
 
     // Long-distance walking in hops, opening doors/gates when stuck.
-    async walkTo(x, y, { tol = 2, timeout = 300 } = {}) {
+    async walkTo(x, y, { tol = 2, timeout = 300, direct = false } = {}) {
+        // long walks go by a planned route around the DANGER zones (a straight line can cross Draynor)
+        if (!direct && this.s && this.s.y < 6000 && y < 6000 && dist(this.s, { x, y }) > 60) return this.travel(x, y, { tol: Math.max(tol, 2), timeout });
         const end = Date.now() + timeout * 1000;
         let stuck = 0;
         let last = null;
@@ -357,11 +383,11 @@ export class Bot {
         if (dist(s, { x, y }) <= tol) return true;
         const q = `/route?from=${s.x},${s.y}&to=${x},${y}&z=${s.z}` + (avoid.length ? `&avoid=${avoid.map(a => `${a.x},${a.y},${a.r}`).join(';')}` : '');
         const r = await http('GET', q).catch(e => ({ ok: false, error: e.message }));
-        if (!r.ok) { this.log(`travel to ${x},${y}: ${r.error}; walking straight`); return this.walkTo(x, y, { tol, timeout }); }
+        if (!r.ok) { this.log(`travel to ${x},${y}: ${r.error}; walking straight`); return this.walkTo(x, y, { tol, timeout, direct: true }); }
         const end = Date.now() + timeout * 1000;
         for (const [wx, wy] of r.path) {
             const left = Math.max(30, (end - Date.now()) / 1000);
-            if (!(await this.walkTo(wx, wy, { tol: 2, timeout: Math.min(120, left) }))) {
+            if (!(await this.walkTo(wx, wy, { tol: 2, timeout: Math.min(120, left), direct: true }))) {
                 // knocked off the path (a fight, a random event, a closed door): re-plan from here once
                 if (this._replanned) { this._replanned = false; return false; }
                 this._replanned = true;
@@ -371,7 +397,7 @@ export class Bot {
             }
             if (Date.now() > end) return false;
         }
-        return dist(await this.state(1), { x, y }) <= tol || this.walkTo(x, y, { tol, timeout: 60 });
+        return dist(await this.state(1), { x, y }) <= tol || this.walkTo(x, y, { tol, timeout: 60, direct: true });
     }
 
     async route(points, opts) {

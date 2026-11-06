@@ -98,7 +98,9 @@ async function cookAll(bot) {
             if (!s.inv.some(i => i.name === 'Logs')) {
                 if (s.invFree === 0) { await bot.act({ type: 'item', slot: raw[raw.length - 1].slot, op: 'Drop' }); await bot.wait(1); }
                 const tree = bot.nearestScenery(l => l.name === 'Tree' && l.ops.includes('Chop down'));
-                if (!tree) { await bot.walkTo(PLACES.draynorTrees.x, PLACES.draynorTrees.y, { tol: 3 }); continue; }
+                // firewood: the Lumbridge trees (never Draynor's, next to the dark wizards, at low combat)
+                const wood = bot.s.combat >= 20 ? PLACES.draynorTrees : PLACES.lumbridgeTrees;
+                if (!tree) { await bot.walkTo(wood.x, wood.y, { tol: 3 }); continue; }
                 await gatherOnce(bot, tree, 'Chop down');
                 continue;
             }
