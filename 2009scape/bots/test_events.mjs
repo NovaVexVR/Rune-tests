@@ -10,16 +10,16 @@ for (const ev of events) {
     console.log(`\n== ${ev}: forcing at ${s.x},${s.y} hp ${s.hp}`);
     console.log(await bot.act({ type: 'forceevent', event: ev }));
     let seen = false, t0 = Date.now();
-    while (Date.now() - t0 < 150_000) {
+    while (Date.now() - t0 < 960_000) {
         await sleep(1200);
         s = await bot.state(10);
-        if (s.randomEvent) seen = true;
+        if (s.randomEvent || s.kidnapped) seen = true;
         await bot.handleInterrupts();
-        if (seen && !s.randomEvent && !s.dialog) break;
+        if (seen && !s.randomEvent && !s.kidnapped && !s.dialog) break;
     }
     s = await bot.state(5);
     const moved = Math.max(Math.abs(s.x - start.x), Math.abs(s.y - start.y));
-    console.log(`${ev}: ${s.randomEvent ? 'STILL ACTIVE' : 'resolved'} after ${Math.round((Date.now() - t0) / 1000)}s; moved ${moved} tiles; hp ${s.hp}; new items: ${s.inv.slice(-2).map(i => i.name).join(', ')}; last msgs: ${bot.msgs.slice(-2).join(' | ')}`);
+    console.log(`${ev}: ${s.randomEvent || s.kidnapped ? 'STILL ACTIVE' : 'resolved'} after ${Math.round((Date.now() - t0) / 1000)}s; moved ${moved} tiles; hp ${s.hp}; new items: ${s.inv.slice(-2).map(i => i.name).join(', ')}; last msgs: ${bot.msgs.slice(-2).join(' | ')}`);
     await sleep(3000);
 }
 process.exit(0);

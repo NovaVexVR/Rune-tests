@@ -213,6 +213,114 @@ export class Bot {
         return false;
     }
 
+    // ---- random events wave 3: puzzles in places the bot is kidnapped to ----
+    async solveKidnap() {
+        const s = this.s;
+        const inBox = (x0, y0, x1, y1) => s.x >= x0 && s.x <= x1 && s.y >= y0 && s.y <= y1;
+        if (inBox(3155, 4812, 3171, 4828)) return this.drillDemon();
+        if (inBox(2587, 4758, 2616, 4788)) return this.freakyForester();
+        if (inBox(2880, 4544, 2943, 4607)) return this.maze();
+        return false;
+    }
+
+    // Drill Demon: Sergeant Damien barks an exercise; do it on the mat whose sign shows it (4 right in a row).
+    async drillDemon() {
+        const said = this.s.dialog?.text?.join(' ') ?? '';
+        const m = /\b(jog|star ?jumps?|push ?ups?|sit ?ups?)\b/i.exec(said);
+        if (m) this._drill = { jog: 0, sit: 1, pus: 2, sta: 3 }[m[1].toLowerCase().slice(0, 3)];
+        if (this.s.dialog || this.s.locked) return false;
+        if (this._drill == null) {
+            if (Date.now() - (this._ddTalk ?? 0) < 8000) return false;
+            this._ddTalk = Date.now();
+            const sarge = this.nearestNpc(n => /sergeant damien/i.test(n.name));
+            if (sarge) await this.act({ type: 'npc', npc: sarge.npc, op: 'Talk-to' });
+            await this.wait(2);
+            return true;
+        }
+        const mats = (await http('GET', `/find?name=mat&x=3163&y=4820&r=6&bot=${this.name}`)).scenery.filter(o => o.ops.includes('Use'));
+        // the exercise signs are drawn by the client from player variables, so a bot can't read them: if no mat
+        // tells us, take a random one (a wrong one only earns abuse; 4 right ones end the drill)
+        const mat = mats.find(o => o.variant === this._drill) ?? mats[Math.floor(Math.random() * mats.length)];
+        this.log(`random event: drill demon wants ${['jogging', 'sit ups', 'push ups', 'star jumps'][this._drill]}, trying the mat at ${mat?.x},${mat?.y}`);
+        this._drill = null;
+        if (!mat) return false;
+        await this.act({ type: 'scenery', x: mat.x, y: mat.y, id: mat.id, op: 'Use' });
+        await this.wait(12); // walk over and exercise
+        return true;
+    }
+
+    // Freaky Forester: kill the pheasant with the number of tails he asks for, bring it to him, leave by the portal.
+    async freakyForester() {
+        const s = this.s;
+        const said = s.dialog?.text?.join(' ') ?? '';
+        const m = /kill the (one|two|three|four) tailed pheasant/i.exec(said);
+        if (m) { this._tails = ['one', 'two', 'three', 'four'].indexOf(m[1].toLowerCase()) + 1; this._freakGave = false; }
+        if (s.dialog) return false;
+        if (s.attacking || s.moving) return false;
+        if (Date.now() - (this._ffAct ?? 0) < 4000) return false;
+        this._ffAct = Date.now();
+        const forester = this.nearestNpc(n => /freaky forester/i.test(n.name));
+        const raw = s.inv.find(i => /raw pheasant/i.test(i.name));
+        if (this._freakGave && !raw) { // handed it over: out through the portal
+            const portal = this.nearestScenery(l => /portal/i.test(l.name) && l.ops.includes('Enter'));
+            if (s.messages?.some(x => /supernatural force/i.test(x.text))) { this._freakGave = false; this._tails = null; }
+            else if (portal) { this.log('random event: freaky forester done, taking the portal'); await this.act({ type: 'scenery', x: portal.x, y: portal.y, id: portal.id, op: 'Enter' }); await this.wait(4); return true; }
+        }
+        if (raw || this._tails == null) {
+            if (forester) { await this.act({ type: 'npc', npc: forester.npc, op: 'Talk-to' }); if (raw) this._freakGave = true; }
+            await this.wait(3);
+            return true;
+        }
+        const drop = s.ground?.find(g => /raw pheasant/i.test(g.name));
+        if (drop) { await this.act({ type: 'ground', x: drop.x, y: drop.y, id: drop.id }); await this.wait(3); return true; }
+        const bird = this.nearestNpc(n => n.id === 2458 + this._tails && n.ops.includes('Attack'));
+        if (!bird) { await this.walkTo(2600 + rand(-6, 6), 4773 + rand(-6, 6), { tol: 2, direct: true }); return true; }
+        this.log(`random event: freaky forester wants the ${this._tails}-tailed pheasant`);
+        await this.act({ type: 'npc', npc: bird.npc, op: 'Attack' });
+        await this.wait(4);
+        return true;
+    }
+
+    // Maze: plan a way to the shrine on the collision map (its doors are walls that open; the plain walls, id 3626,
+    // only look like it), walk it opening each door, touch the shrine. One-way doors that refuse get avoided next time.
+    async maze() {
+        if (this._mazeBusy) return false;
+        this._mazeBusy = true;
+        try {
+            const shrine = (await http('GET', '/find?name=shrine&x=2911&y=4576&r=34')).scenery[0];
+            if (!shrine) return false;
+            const refused = [];
+            const reached = () => this._mazeAtShrine;
+            for (let attempt = 0; attempt < 8 && !reached(); attempt++) {
+                const s = await this.state(10);
+                // next to the shrine's room: open its door (a real one, not the plain walls) and touch the shrine
+                if (dist(s, shrine) <= 3) {
+                    const door = s.scenery.filter(l => l.id !== 3626 && l.ops.includes('Open') && dist(l, shrine) <= 2).sort((a, b) => a.dist - b.dist)[0];
+                    if (door) { await this.act({ type: 'scenery', x: door.x, y: door.y, id: door.id, op: 'Open' }); await this.waitIdle({ timeout: 8, quiet: 2 }); }
+                    await this.act({ type: 'scenery', x: shrine.x, y: shrine.y, id: shrine.id, op: 'Touch' });
+                    await this.wait(5);
+                    const after = await this.state(4);
+                    if (!after.messages?.some(m => /can't reach/i.test(m.text))) { this._mazeAtShrine = true; break; }
+                }
+                const avoid = refused.map(([x, y]) => `${x},${y},0`).join(';');
+                // aim for a tile beside the shrine that a route really ends on (the shrine sits in its own walled room)
+                let r = null;
+                for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1], [-1, 1], [1, -1]]) {
+                    const tx = shrine.x + dx, ty = shrine.y + dy;
+                    const c = await http('GET', `/route?from=${s.x},${s.y}&to=${tx},${ty}&solid=3626${avoid ? '&avoid=' + avoid : ''}`).catch(() => ({ ok: false }));
+                    const endp = c.ok && c.path.at(-1);
+                    if (endp && endp[0] === tx && endp[1] === ty && (!r || c.length < r.length)) r = c;
+                }
+                if (!r) { this.log('random event: no way through the maze'); break; }
+                this.log(`random event: maze route ${r.length} steps through ${r.doors.length} doors`);
+                if (await this.followRoute(r)) continue;
+                if (this.lastDoorFail) refused.push(this.lastDoorFail);
+            }
+            if (this._mazeAtShrine) { this.log('random event: touched the maze shrine'); this._mazeAtShrine = false; await this.wait(10); }
+            return true;
+        } finally { this._mazeBusy = false; }
+    }
+
     // Experience lamps (the Genie's reward): rub, pick a skill on interface 134, confirm (button 2).
     // Skill: this.lampSkill (set by a runner) or else the highest-level skill, since the genie lamp gives level x 10 xp.
     async useLamp() {
@@ -246,11 +354,14 @@ export class Bot {
         const s = this.s;
         if (await this.handleRandomEvent()) return true;
         if (await this.useLamp()) return true;
+        if (await this.solveKidnap()) return true;
         // safety net: stuck in a kidnap area we have no solver for (shouldn't happen while only wave 1 is enabled)
         if (s.kidnapped) {
             this._kidnappedAt ??= Date.now();
-            if (Date.now() - this._kidnappedAt > 5 * 60_000) {
-                this.log(`random event: stuck in a kidnap area for 5 min at ${s.x},${s.y}, rescued`);
+            // the Drill Demon takes a while when the bot can't read the signs; elsewhere 6 minutes is plenty
+            const limit = s.x >= 3155 && s.x <= 3171 && s.y >= 4812 && s.y <= 4828 ? 15 : 10;
+            if (Date.now() - this._kidnappedAt > limit * 60_000) {
+                this.log(`random event: stuck in a kidnap area for ${limit} min at ${s.x},${s.y}, rescued`);
                 this.onRandomEvent?.('RESCUED');
                 await this.act({ type: 'rescue' });
                 this._kidnappedAt = null;
@@ -385,19 +496,50 @@ export class Bot {
         const r = await http('GET', q).catch(e => ({ ok: false, error: e.message }));
         if (!r.ok) { this.log(`travel to ${x},${y}: ${r.error}; walking straight`); return this.walkTo(x, y, { tol, timeout, direct: true }); }
         const end = Date.now() + timeout * 1000;
-        for (const [wx, wy] of r.path) {
-            const left = Math.max(30, (end - Date.now()) / 1000);
-            if (!(await this.walkTo(wx, wy, { tol: 2, timeout: Math.min(120, left), direct: true }))) {
-                // knocked off the path (a fight, a random event, a closed door): re-plan from here once
-                if (this._replanned) { this._replanned = false; return false; }
-                this._replanned = true;
-                const ok = await this.travel(x, y, { avoid, tol, timeout: left });
-                this._replanned = false;
-                return ok;
-            }
-            if (Date.now() > end) return false;
+        const ok = await this.followRoute(r, end);
+        if (!ok) {
+            // knocked off the path (a fight, a random event, a door that wouldn't open): re-plan from here once
+            if (this._replanned) { this._replanned = false; return false; }
+            this._replanned = true;
+            const again = await this.travel(x, y, { avoid, tol, timeout: Math.max(30, (end - Date.now()) / 1000) });
+            this._replanned = false;
+            return again;
         }
         return dist(await this.state(1), { x, y }) <= tol || this.walkTo(x, y, { tol, timeout: 60, direct: true });
+    }
+
+    // Walk a planned route: open the door the planner names before each waypoint, then walk to it.
+    // Returns false if a waypoint couldn't be reached (the caller re-plans); `this.lastDoorFail` is the door that refused.
+    async followRoute(r, end = Date.now() + 600_000) {
+        this.lastDoorFail = null;
+        for (let i = 0; i < r.path.length; i++) {
+            const [wx, wy] = r.path[i];
+            const door = r.opens?.[i];
+            const prevDoor = r.opens?.[i - 1];
+            // the same door twice in a row: we're already through it (auto-walk doors carry you across)
+            if (door && !(prevDoor && prevDoor[0] === door[0] && prevDoor[1] === door[1])) {
+                const st = await this.state(4);
+                const d = st.scenery.find(l => l.x === door[0] && l.y === door[1] && l.ops.includes('Open'));
+                if (d) {
+                    const before = { x: st.x, y: st.y };
+                    await this.act({ type: 'scenery', x: d.x, y: d.y, id: d.id, op: 'Open' }).catch(() => {});
+                    await this.waitIdle({ timeout: 8, quiet: 2 });
+                    const after = await this.state(4);
+                    // a refusal comes as a game message or a dialogue box ("I don't think that's the right way.")
+                    const said = [...(after.messages ?? []).map(m => m.text), ...(after.dialog?.text ?? [])].join(' | ');
+                    if (/doesn't open|right way|locked/i.test(said) && dist(after, before) === 0) {
+                        this.lastDoorFail = door;
+                        this.log(`route: door at ${door} won't open from here (${said.slice(-60)})`);
+                        if (after.dialog) await this.act({ type: 'continue' }).catch(() => {});
+                        return false;
+                    }
+                } else if (this.debugRoute) this.log(`route: no door to open at ${door} (from ${st.x},${st.y})`);
+            }
+            const left = Math.max(30, (end - Date.now()) / 1000);
+            if (!(await this.walkTo(wx, wy, { tol: door ? 1 : 2, timeout: Math.min(door ? 20 : 120, left), direct: true }))) { this.log(`route: couldn't reach waypoint ${wx},${wy} (at ${this.s.x},${this.s.y})`); return false; }
+            if (Date.now() > end) return false;
+        }
+        return true;
     }
 
     async route(points, opts) {

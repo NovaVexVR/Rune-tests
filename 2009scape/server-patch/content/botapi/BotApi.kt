@@ -126,7 +126,7 @@ object BotRegistry {
      * since bots open those on the way. Tiles inside `avoid` circles (x, y, radius) are off limits.
      * Returns waypoints about 14 tiles apart and the doors on the way.
      */
-    fun planRoute(fx: Int, fy: Int, tx: Int, ty: Int, z: Int, avoid: List<List<Int>>): JSONObject {
+    fun planRoute(fx: Int, fy: Int, tx: Int, ty: Int, z: Int, avoid: List<List<Int>>, solid: Set<Int> = emptySet()): JSONObject {
         val margin = 60
         val x0 = minOf(fx, tx) - margin; val y0 = minOf(fy, ty) - margin
         val w = maxOf(fx, tx) + margin - x0 + 1; val h = maxOf(fy, ty) + margin - y0 + 1
@@ -134,14 +134,17 @@ object BotRegistry {
         val flags = IntArray(w * h) { i -> RegionManager.getClippingFlag(z, x0 + i % w, y0 + i / w) }
         val banned = BooleanArray(w * h) { i -> val x = x0 + i % w; val y = y0 + i / w; avoid.any { (ax, ay, r) -> maxOf(Math.abs(x - ax), Math.abs(y - ay)) <= r } }
         val doorCache = HashMap<Int, Boolean>()
+        // a door: any wall-type object (doors, gates, the maze's walls) on the tile that can be opened
         fun door(x: Int, y: Int): Boolean = doorCache.getOrPut(x * 65536 + y) {
-            val o = RegionManager.getObject(x, y, z) ?: return@getOrPut false
-            Regex("door|gate", RegexOption.IGNORE_CASE).containsMatchIn(o.name) && o.definition.options?.any { it != null && it.equals("Open", true) } == true
+            val loc = core.game.world.map.Location(x, y, z)
+            val here = RegionManager.getRegionChunk(loc).objects?.getOrNull(loc.chunkOffsetX)?.getOrNull(loc.chunkOffsetY) ?: return@getOrPut false
+            here.any { o -> o != null && o.isRenderable && o.id !in solid && (o.type in 0..3 || o.type == 9) && o.definition.options?.any { it != null && it.equals("Open", true) } == true }
         }
         fun f(x: Int, y: Int) = if (x < x0 || y < y0 || x >= x0 + w || y >= y0 + h) -1 else flags[(y - y0) * w + (x - x0)]
         val dirs = arrayOf(intArrayOf(0, -1, 0x12c0102), intArrayOf(-1, 0, 0x12c0108), intArrayOf(0, 1, 0x12c0120), intArrayOf(1, 0, 0x12c0180),
             intArrayOf(-1, -1, 0x12c010e), intArrayOf(-1, 1, 0x12c0138), intArrayOf(1, -1, 0x12c0183), intArrayOf(1, 1, 0x12c01e0))
         val prev = IntArray(w * h) { -1 }
+        val viaDoor = BooleanArray(w * h) // reached by opening a door
         val start = (fy - y0) * w + (fx - x0); val goal = (ty - y0) * w + (tx - x0)
         prev[start] = start
         val queue = java.util.ArrayDeque<Int>(); queue.add(start)
@@ -160,9 +163,11 @@ object BotRegistry {
                 var ok = fl and d[2] == 0
                 if (ok && d[0] != 0 && d[1] != 0) ok = f(nx, cy) and dirs[if (d[0] < 0) 1 else 3][2] == 0 && f(cx, ny) and dirs[if (d[1] < 0) 0 else 2][2] == 0
                 // a wall with a door/gate in it (orthogonal steps only; solid objects stay blocked)
-                if (!ok && (d[0] == 0 || d[1] == 0) && fl and 0x100 == 0 && fl and 0x200000 == 0 && (door(nx, ny) || door(cx, cy))) { ok = true; doorsUsed++ }
+                var opened = false
+                if (!ok && (d[0] == 0 || d[1] == 0) && fl and 0x100 == 0 && fl and 0x200000 == 0 && (door(nx, ny) || door(cx, cy))) { ok = true; opened = true; doorsUsed++ }
                 if (!ok) continue
                 prev[ni] = cur
+                viaDoor[ni] = opened
                 queue.add(ni)
             }
         }
@@ -180,16 +185,24 @@ object BotRegistry {
         var c = end
         while (c != start) { tiles.add(c); c = prev[c] }
         tiles.reverse()
-        val way = JSONArray(); val doors = JSONArray()
+        // waypoints ~14 tiles apart; a door on the way gets a waypoint on each side, and `opens[i]` names the door
+        // to open before walking to waypoint i (null when there's none)
+        val way = JSONArray(); val opens = JSONArray(); val doors = JSONArray()
         var last = start
+        fun emit(t: Int, door: JSONArray?) { way.add(JSONArray().apply { add(x0 + t % w); add(y0 + t / w) }); opens.add(door); last = t }
         for ((k, t) in tiles.withIndex()) {
             val x = x0 + t % w; val y = y0 + t / w
             val lx = x0 + last % w; val ly = y0 + last / w
-            val atDoor = door(x, y)
-            if (atDoor) doors.add(JSONArray().apply { add(x); add(y) })
-            if (k == tiles.lastIndex || atDoor || maxOf(Math.abs(x - lx), Math.abs(y - ly)) >= 14) { way.add(JSONArray().apply { add(x); add(y) }); last = t }
+            if (viaDoor[t]) {
+                val from = if (k == 0) start else tiles[k - 1]
+                val fx2 = x0 + from % w; val fy2 = y0 + from / w
+                if (from != last) emit(from, null)
+                val d = if (door(x, y)) JSONArray().apply { add(x); add(y) } else JSONArray().apply { add(fx2); add(fy2) }
+                doors.add(d)
+                emit(t, d)
+            } else if (k == tiles.lastIndex || maxOf(Math.abs(x - lx), Math.abs(y - ly)) >= 14) emit(t, null)
         }
-        return JSONObject().apply { this["ok"] = true; this["length"] = tiles.size; this["path"] = way; this["doors"] = doors }
+        return JSONObject().apply { this["ok"] = true; this["length"] = tiles.size; this["path"] = way; this["opens"] = opens; this["doors"] = doors }
     }
 
     fun logout(name: String) {
@@ -545,7 +558,8 @@ object BotRegistry {
             val type = content.global.ame.RandomEvents.values().firstOrNull { it.npc::class == re::class }?.name ?: "UNKNOWN" // by class: hostile events transform to a combat-level id
             o["randomEvent"] = JSONObject().apply { this["type"] = type; this["npc"] = re.index; this["name"] = re.name; this["x"] = re.location.x; this["y"] = re.location.y; this["ticksLeft"] = re.ticksLeft }
         }
-        if (p.getAttribute<Any?>("kidnapped-by-random", null) != null) o["kidnapped"] = true
+        // kidnapped into a random event area: the game keeps the bot's original location until it returns it
+        if (p.getAttribute<Any?>("kidnapped-by-random", null) != null || p.getAttribute<Any?>("/save:original-loc", null) != null) o["kidnapped"] = true
         o["bank"] = items(p.bank)
         val shop = p.getAttribute<core.game.shops.Shop?>("shop", null)
         val shopCont = p.getAttribute<core.game.container.Container?>("shop-cont", null)
@@ -670,7 +684,8 @@ object BotRegistry {
                         val (fx, fy) = xy(q["from"]); val (tx, ty) = xy(q["to"])
                         val z = q["z"]?.toInt() ?: 0
                         val avoid = (q["avoid"] ?: "").split(";").filter { it.isNotBlank() }.map { it.split(",").map { n -> n.trim().toInt() } }
-                        onGame { planRoute(fx, fy, tx, ty, z, avoid) }
+                        val solid = (q["solid"] ?: "").split(",").mapNotNull { it.trim().toIntOrNull() }.toSet() // object ids that look like doors but never open
+                        onGame { planRoute(fx, fy, tx, ty, z, avoid, solid) }
                     }
                     // what's around a place: /find?name=dairy cow&x=3250&y=3275[&z=0][&r=30] (scenery and NPCs whose name contains `name`)
                     parts == listOf("find") -> {
@@ -679,10 +694,21 @@ object BotRegistry {
                         val z = q["z"]?.toInt() ?: 0; val r = minOf(q["r"]?.toInt() ?: 30, 64)
                         onGame {
                             val sc = JSONArray(); val np = JSONArray()
+                            // every object on each tile (walls, wall decorations like signs, ground decoration); with &bot=<name>
+                            // varbit-driven objects are resolved to what that bot sees (e.g. which exercise a sign shows)
+                            val viewer = q["bot"]?.let { bots[it.lowercase()]?.player }
                             for (x in cx - r..cx + r) for (y in cy - r..cy + r) {
-                                val obj = RegionManager.getObject(x, y, z) ?: continue
-                                if (!obj.name.lowercase().contains(want)) continue
-                                sc.add(JSONObject().apply { this["name"] = obj.name; this["id"] = obj.id; this["x"] = x; this["y"] = y; this["ops"] = JSONArray().apply { obj.definition.options?.filterNotNull()?.forEach { add(it) } } })
+                                val loc = core.game.world.map.Location(x, y, z)
+                                val chunk = RegionManager.getRegionChunk(loc)
+                                val here = chunk.objects?.getOrNull(loc.chunkOffsetX)?.getOrNull(loc.chunkOffsetY) ?: continue
+                                for (obj in here) {
+                                    if (obj == null || !obj.isRenderable) continue
+                                    val shown = if (viewer != null) obj.getChild(viewer) else obj
+                                    if (!shown.name.lowercase().contains(want) && !obj.name.lowercase().contains(want)) continue
+                                    sc.add(JSONObject().apply { this["name"] = shown.name; this["id"] = obj.id; this["shownId"] = shown.id; this["type"] = obj.type
+                                        this["variant"] = obj.definition.childrenIds?.indexOf(shown.id) ?: -1 // which picture a varbit-driven object shows (-1: not one)
+                                        this["x"] = x; this["y"] = y; this["ops"] = JSONArray().apply { shown.definition.options?.filterNotNull()?.forEach { add(it) } } })
+                                }
                             }
                             for (n in Repository.npcs) {
                                 if (n == null || !n.isActive || n.location.z != z || maxOf(Math.abs(n.location.x - cx), Math.abs(n.location.y - cy)) > r) continue

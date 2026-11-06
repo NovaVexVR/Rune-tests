@@ -131,6 +131,10 @@ export class Parties {
             const g = role[item];
             for (const b of bots) if (b !== g && !count(b, item) && count(g, item) > 1) await this.give(g, b, item);
         }
+        // anyone still missing something gets it themselves
+        await Promise.all(bots.map(async b => {
+            for (const item of q.items) if (!count(b, item)) { b.log(`[party] getting my own ${item}`); await GATHER[item](b, 1); }
+        }));
         // everyone hands in
         const finished = await Promise.all(bots.map(b => q.finish(b)));
         const done = bots.filter((_, i) => finished[i]).map(b => b.name);

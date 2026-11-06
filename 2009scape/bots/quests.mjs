@@ -2,6 +2,18 @@
 // Each quest lists the items it needs, and how to get each one, so a party can split the gathering
 // (see party.mjs). Quest progress comes from the bot API's `quests` state (stage 100 = done).
 import { sleep, dist } from './lib.mjs';
+import { SHOPS } from './tasks.mjs';
+
+// A bucket or pot to fill: buy one at the Lumbridge general store if the bot has none.
+export async function ensureContainer(bot, name, n = 1) {
+    if (count(bot, name) >= n) return true;
+    const shop = await bot.openShop(SHOPS.general);
+    if (shop) await bot.buy(name, n - count(bot, name));
+    await bot.closeInterfaces();
+    await bot.state(5);
+    if (count(bot, name) < n) bot.log(`quest: couldn't get ${n} ${name} (have ${count(bot, name)}, ${bot.s.coins}gp)`);
+    return count(bot, name) > 0;
+}
 
 const COOK = { x: 3208, y: 3214 };
 const MILL = { door: { x: 3166, y: 3301 }, ladder: { x: 3164, y: 3307 }, hopper: { x: 3166, y: 3307 }, controls: { x: 3166, y: 3305 }, bin: { x: 3166, y: 3306, id: 36880 } };
@@ -39,18 +51,21 @@ export const GATHER = {
         return count(bot, 'Egg') >= n;
     },
     async 'Bucket of milk'(bot, n = 1) {
+        await ensureContainer(bot, 'Bucket', n - count(bot, 'Bucket of milk'));
         for (let tries = 0; tries < 8 && count(bot, 'Bucket of milk') < n; tries++) {
-            if (!count(bot, 'Bucket')) { bot.log('quest: no empty bucket to milk into'); return false; }
+            if (!count(bot, 'Bucket')) { bot.log(`quest: out of buckets with ${count(bot, 'Bucket of milk')}/${n} milk`); return false; }
             const cow = COWS[tries % COWS.length];
             await bot.travel(cow.x - 1, cow.y, { tol: 3 });
             await bot.state(10);
             await bot.act({ type: 'scenery', x: cow.x, y: cow.y, id: 8689, op: 'Milk' }).catch(e => bot.log(`quest: ${e.message}`));
             await bot.waitIdle({ timeout: 15, quiet: 3 });
             await bot.state(5);
+            bot.log(`quest: milking, ${count(bot, 'Bucket of milk')}/${n} (${bot.s.messages?.map(m => m.text).slice(-1)})`);
         }
         return count(bot, 'Bucket of milk') >= n;
     },
     async 'Pot of flour'(bot, n = 1) {
+        await ensureContainer(bot, 'Empty pot', n - count(bot, 'Pot of flour'));
         for (let round = 0; round < 3 && count(bot, 'Pot of flour') < n; round++) {
             const want = Math.min(n - count(bot, 'Pot of flour'), count(bot, 'Empty pot'));
             if (!want) { bot.log('quest: no empty pot for the flour'); return false; }
@@ -79,13 +94,14 @@ export const GATHER = {
                 await bot.waitIdle({ timeout: 10 });
                 await bot.state(5);
             }
-            if (!(await climb(bot, 'Climb-down', 1)) || !(await climb(bot, 'Climb-down', 0))) return false;
+            if (!(await climb(bot, 'Climb-down', 1)) || !(await climb(bot, 'Climb-down', 0))) { bot.log('quest: stuck on the mill ladders'); return false; }
             for (let i = 0; i < want; i++) {
                 await bot.act({ type: 'scenery', x: MILL.bin.x, y: MILL.bin.y, id: MILL.bin.id, op: 'Empty' }).catch(e => bot.log(`quest: ${e.message}`));
                 await bot.waitIdle({ timeout: 8 });
                 await bot.state(5);
             }
         }
+        bot.log(`quest: milled ${count(bot, 'Pot of flour')}/${n} flour`);
         return count(bot, 'Pot of flour') >= n;
     }
 };
