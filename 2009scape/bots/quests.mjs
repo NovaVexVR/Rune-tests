@@ -1,3 +1,4 @@
+import { FOOD } from './lib.mjs';
 // Quests (Phase 4.2). Each quest is a task like the skill tasks: { id, canRun(bot), run(bot, untilMs) }.
 // The steps only use normal player actions: walking, picking things up, talking, using items on scenery.
 const COOK = { x: 3209, y: 3214 };
@@ -29,6 +30,17 @@ async function pickUp(bot, name, at, route = null) {
         if (!has(bot, name) && bot.msgs.slice(n0).some(t => /can't reach/i.test(t))) unreachable.add(`${g.x},${g.y}`);
     }
     return has(bot, name);
+}
+
+// bank whatever isn't a tool, food or a quest item when the bag is too full for the job
+const KEEP = /axe|pickaxe|tinderbox|net|knife|hammer|shears|coins|bucket|pot|egg|wool|flour|milk|grain|rune|arrow|bow|sword|shield|dagger/i;
+async function makeRoom(bot, free) {
+    if ((await bot.state(3)).invFree >= free) return true;
+    bot.log(`quest: making room in the bank (need ${free} free slots)`);
+    if (!(await bot.openBank())) return false;
+    await bot.depositAll(i => !KEEP.test(i.name) && !FOOD.includes(i.name));
+    await bot.leaveBank();
+    return (await bot.state(3)).invFree >= free;
 }
 
 async function climb(bot, dir) {
@@ -115,6 +127,7 @@ export const COOKS_ASSISTANT = {
     async steps(bot, until, step) {
         const stage = () => bot.s.quests?.COOKS_ASSISTANT ?? 0;
         await toGround(bot);
+        await makeRoom(bot, 5);
         if (stage() === 0) { bot.log('quest: starting Cook\'s Assistant'); await talkCook(bot); }
         if (stage() === 0) { bot.log('quest: the cook did not give us the quest'); return; }
         const given = k => !!bot.s.questFlags?.[k + '_submitted'] || !!bot.s.questFlags?.all_submitted; // already handed to the cook
@@ -173,4 +186,83 @@ export const QUEST_FETCH = {
     }
 };
 
-export const QUESTS = [COOKS_ASSISTANT, QUEST_FETCH];
+// ---------- Sheep Shearer: 20 balls of wool for Fred the Farmer (delivered in batches) ----------
+const FRED_HOUSE = { x: 3189, y: 3273 };
+const SHEEP_FIELD = { x: 3203, y: 3266 };
+const SPIN_WHEEL_FLOOR = 1; // Lumbridge castle first floor
+
+async function shearSheep(bot, want, until) {
+    bot._notSheep ??= new Set(); // "sheep" that turned out not to be (The Thing)
+    await bot.walkTo(SHEEP_FIELD.x, SHEEP_FIELD.y, { tol: 4 });
+    while (Date.now() < until && bot.count('Wool') < want && bot.s.invFree > 0) {
+        const s = await bot.state(12);
+        if (await bot.handleInterrupts()) continue;
+        const sheep = bot.nearestNpc(n => n.name === 'Sheep' && n.ops.includes('Shear') && !bot._notSheep.has(n.id));
+        if (!sheep) { await bot.walkTo(SHEEP_FIELD.x + Math.round(Math.random() * 8 - 4), SHEEP_FIELD.y + Math.round(Math.random() * 8 - 4), { tol: 2 }); continue; }
+        const before = bot.count('Wool');
+        await bot.act({ type: 'npc', npc: sheep.npc, op: 'Shear' });
+        await bot.waitIdle({ timeout: 12, quiet: 3 });
+        await bot.state(5);
+        if (bot.count('Wool') === before && bot.msgs.slice(-3).some(t => /escape|penguin|not a sheep|run/i.test(t))) {
+            bot.log(`quest: that wasn't a sheep (npc ${sheep.id}); leaving it alone`);
+            bot._notSheep.add(sheep.id);
+        }
+    }
+    return bot.count('Wool');
+}
+
+async function spinWool(bot) {
+    if (!bot.count('Wool')) return 0;
+    await bot.lumbridgeFloor(SPIN_WHEEL_FLOOR);
+    for (let tries = 0; tries < 6 && bot.count('Wool') > 0; tries++) {
+        await bot.state(10);
+        if (await bot.handleInterrupts({ answer: /ball of wool/i })) continue; // the "how many" menu
+        const wheel = bot.nearestScenery(l => /spinning wheel/i.test(l.name) && l.ops.includes('Spin'));
+        if (!wheel) { await bot.walkTo(3209, 3213, { tol: 2 }); continue; }
+        await bot.act({ type: 'scenery', x: wheel.x, y: wheel.y, id: wheel.id, op: 'Spin' });
+        await bot.wait(3);
+        await bot.handleInterrupts({ answer: /ball of wool/i });
+        await bot.waitIdle({ timeout: 90, quiet: 5 });
+    }
+    await bot.lumbridgeFloor(0);
+    return bot.count('Ball of wool');
+}
+
+async function talkFred(bot) {
+    await bot.walkTo(FRED_HOUSE.x, FRED_HOUSE.y, { tol: 3 });
+    await bot.talkTo('Fred the Farmer', { answer: /looking for a quest|yes okay|i can do that|i have some/i });
+    await bot.state(5);
+}
+
+export const SHEEP_SHEARER = {
+    id: 'sheep_shearer',
+    skills: ['crafting'],
+    canRun: bot => (bot.s.quests?.SHEEP_SHEARER ?? 0) >= 100 ? 'already done' : true,
+    async run(bot, until, step = {}) {
+        bot._questing = true;
+        try { await this.steps(bot, until, step); } finally { bot._questing = false; }
+    },
+    async steps(bot, until) {
+        const stage = () => bot.s.quests?.SHEEP_SHEARER ?? 0;
+        const delivered = () => Number(bot.s.questFlags?.['num-balls-of-wool-delivered'] ?? 0);
+        await toGround(bot);
+        if (stage() === 0) { bot.log('quest: starting Sheep Shearer'); await talkFred(bot); }
+        if (stage() === 0) { bot.log('quest: Fred did not give us the quest'); return; }
+        await makeRoom(bot, 12);
+        while (Date.now() < until && stage() < 90) {
+            if (!bot.has('Shears')) await pickUp(bot, 'Shears', { x: 3192, y: 3272 });
+            if (!bot.has('Shears')) { bot.log('quest: no shears'); return; }
+            const need = 20 - delivered() - bot.count('Ball of wool');
+            const batch = Math.min(need, bot.s.invFree + bot.count('Wool'));
+            if (batch <= 0 && !bot.count('Ball of wool')) { bot.log('quest: no room for wool; bank or drop something first'); return; }
+            if (batch > 0) await shearSheep(bot, batch, until);
+            await spinWool(bot);
+            if (bot.count('Ball of wool')) { await talkFred(bot); bot.log(`quest: Sheep Shearer: ${delivered()}/20 balls delivered`); }
+        }
+        if (stage() >= 90 && stage() < 100) await talkFred(bot); // get paid
+        await bot.state(5);
+        bot.log(`quest: Sheep Shearer stage ${stage()}${stage() >= 100 ? ' (complete!)' : ''}, quest points ${bot.s.questPoints}`);
+    }
+};
+
+export const QUESTS = [COOKS_ASSISTANT, QUEST_FETCH, SHEEP_SHEARER];

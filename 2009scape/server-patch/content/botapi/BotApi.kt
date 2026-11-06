@@ -531,7 +531,7 @@ object BotRegistry {
         // quests: points, plus the stage of every quest that's been started (100 = complete)
         o["questPoints"] = p.questRepository.points
         // per-quest progress flags kept as player attributes (e.g. cooks_assistant:milk_submitted)
-        o["questFlags"] = JSONObject().apply { for ((k0, v) in p.attributes) { val k = k0.removePrefix("/save:"); if (k.startsWith("cooks_assistant:") && v is Boolean) this[k.substringAfter(":")] = v } }
+        o["questFlags"] = JSONObject().apply { for ((k0, v) in p.attributes) { val k = k0.removePrefix("/save:"); if ((k.startsWith("cooks_assistant:") || k.startsWith("sheep-shearer:")) && (v is Boolean || v is Number)) this[k.substringAfter(":")] = v } }
         o["ge"] = JSONArray().apply {
             val rec = core.game.ge.GrandExchangeRecords.getInstance(p)
             for (i in 0 until 6) {

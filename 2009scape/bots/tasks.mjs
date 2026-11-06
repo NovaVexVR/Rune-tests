@@ -261,6 +261,7 @@ export const TASKS = [
                 const farmerLvl = bot.lvl('thieving') >= 10;
                 const t = bot.nearestNpc(n => (farmerLvl ? /^Farmer$/ : /^(Man|Woman)$/).test(n.name) && n.ops.includes('Pickpocket'));
                 const home = farmerLvl ? PLACES.farmers : PLACES.lumbridge;
+                if (await restIfHurt(bot, until, { x: home.x + 10, y: home.y - 10 })) continue; // farmers hit back
                 if (!t) { await bot.walkTo(home.x + rand(-6, 6), home.y + rand(-6, 6)); continue; }
                 await bot.act({ type: 'npc', npc: t.npc, op: 'Pickpocket' });
                 await bot.waitIdle({ timeout: 15, quiet: 2 });
@@ -300,24 +301,29 @@ export const FLETCH = {
     }
 };
 
+// No food and below half HP: step away and rest until mostly healed (HP comes back ~1 a minute).
+// Used by anything that can hurt the bot (combat, pickpocketing). Returns true if it rested.
+async function restIfHurt(bot, until, spot) {
+    const s = bot.s;
+    if (s.hp >= s.maxHp * 0.5 || s.inv.some(i => FOOD.includes(i.name))) return false;
+    bot.log(`hp ${s.hp}/${s.maxHp} and no food: resting before carrying on`);
+    await bot.walkTo(spot.x, spot.y, { tol: 3 });
+    while (now() < until && bot.s.hp < bot.s.maxHp * 0.8) {
+        await bot.wait(30);
+        await bot.state(5);
+        if (bot.s.inCombat) await bot.walkTo(spot.x + 6, spot.y + 4, { tol: 3 });
+        await bot.handleInterrupts();
+    }
+    return true;
+}
+
 async function fightLoop(bot, until, area, names, { pickup = [], stopIf = null } = {}) {
     await bot.walkTo(area.x, area.y, { tol: 6 });
     while (now() < until) {
         const s = await bot.state(12);
         if (await bot.handleInterrupts()) continue;
         if (stopIf && stopIf(bot)) return;
-        // no food: stop at half HP and rest away from the fight until mostly healed (HP comes back ~1 a minute)
-        if (s.hp < s.maxHp * 0.5 && !s.inv.some(i => FOOD.includes(i.name))) {
-            bot.log(`hp ${s.hp}/${s.maxHp} and no food: resting before fighting again`);
-            await bot.walkTo(area.x + 12, area.y + 12, { tol: 3 });
-            while (now() < until && bot.s.hp < bot.s.maxHp * 0.8) {
-                await bot.wait(30);
-                await bot.state(5);
-                if (bot.s.inCombat) await bot.walkTo(area.x + 18, area.y + 15, { tol: 3 });
-                await bot.handleInterrupts();
-            }
-            continue;
-        }
+        if (await restIfHurt(bot, until, { x: area.x + 12, y: area.y + 12 })) continue;
         if (s.attacking || s.inCombat) { await bot.wait(2); continue; }
         const loot = s.ground.find(o => o.dist <= 5 && ['Bones', 'Feather', ...pickup].includes(o.name) && s.invFree > 1);
         if (loot) { await bot.act({ type: 'ground', x: loot.x, y: loot.y, id: loot.id }); await bot.waitIdle({ timeout: 8 }); continue; }
