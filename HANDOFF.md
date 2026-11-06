@@ -36,7 +36,9 @@ Last session's container had everything under `/home/user`; a new one starts emp
 ## Status
 **Done and seen working in-game:** shops, banking, fletching, trading at perceived values, team gifts and treasurer pooling, favors/IOUs (organic), bounties (claimed and delivered), grudges from defaults, mutiny, a member leaving, recruitment, DMs (verified delivery), habits/collectors/gamblers assigned.
 
-**Built but not yet observed in-game:** debt-collector purchase completing (last attempt interrupted by a restart), hounding, call-outs, wagers, collection completion, mood effects.
+**Observed in-game (Nov 6):** wagers (coin flip paid via trade), debt-collector purchase -> hounding (walk + DMs) -> repayment to the collector, call-outs with bystander trust drops, mood shifts (deaths/level-ups).
+**Built but not yet observed in-game:** collection completion (bots are too poor so far; claudebot9 is 4 tools short).
+**Fixed Nov 6:** the first state poll replayed the server's message backlog into onMsg/onPm (fake deaths/level-ups in mood after every runner restart); cookAll sent low-level bots to Draynor trees (dark wizards) when no tree was near.
 
 **Random events wave 1: done and verified** (`node bots/test_events.mjs testbot <EVENTS...>`, all resolved, no deaths).
 - Root cause of the first failed test: `forceevent` was blocked by the per-type allowlist (which was empty). Forced events now bypass it; the state's `randomEvent.type` comes from a `re-type` attribute (hostile NPCs transform their id by combat level, so id matching failed).
@@ -54,7 +56,7 @@ Last session's container had everything under `/home/user`; a new one starts emp
 
 ## Next steps (in order)
 1. ~~Random events wave 1~~ (done).
-2. Confirm the unobserved Phase 1–3 mechanics in-game (collector purchase, wagers, mood).
+2. Confirm collection completion in-game (everything else from Phases 1–3 is now observed).
 3. Phase 4: market days at the Grand Exchange (needs GE API), quest parties (Cook's Assistant, The Knight's Sword, Druidic Ritual), diaries and recaps.
 4. Random events waves 2–3, bounded PvP (Phase 5), more training methods from `guides/`, a cross-platform local launcher.
 5. Reset all bots to level 1 and start the real run.
