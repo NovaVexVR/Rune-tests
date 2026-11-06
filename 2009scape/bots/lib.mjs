@@ -539,6 +539,12 @@ export class Bot {
             await this.wait(2);
             return true;
         }
+        // "How many would you like to cook?" (chatbox 307): cook all. (Button 2; the interpreter passes child - 1.)
+        if (s.chatbox === 307) {
+            await this.act({ type: 'continue', child: 3 });
+            await this.wait(2);
+            return true;
+        }
         if (s.dialog && s.chatbox !== 372) {
             if (s.dialog.options.length) {
                 const want = answer ? s.dialog.options.find(o => answer.test(o)) : null;

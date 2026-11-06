@@ -2,16 +2,6 @@
   "role": "Guild vanguard: combat first, gathers food/supplies in between",
   "plan": [
     {
-      "task": "cooks_assistant",
-      "minutes": 40,
-      "party": {
-        "Egg": "guildbot2",
-        "Bucket of milk": "guildbot3"
-      },
-      "why": "quest party leader (guild)",
-      "once": true
-    },
-    {
       "task": "melee",
       "minutes": 45,
       "why": "guild fighter"

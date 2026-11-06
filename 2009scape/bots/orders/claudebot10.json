@@ -51,7 +51,8 @@
     "habits": {
       "spot": "courtyard",
       "food": "Cooked chicken",
-      "collection": "tools"
+      "collection": "tools",
+      "collectionDone": "2026-11-06T09:03:14.911Z"
     }
   }
 }

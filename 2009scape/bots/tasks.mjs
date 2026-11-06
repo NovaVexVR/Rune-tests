@@ -124,6 +124,7 @@ async function cookAll(bot) {
 // Skill "make X" menus: press the "make all" style option if one is open.
 async function cookMenu(bot) {
     const s = await bot.state(3);
+    if (s.chatbox === 307) { await bot.act({ type: 'continue', child: 3 }); return true; } // cook all
     if (s.dialog?.skillMenu) { await bot.act({ type: 'skillmenu', index: 0 }); return true; }
     return false;
 }

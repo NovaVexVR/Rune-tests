@@ -2,6 +2,16 @@
   "role": "[wolf] Team miner: banks ore for future smithing, also fights and fletches",
   "plan": [
     {
+      "task": "cooks_assistant",
+      "minutes": 40,
+      "party": {
+        "Egg": "wolfbot1",
+        "Bucket of milk": "wolfbot3"
+      },
+      "why": "quest party leader (wolf)",
+      "once": true
+    },
+    {
       "task": "mine",
       "minutes": 45,
       "why": "copper/tin to bank"

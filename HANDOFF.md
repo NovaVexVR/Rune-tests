@@ -30,7 +30,10 @@ Last session's container had everything under `/home/user`; a new one starts emp
   - `market.mjs`: perceived values, deals (sale, gift, favor, repay, debtsale, bounty, wager), trade-window flow, collections, call-outs, debt collection, bounty posting/claiming, DMs.
   - `social.mjs`: personalities + habits, trust, IOUs, rivalries, bounties state, mood, chat lines.
   - `politics.mjs`: dynamic teams (`market/teams.json`), scoreboard, taxes/mutiny, leaving/recruiting, scaling caps (`capFor`).
+  - `quests.mjs` (Cook's Assistant, Sheep Shearer, `quest_fetch` for party members), `questplanner.mjs` (bots take on quests by themselves; can preempt the current task).
+  - `marketday.mjs` (market days at the GE), `diary.mjs` + `recap.mjs` (diaries and daily recap), `health.mjs` (fleet health check).
   - `status.mjs`, `social_report.mjs`, `export_dashboard.mjs` (dashboard snapshot JSON), `test_task.mjs`, `test_events.mjs`.
+- `2009scape/launch.mjs`: cross-platform launcher (`setup|start|stop|status|restart`; set `JAVA11_HOME`).
 - Runtime state (not in git): `bots/market/*.json(l)`, `bots/logs/`, server saves in `Server/data/players/`.
 
 ## Status
@@ -44,7 +47,6 @@ Last session's container had everything under `/home/user`; a new one starts emp
 - Root cause of the first failed test: `forceevent` was blocked by the per-type allowlist (which was empty). Forced events now bypass it; the state's `randomEvent.type` comes from a `re-type` attribute (hostile NPCs transform their id by combat level, so id matching failed).
 - Enabled by default for bots (server-side `WAVE1_EVENTS`, survives restarts; `POST /events` overrides): GENIE, DRUNKEN_DWARF, RICK_TURPENTINE, STRANGE_PLANT, EVIL_CHICKEN, RIVER_TROLL, ROCK_GOLEM, SHADE, SWARM, TREE_SPIRIT, ZOMBIE.
 - Handler: talkers are talked to; Genie's lamp is rubbed (XP to the bot's lowest combat/gathering skill); strange plant is picked once grown; hostile events are fought only if combat >= 10 and HP > 60%, otherwise (and always for SWARM) the bot runs until it despawns. Evil Chicken feathers are picked up after a kill (kill path not yet seen in-game; test bots were level 3).
-- Wave 2 needs bots to "see" interface item models (Sandwich Lady, Certer), wave 3 the kidnap puzzles (Surprise Exam, Drill Demon, Freaky Forester, Maze, Mime, Pillory, Quiz Master, Evil Bob, Candlelight). The `rescue` action pulls a bot out of a kidnap area.
 
 **Phase 4 (Nov 6):**
 - **4.3 diaries + recap: running.** `bots/diary.mjs` writes `bots/diaries/<bot>.md` from the runner's log lines and each bot's game messages (deaths, level milestones, trades/records, debts, grudges, wagers, team changes, quests, random events). `node bots/recap.mjs [hours]` prints a news-style recap (also `logs/recap-<date>.md`).
@@ -56,6 +58,15 @@ Last session's container had everything under `/home/user`; a new one starts emp
 - Perception added to the state: `ifaceText`/`ifaceModels` (with `seen` descriptions), `dialog.models`, npc `anim`, every object on a tile, `shownId` for varying scenery, `sign` for Drill Demon mats and exam doors, `kidnapped`/`kidnapType`.
 - `node bots/health.mjs`: quick check for bots underground / far from home / near the dark wizards / low HP.
 - State now has `questPoints`, `quests` (stage per started quest, 100 = done), `questFlags`; scoreboard counts quest points.
+- **Quest planner live:** formed guild/wolf/hawk Cook's Assistant parties by itself; wolf (9 min) and guild finished, hawk was in progress at handoff. Individualists get Cook's Assistant then Sheep Shearer solo. Max 3 quests at once.
+
+**Fixed later on Nov 6 (all in git):**
+- Deaths (~10/hour, Fred's chicken pen and pickpocketing farmers): with no food, combat and thieving now stop at half HP and rest to 80% (0 deaths in the first 30 min after).
+- **Bots never cooked** (fleet Cooking ≈1 while Fishing reached 30): fires have no options so the state hid them, and the "how many?" cook menu is chatbox 307 (cook all = `continue` child 3), which nothing answered. Both fixed; **the cook-menu fix went live at 09:2x and still needs confirming** (fleet Cooking should start rising).
+- A random event that times out notes all your items: state marks `noted` items, `has()` ignores them, bots swap noted tools/food at the bank.
+- Dialog loops (quest leader stuck 20 min in the cook's "where do I find..." menu): a menu seen again recently gets an exit answer.
+- Random events that can't be resolved stop blocking work after 3 min; out-of-reach talkers/plants: step closer first.
+- Routing: walks crossing the Varrock–Lumbridge line take the safe corridor east of the dark wizards (also after surfacing from a cellar); deals only open between reachable partners.
 
 ## Known gotchas
 - After any server restart, the bot runners log bots back in automatically, but deals in flight time out.
@@ -65,13 +76,15 @@ Last session's container had everything under `/home/user`; a new one starts emp
 - `RegionManager.getObject(x, y, z)` argument order (an early bug).
 - Farm cellar at 3230,3286 (trapdoor) has no working exit: bots skip trapdoors, and a bot stuck underground >90s casts Home Teleport (button 192:0).
 - `restart.sh` runs a copy of the jar (`target/server-running.jar`), so rebuilding while the server runs is safe.
-- Kill runners with `pkill -f "node claude_runner.mjs"` (a broader pattern can kill the calling shell).
+- Cook menu = chatbox 307; spinning wheel = interface 459 (wool button 19, op 2 = all); fires (id 2732) have no options.
+- Pillory event is broken server-side (its kidnap teleport into the cage zone is blocked): keep it disabled.
+- Kill runners with `pkill -f "node claude_runner.mjs"` (a broader pattern can kill the calling shell), or use `node launch.mjs stop`.
 
 ## Next steps (in order)
-1. ~~Random events wave 1~~ (done).
-2. ~~Confirm Phase 1–3 mechanics~~ (all observed, incl. collection completion by legion20).
-3. Phase 4: market days at the GE (GE API done), verify quest parties, then The Knight's Sword and Druidic Ritual (both pass dangerous areas: need escorts/levels).
-4. Random events: Maze, Candlelight, Evil Bob; bounded PvP (Phase 5), more training methods from `guides/`, a cross-platform local launcher.
+1. Confirm the cooking fix in-game (fleet Cooking level rising; `node bots/status.mjs`), and that the quest planner keeps finishing quests (`grep "\[quest\]" bots/logs/claude_runner.out`, diaries).
+2. Random events still open: Maze (needs corridor exploration: the server won't path to an unreachable target, so probe nearby points), Evil Bob.
+3. More training methods (e.g. the Lumbridge range after Cook's Assistant, smithing/crafting), then the riskier quests (Rune Mysteries, Restless Ghost, Knight's Sword, Druidic Ritual) once combat levels allow; bounded PvP (Phase 5).
+4. Try `launch.mjs` on Windows.
 5. Reset all bots to level 1 and start the real run.
 
 ## Usage rules (from the user)
