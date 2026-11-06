@@ -26,28 +26,33 @@ Perceived values (`bots/market.mjs`): each bot starts from store price and adjus
 
 Requirements: git + git-lfs, **JDK 11** (the server targets Java 11), **Node.js 22+**.
 
-### Linux (e.g. CachyOS/Arch)
+- **Linux (e.g. CachyOS/Arch):** `sudo pacman -S --needed git git-lfs jdk11-openjdk nodejs`
+- **Windows:** install Git for Windows (includes git-lfs), Temurin JDK 11 and Node.js.
+
+Then, from the `2009scape` folder (same commands on both; set `JAVA11_HOME` if JDK 11 isn't your default `java`):
+
 ```bash
-sudo pacman -S --needed git git-lfs jdk11-openjdk nodejs
+node launch.mjs setup
 ```
 ```bash
-cd 2009scape && ./setup.sh
+node launch.mjs start
 ```
 ```bash
-./restart.sh            # starts the server (and the bot API)
+node launch.mjs status
 ```
 ```bash
-cd bots && ./start-bots.sh
+node launch.mjs stop
 ```
 
-### Windows
-Install Git for Windows (includes git-lfs), Temurin JDK 11 and Node.js. Run `setup.sh` from Git Bash, start the server with `restart.sh` (Git Bash) or `java -jar Server/target/server-1.0.0-jar-with-dependencies.jar` from the `Server` folder, then double-click `bots/start-bots.bat`.
+`setup` clones 2009Scape next to this repo, applies the bot API, and builds it (retrying if Maven Central rate-limits). `start` runs the server, waits for the bot API, then starts the 10 scripted and 50 Claude-directed bots. Logs: `server.log`, `bots/logs/`. (The older `setup.sh` / `restart.sh` / `bots/start-bots.sh|.bat` still work. The launcher is tested on Linux; Windows is untested so far.)
 
 ### Watching / playing
 Use the 2009Scape client ([rt4-client](https://gitlab.com/2009scape/rt4-client)) with `client/config.json` pointing `ip_address`/`ip_management` to `127.0.0.1`. Dev-server logins are admins, so `::tele x y z` works to jump to any bot.
 
 ### Useful commands
 - `node bots/status.mjs`: level table for every bot
+- `node bots/health.mjs`: who's stuck (underground, far from home), low on HP, or in a random event
+- `node bots/recap.mjs`: news-style recap of the last day from the bots' diaries (`bots/diaries/`)
 - edit `bots/orders/<bot>.json`: change a Claude-directed bot's plan (re-read live)
 - `bots/GUIDE.md`: the leveling plan the bots follow, built from the 2009Scape wiki guides in `guides/`
 

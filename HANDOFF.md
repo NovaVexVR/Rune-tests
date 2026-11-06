@@ -16,7 +16,7 @@ Last session's container had everything under `/home/user`; a new one starts emp
 3. Node 24: download from nodejs.org (`node-v24.x-linux-x64.tar.xz`); the bots use `fetch` and ESM.
 4. `cd 2009scape && JAVA11_HOME=/usr/lib/jvm/java-11-openjdk-amd64 ./setup.sh` (clones to `../../2009scape-server`, `git lfs pull` for the cache, applies `server-patch/`, builds with Maven).
    If Maven Central rate-limits (HTTP 429), it caches the error page as .pom/.jar files: delete those (`grep -rl "exceeded rate limits" ~/.m2/repository`, also check jars) and add a `~/.m2/settings.xml` mirror of `central` to `https://maven-central.storage-download.googleapis.com/maven2/`.
-   Then `./restart.sh` (server; waits for "started in"), then `bots/start-bots.sh` (10 scripted + 50 Claude-directed bots).
+   Then `JAVA11_HOME=... node launch.mjs start` (server + all bots; `status`/`stop` too). The old `./restart.sh` + `bots/start-bots.sh` still work.
 5. Optional viewer: `rt4-client` from GitLab (`./gradlew :client:build`; Maven Central may rate-limit, just retry), run with **Java 21** under `Xvfb :99` (JDK 11 here is headless), `xdotool` for input, `viewer/snap.sh <bot>` screenshots. The spectator account must skip the tutorial via Skippy, then admin `::tele x y z` works.
 
 ## Layout
