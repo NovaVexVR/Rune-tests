@@ -24,7 +24,23 @@ const IOU_FILE = path.join(DIR, 'ious.json');
 const TRUST_FILE = path.join(DIR, 'trust.json');
 const REL_FILE = path.join(DIR, 'relations.json');
 const BOUNTY_FILE = path.join(DIR, 'bounties.json');
-const GRUDGE_HOURS = 3; // rivalries fade after this long unless renewed
+const MOOD_FILE = path.join(DIR, 'mood.json');
+const GRUDGE_HOURS = 3;
+
+// ---------- habits & collections (Phase 3) ----------
+export const SPOTS = {
+    courtyard: { x: 3222, y: 3218, label: 'the castle courtyard' },
+    chapel: { x: 3243, y: 3208, label: 'the Lumbridge chapel' },
+    riverbank: { x: 3239, y: 3245, label: 'the river bank' },
+    farm: { x: 3190, y: 3272, label: 'the farm' },
+    store: { x: 3212, y: 3247, label: 'the general store' }
+};
+export const COLLECTIONS = {
+    fish: ['Shrimps', 'Anchovies', 'Sardine', 'Herring', 'Trout'],
+    tools: ['Bronze axe', 'Bronze pickaxe', 'Tinderbox', 'Knife', 'Small fishing net', 'Hammer'],
+    logs: ['Logs', 'Oak logs', 'Willow logs']
+};
+const FAV_FOODS = ['Shrimps', 'Anchovies', 'Bread', 'Cooked chicken', 'Cooked meat', 'Trout']; // rivalries fade after this long unless renewed
 
 const ARCHETYPES = {
     merchant: { greed: 0.75, generosity: 0.2, caution: 0.5, loyalty: 0.7, patience: 0.6, sociability: 0.7 },
@@ -48,17 +64,38 @@ function seeded(name) {
 export function personalityOf(name) {
     const f = path.join(ORDERS, `${name}.json`);
     const o = fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : {};
-    if (o.personality) return o.personality;
+    if (o.personality) {
+        if (!o.personality.habits && fs.existsSync(f)) {
+            o.personality.habits = makeHabits(name, o.personality);
+            fs.writeFileSync(f, JSON.stringify(o, null, 2));
+        }
+        return o.personality;
+    }
     const rnd = seeded(name);
     const keys = Object.keys(ARCHETYPES);
     const archetype = keys[Math.floor(rnd() * keys.length)];
     const p = { archetype };
     for (const [k, v] of Object.entries(ARCHETYPES[archetype])) p[k] = Math.round(Math.min(1, Math.max(0, v + (rnd() - 0.5) * 0.3)) * 100) / 100;
+    p.habits = makeHabits(name, p);
     if (fs.existsSync(f)) {
         o.personality = p;
         fs.writeFileSync(f, JSON.stringify(o, null, 2));
     }
     return p;
+}
+
+function makeHabits(name, p) {
+    const rnd = seeded(name + '#habits');
+    const spots = Object.keys(SPOTS);
+    const h = { spot: spots[Math.floor(rnd() * spots.length)], food: FAV_FOODS[Math.floor(rnd() * FAV_FOODS.length)] };
+    // hoarding types sometimes fixate on a collection
+    const collectorOdds = { miser: 0.6, merchant: 0.4, loyalist: 0.2 }[p.archetype] ?? 0.15;
+    if (rnd() < collectorOdds) {
+        const sets = Object.keys(COLLECTIONS);
+        h.collection = sets[Math.floor(rnd() * sets.length)];
+    }
+    if (p.archetype === 'gambler' || rnd() < 0.1) h.gambles = true;
+    return h;
 }
 
 const load = (f, d) => (fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : d);
@@ -72,6 +109,7 @@ export class Social {
         this.trustMap = load(TRUST_FILE, {});
         this.rel = load(REL_FILE, {}); // rel[a][b] = { strikes, rival, since, reason }
         this.bounties = load(BOUNTY_FILE, []);
+        this.moodMap = load(MOOD_FILE, {});
         this.seq = this.ious.reduce((m, i) => Math.max(m, i.id), 0);
         this.bseq = this.bounties.reduce((m, b) => Math.max(m, b.id), 0);
     }
@@ -162,8 +200,31 @@ export class Social {
         for (const b of this.bounties) if (['open', 'claimed'].includes(b.status) && Date.now() > b.deadline) this.setBounty(b, 'expired');
     }
 
+    // personality as it acts right now: mood shifts caution, chattiness and generosity
     p(name) {
-        return personalityOf(name);
+        const base = personalityOf(name);
+        const m = this.mood(name);
+        const c = v => Math.round(Math.max(0, Math.min(1, v)) * 100) / 100;
+        return { ...base, caution: c(base.caution - 0.3 * m), sociability: c(base.sociability + 0.3 * m), generosity: c(base.generosity + 0.2 * m), mood: m };
+    }
+
+    mood(name) {
+        return this.moodMap[name] ?? 0;
+    }
+
+    bumpMood(name, delta, why) {
+        const before = this.mood(name);
+        const after = Math.round(Math.max(-1, Math.min(1, before + delta)) * 100) / 100;
+        this.moodMap[name] = after;
+        save(MOOD_FILE, this.moodMap);
+        if (Math.abs(delta) >= 0.2) this.log(`[mood] ${name} ${delta > 0 ? 'cheered' : 'shaken'} by ${why} (${before} -> ${after})`);
+        this.onMood?.(name, delta, why);
+    }
+
+    // moods drift back toward neutral
+    driftMoods(factor = 0.97) {
+        for (const k of Object.keys(this.moodMap)) this.moodMap[k] = Math.round(this.moodMap[k] * factor * 100) / 100;
+        save(MOOD_FILE, this.moodMap);
     }
 
     trust(a, b) {
@@ -237,9 +298,12 @@ export class Social {
             this.adjustTrust(iou.creditor, iou.debtor, onTime ? 0.15 : 0.05);
             this.adjustTrust(iou.debtor, iou.creditor, 0.05);
             if (this.rel[iou.creditor]?.[iou.debtor]?.rival) this.clearRival(iou.creditor, iou.debtor);
+            this.bumpMood(iou.creditor, 0.1, 'being repaid');
+            this.bumpMood(iou.debtor, 0.05, 'clearing a debt');
         } else {
             this.adjustTrust(iou.creditor, iou.debtor, -0.5);
             this.markRival(iou.creditor, iou.debtor, `defaulted on IOU #${iou.id}`);
+            this.bumpMood(iou.creditor, -0.3, `${iou.debtor} defaulting`);
             // reputation: everyone who has dealt in IOUs hears about it
             const known = new Set([...Object.keys(this.trustMap), ...this.ious.flatMap(i => [i.debtor, i.creditor])]);
             for (const other of known) if (other !== iou.creditor && other !== iou.debtor) this.adjustTrust(other, iou.debtor, -0.1);
@@ -275,7 +339,10 @@ export class Social {
             callout: { miser: `Watch your coins around ${other}. Thief.`, loyalist: `${other} broke their word to me.`, merchant: `Don't do business with ${other}.`, default: `${other} can't be trusted!` },
             collect: { merchant: `${other}, I own your debt now. Pay up.`, opportunist: `Tick tock, ${other}. You owe me.`, default: `${other}, time to pay what you owe.` },
             bounty: { philanthropist: `Paying well for some help!`, miser: `Paying fair. Not a coin more.`, default: `Bounty posted. Anyone?` },
-            bountyDone: { default: `Job done for ${other}.` }
+            bountyDone: { default: `Job done for ${other}.` },
+            wagerWin: { gambler: `Heads! Lady luck loves me.`, default: `Ha, I win the flip!` },
+            collection: { miser: `My collection is complete. Mine, all mine.`, default: `Finally completed my collection!` },
+            idle: { philanthropist: `Lovely day at ${other}.`, miser: `Nobody touch my stuff.`, gambler: `Anyone up for a coin flip?`, merchant: `Buying and selling, best prices!`, loyalist: `Good to be back at ${other}.`, opportunist: `Just passing through ${other}...`, default: `Nice spot, ${other}.` }
         }[event];
         if (!L) return null;
         return (L[p.archetype] ?? L.default).slice(0, 80);

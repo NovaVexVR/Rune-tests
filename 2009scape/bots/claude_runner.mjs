@@ -11,7 +11,7 @@ import path from 'path';
 import { Bot, LOG_DIR, sleep, summary } from './lib.mjs';
 import { taskById, RESUPPLY } from './tasks.mjs';
 import { Market, TEAMS } from './market.mjs';
-import { personalityOf } from './social.mjs';
+import { personalityOf, SPOTS } from './social.mjs';
 import { council, STATE as POLITICS } from './politics.mjs';
 
 const market = new Market((...a) => console.log(new Date().toISOString(), ...a));
@@ -45,6 +45,11 @@ async function runBot(name, delay) {
     market.register(bot, () => readOrders(name).plan ?? []);
     bot.market = market;
     bot.onPm = pm => market.onPm(name, pm);
+    // mood reacts to what happens in-game
+    bot.onMsg = text => {
+        if (/Oh dear, you are dead/i.test(text)) market.social.bumpMood(name, -0.4, 'dying');
+        else if (/advanced .* level|reached level/i.test(text)) market.social.bumpMood(name, 0.1, 'a level-up');
+    };
     let lastSeek = 0;
     bot.hook = async b => {
         if (market.dealFor(b.name)) {
@@ -92,6 +97,16 @@ async function runBot(name, delay) {
             bot.log(`[plan step ${step}] ${item.task} for ${item.minutes}m — ${item.why ?? ''} | ${summary(bot.s)}`);
             await task.run(bot, Date.now() + (item.minutes ?? 15) * 60_000);
             writeStep(name, step + 1);
+            // habit: now and then, drift to a favorite spot between tasks
+            const habits = personalityOf(name).habits;
+            if (habits?.spot && Math.random() < 0.2 && market.social.mood(name) > -0.5) {
+                const spot = SPOTS[habits.spot];
+                bot.log(`habit: wandering to ${spot.label}`);
+                await bot.walkTo(spot.x, spot.y, { tol: 3, timeout: 120 });
+                const text = market.social.line(name, 'idle', spot.label);
+                if (text) await bot.act({ type: 'say', text });
+                await bot.wait(30);
+            }
             await bot.state(1);
             fs.appendFileSync(PROGRESS, JSON.stringify({ t: Date.now(), bot: name, kind: 'claude', task: item.task, total: bot.s.totalLevel, combat: bot.s.combat, x: bot.s.x, y: bot.s.y, stats: Object.fromEntries(Object.entries(bot.s.stats).map(([k, v]) => [k, v.level])) }) + '\n');
         } catch (e) {
@@ -111,4 +126,5 @@ console.log(`starting Claude-directed bots: ${names.join(', ')}`);
 // team council (scoreboard, mutiny, leaving, recruiting) every POLITICS_MINUTES
 const POLITICS_MINUTES = Number(process.env.POLITICS_MINUTES ?? 60);
 setInterval(() => { try { council(market); } catch (e) { console.log('council error', e); } }, POLITICS_MINUTES * 60_000);
+setInterval(() => market.social.driftMoods(), 10 * 60_000);
 await Promise.all(names.map((n, i) => runBot(n, i * 3000)));

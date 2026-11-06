@@ -19,7 +19,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { dist, sleep } from './lib.mjs';
-import { Social } from './social.mjs';
+import { Social, COLLECTIONS, personalityOf } from './social.mjs';
 import { teamOf, treasurerOfTeam, onContribution, onHelped } from './politics.mjs';
 
 const DIR = path.join(path.dirname(new URL(import.meta.url).pathname), 'market');
@@ -51,7 +51,7 @@ export const TASK_NEEDS = {
     magic: [['Air rune'], ['Mind rune']],
     fletch: [['Knife'], ['Bronze axe', 'Iron axe', 'Steel axe']]
 };
-const TRADEABLE = new Set([...Object.values(TASK_NEEDS).flat(2), 'Copper ore', 'Tin ore', 'Iron ore', 'Logs', 'Oak logs', 'Willow logs', 'Shrimps', 'Anchovies', 'Bones', 'Feather', 'Cowhide']);
+const TRADEABLE = new Set(['Hammer', 'Sardine', 'Herring', 'Trout', 'Bread', 'Cooked chicken', 'Cooked meat', ...Object.values(COLLECTIONS).flat(), ...Object.values(TASK_NEEDS).flat(2), 'Copper ore', 'Tin ore', 'Iron ore', 'Logs', 'Oak logs', 'Willow logs', 'Shrimps', 'Anchovies', 'Bones', 'Feather', 'Cowhide']);
 const STORE_FALLBACK = { 'Small fishing net': 5, 'Bronze axe': 16, 'Bronze pickaxe': 1, Tinderbox: 1, Shortbow: 50, 'Bronze arrow': 1, 'Air rune': 4, 'Mind rune': 3, 'Copper ore': 3, 'Tin ore': 3, 'Iron ore': 17, Logs: 4, 'Oak logs': 20, 'Willow logs': 32, Shrimps: 5, Anchovies: 15, Bones: 1, Feather: 2, Cowhide: 1 };
 
 export class Market {
@@ -112,7 +112,19 @@ export class Market {
         for (const task of new Set(plan().map(p => p.task))) {
             for (const group of TASK_NEEDS[task] ?? []) if (!group.some(n => this.has(s, n))) needs.push(group[0]);
         }
+        // collectors also "need" the missing pieces of their set
+        const col = this.collectionOf(name);
+        if (col) for (const piece of col.missing) needs.push(piece);
         return [...new Set(needs)];
+    }
+
+    collectionOf(name) {
+        const h = personalityOf(name).habits;
+        if (!h?.collection) return null;
+        const s = this.bots.get(name)?.bot.s;
+        const set = COLLECTIONS[h.collection];
+        const missing = set.filter(n => !(s?.inv?.some(i => i.name === n) || s?.bank?.some(i => i.name === n)));
+        return { name: h.collection, set, missing, done: !!h.collectionDone };
     }
 
     wantedBy(name) {
@@ -124,7 +136,9 @@ export class Market {
         const s = this.bots.get(name).bot.s;
         if (!s?.inv) return [];
         const wanted = this.wantedBy(name);
-        return s.inv.filter(i => TRADEABLE.has(i.name) && (!wanted.has(i.name) || s.inv.filter(j => j.name === i.name).length > 1 && !/rune|arrow/i.test(i.name)));
+        const h = personalityOf(name).habits ?? {};
+        const keep = new Set([h.food, ...(h.collection ? COLLECTIONS[h.collection] : [])]);
+        return s.inv.filter(i => !keep.has(i.name)).filter(i => TRADEABLE.has(i.name) && (!wanted.has(i.name) || s.inv.filter(j => j.name === i.name).length > 1 && !/rune|arrow/i.test(i.name)));
     }
 
     coins(name) {
@@ -151,6 +165,10 @@ export class Market {
         if (needs.includes(item)) f *= 1.6; // I need this to do my job
         else if (this.wantedBy(name).has(item)) f *= owned > 1 ? 0.9 : 1.3; // I use it; reluctant to part with my only one
         else f *= 0.7; // spare to me
+        const h = personalityOf(name).habits ?? {};
+        if (h.food === item) f *= 3; // its favorite food: hardly for sale
+        const col = h.collection ? COLLECTIONS[h.collection] : null;
+        if (col?.includes(item)) f *= owned > 0 ? 2 : 4; // collectors overpay for missing pieces and cling to the rest
         let demand = 0, supply = 0;
         for (const [other] of this.bots) {
             if (other === name) continue;
@@ -209,6 +227,8 @@ export class Market {
             return;
         }
 
+        this.checkCollection(name);
+        if (this.seekWager(name)) return;
         if (this.seekBounty(name)) return;
         if (this.seekDebtPurchase(name)) return;
 
@@ -250,6 +270,37 @@ export class Market {
             }
         }
         this.maybePostBounties(name);
+    }
+
+    // ---------- 3.2 collections ----------
+    checkCollection(name) {
+        const col = this.collectionOf(name);
+        if (!col || col.done || col.missing.length) return;
+        const f = path.join(path.dirname(new URL(import.meta.url).pathname), 'orders', `${name}.json`);
+        const o = JSON.parse(fs.readFileSync(f, 'utf8'));
+        o.personality.habits.collectionDone = new Date().toISOString();
+        fs.writeFileSync(f, JSON.stringify(o, null, 2));
+        this.log(`[character] ${name} completed its ${col.name} collection!`);
+        this.social.bumpMood(name, 0.3, 'completing a collection');
+        const text = this.social.line(name, 'collection', '');
+        if (text) this.bots.get(name).bot.act({ type: 'say', text });
+    }
+
+    // ---------- 3.1 gambling ----------
+    seekWager(name) {
+        const h = personalityOf(name).habits ?? {};
+        if (!h.gambles || this.coins(name) < 20 || Date.now() - (this.lastWager?.[name] ?? 0) < 30 * 60_000) return false;
+        const me = this.bots.get(name).bot.s;
+        const other = [...this.bots.keys()].find(o => o !== name && !this.busy.has(o) && personalityOf(o).habits?.gambles && this.coins(o) >= 20
+            && this.bots.get(o).bot.s?.online && dist(me, this.bots.get(o).bot.s) <= 25 && !this.social.isRival(name, o) && !this.social.isRival(o, name));
+        if (!other) return false;
+        (this.lastWager ??= {})[name] = Date.now();
+        this.lastWager[other] = Date.now();
+        const stake = Math.min(20, Math.floor(Math.min(this.coins(name), this.coins(other)) / 3));
+        const [winner, loser] = Math.random() < 0.5 ? [name, other] : [other, name]; // the coin is flipped now; the loser pays up
+        this.log(`[character] ${name} and ${other} flip a coin for ${stake}gp: ${winner} wins`);
+        this.open({ buyer: winner, seller: loser, item: 'Coins', amount: stake, price: 0, kind: 'wager' });
+        return true;
     }
 
     // ---------- 1.1 call-outs ----------
@@ -375,7 +426,15 @@ export class Market {
         this.deals.delete(deal.id);
         this.busy.delete(deal.buyer);
         this.busy.delete(deal.seller);
-        if (outcome === 'completed' && deal.kind === 'sale') (this.memory[deal.item] ??= []).push(deal.price / (deal.amount ?? 1));
+        if (outcome === 'completed' && deal.kind === 'sale') {
+            (this.memory[deal.item] ??= []).push(deal.price / (deal.amount ?? 1));
+            this.social.bumpMood(deal.buyer, 0.05, 'a good deal');
+            this.social.bumpMood(deal.seller, 0.05, 'a good deal');
+        }
+        if (outcome === 'completed' && deal.kind === 'wager') {
+            this.social.bumpMood(deal.buyer, 0.15, 'winning a coin flip');
+            this.social.bumpMood(deal.seller, -0.15, 'losing a coin flip');
+        }
         if (outcome === 'completed' && deal.kind === 'favor') {
             const iou = this.social.createIou(deal.buyer, deal.seller, deal.item, deal.value);
             this.dm(deal.seller, deal.buyer, `You owe me ${iou.owed} coins for the ${deal.item}. Due in an hour.`);
@@ -403,8 +462,8 @@ export class Market {
             if (iou && iou.status === 'open') this.social.settle(iou, true);
         }
         if (outcome === 'completed') {
-            const event = { sale: 'sale', favor: 'favor', repay: 'repaid', bounty: 'bountyDone' }[deal.kind];
-            const speaker = deal.kind === 'repay' ? deal.buyer : deal.seller;
+            const event = { sale: 'sale', favor: 'favor', repay: 'repaid', bounty: 'bountyDone', wager: 'wagerWin' }[deal.kind];
+            const speaker = deal.kind === 'repay' || deal.kind === 'wager' ? deal.buyer : deal.seller;
             const other = speaker === deal.buyer ? deal.seller : deal.buyer;
             const text = event && this.social.line(speaker, event, other);
             if (text) this.bots.get(speaker)?.bot.act({ type: 'say', text }).catch?.(() => {});
@@ -418,7 +477,7 @@ export class Market {
     acceptable(name, trade, deal) {
         const partner = name === deal.buyer ? deal.seller : deal.buyer;
         if (sameGuild(name, partner)) return true;
-        if (['favor', 'repay', 'debtsale', 'bounty'].includes(deal.kind)) return true; // agreed contract (IOU / posted bounty)
+        if (['favor', 'repay', 'debtsale', 'bounty', 'wager'].includes(deal.kind)) return true; // agreed contract (IOU / posted bounty)
         const val = list => list.reduce((t, i) => t + (deal.snap?.[name]?.[i.name] ?? this.perceived(name, i.name)) * i.count, 0);
         const give = val(trade.mine), get = val(trade.theirs);
         if (give === 0) return true;

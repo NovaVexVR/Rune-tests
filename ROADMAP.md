@@ -14,7 +14,7 @@ favors/IOUs (`bots/social.mjs`, report with `node bots/social_report.mjs`).
 ## Phase 1: Reputation and conflict
 Builds directly on trust and IOUs.
 
-### Done: Phase 1 (rivalries, debt collectors, bounties) and Phase 2 (scoreboard, taxes/mutiny, leaving/recruiting), plus private messages between bots and caps that scale with the bot population (`capFor` in politics.mjs).
+### Done: Phase 3 (habits, collectors, mood), Phase 1 (rivalries, debt collectors, bounties) and Phase 2 (scoreboard, taxes/mutiny, leaving/recruiting), plus private messages between bots and caps that scale with the bot population (`capFor` in politics.mjs).
 
 ### 1.1 Rivalries and grudges
 - A bot that is defaulted on (or loses a trade it judged unfair twice) marks the other bot as a **rival** in `market/relations.json`.
@@ -76,6 +76,15 @@ Teams start pre-made, but membership changes with how the bots get along (needs 
 - Low mood means more caution and less chat; high mood means more generosity and more risk.
 - **Check:** after a death, the bot's caution and prices shift, then recover.
 
+## Next up: RuneScape random events (moved ahead of Phase 4)
+Today the bots are exempt from random events (like the game's own AI players), and any bot already kidnapped into one is rescued by an operator command. The goal is for bots to handle them as players do.
+- **Talkers and gift-givers** (Genie, Drunken Dwarf, Mysterious Old Man, Sandwich Lady, Rick Turpentine, Certer): talk to them, pick the right option or item, take the reward.
+- **Fight-or-flee** (Evil Chicken, River Troll, Rock Golem, Shade, Swarm, Tree Spirit, Zombie): fight if combat allows, otherwise move away from the spot until it despawns.
+- **Puzzles and kidnappings** (Surprise Exam, Drill Demon, Freaky Forester, Maze, Mime, Pillory, Quiz Master, Evil Bob, Strange Plant, Candlelight): one solver per event, reading the event's interface or dialog from the bot API and answering it.
+- **Safety net:** if a bot is somewhere it can't solve for too long, it uses the event's exit or is rescued, and the incident goes in its diary.
+- Re-enable random events for bots one event type at a time as each solver is proven.
+- **Check:** trigger each event on a test bot; it completes or exits without help.
+
 ## Phase 4: Gatherings and stories
 
 ### 4.1 Market days at the Grand Exchange
@@ -100,15 +109,6 @@ Teams start pre-made, but membership changes with how the bots get along (needs 
 - **Check:** diaries fill in as events happen; the recap covers the day's highlights.
 
 ---
-
-## Phase 6: Random events
-Today the bots are exempt from random events (like the game's own AI players), and any bot already kidnapped into one is rescued by an operator command. The goal is for bots to handle them as players do.
-- **Talkers and gift-givers** (Genie, Drunken Dwarf, Mysterious Old Man, Sandwich Lady, Rick Turpentine, Certer): talk to them, pick the right option or item, take the reward.
-- **Fight-or-flee** (Evil Chicken, River Troll, Rock Golem, Shade, Swarm, Tree Spirit, Zombie): fight if combat allows, otherwise move away from the spot until it despawns.
-- **Puzzles and kidnappings** (Surprise Exam, Drill Demon, Freaky Forester, Maze, Mime, Pillory, Quiz Master, Evil Bob, Strange Plant, Candlelight): one solver per event, reading the event's interface or dialog from the bot API and answering it.
-- **Safety net:** if a bot is somewhere it can't solve for too long, it uses the event's exit or is rescued, and the incident goes in its diary.
-- Re-enable random events for bots one event type at a time as each solver is proven.
-- **Check:** trigger each event on a test bot; it completes or exits without help.
 
 ## Phase 5: PvP (bounded)
 - Duels at the Duel Arena are the main outlet for rivalries, with optional near-equal stakes; the loser settles the grudge.

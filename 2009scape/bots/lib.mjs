@@ -59,7 +59,7 @@ export class Bot {
         const s = await http('GET', `/bot/${this.name}/state?r=${r}&since=${this.since}`);
         for (const m of s.messages ?? []) {
             this.since = Math.max(this.since, m.id);
-            if (!DEBUG_MSG.test(m.text)) this.msgs.push(m.text);
+            if (!DEBUG_MSG.test(m.text)) { this.msgs.push(m.text); this.onMsg?.(m.text); }
         }
         if (this.msgs.length > 150) this.msgs.splice(0, this.msgs.length - 150);
         for (const pm of s.pms ?? []) {
