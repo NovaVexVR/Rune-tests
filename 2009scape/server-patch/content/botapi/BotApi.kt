@@ -47,6 +47,7 @@ class BotSession : IoSession(null, null) {
 class BotData(val name: String, val session: BotSession) {
     var player: Player? = null
     val messages = ArrayList<Pair<Int, String>>()
+    val pms = ArrayList<Triple<Int, String, String>>() // (seq, from, text)
     var seq = 0
     // interface id -> (child -> text), captured from outgoing string packets
     val strings = HashMap<Int, HashMap<Int, String>>()
@@ -65,6 +66,10 @@ object BotRegistry {
 
     @JvmStatic fun onMessage(p: Player, msg: String) {
         bots[p.username.lowercase()]?.let { if (it.player === p) it.addMessage(msg) }
+    }
+
+    @JvmStatic fun onPm(p: Player, from: String, text: String) {
+        bots[p.username.lowercase()]?.let { if (it.player === p) synchronized(it) { it.pms.add(Triple(++it.seq, from.lowercase(), text)); if (it.pms.size > 100) it.pms.removeAt(0) } }
     }
 
     @JvmStatic fun onString(p: Player, iface: Int, child: Int, text: String) {
@@ -314,6 +319,14 @@ object BotRegistry {
                 content.global.ame.returnPlayer(p)
                 "rescued to ${p.getAttribute("/save:original-loc", ServerConstants.HOME_LOCATION)}"
             }
+            "dm" -> {
+                // private message, the way a player does it: add them as a friend, then message
+                val to = a["to"].toString().lowercase()
+                val text = a["text"].toString().take(80)
+                PacketProcessor.enqueue(Packet.AddFriend(p, to))
+                PacketProcessor.enqueue(Packet.PrivateMessage(p, to, text))
+                "dm $to: $text"
+            }
             "player" -> {
                 // e.g. {"type":"player","name":"claudebot2","op":"Trade with"}
                 val other = Repository.getPlayerByName(a["name"].toString()) ?: throw BotError("${a["name"]} not online")
@@ -462,6 +475,7 @@ object BotRegistry {
         // messages
         synchronized(bot) {
             o["messages"] = JSONArray().apply { bot.messages.filter { it.first > since }.forEach { add(JSONObject().apply { this["id"] = it.first; this["text"] = strip(it.second) }) } }
+            o["pms"] = JSONArray().apply { bot.pms.filter { it.first > since }.forEach { add(JSONObject().apply { this["id"] = it.first; this["from"] = it.second; this["text"] = strip(it.third) }) } }
         }
         // nearby
         val npcs = JSONArray()

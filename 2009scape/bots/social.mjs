@@ -93,7 +93,10 @@ export class Social {
         const was = this.isRival(a, b);
         this.rel[a][b] = { ...(this.rel[a][b] ?? {}), rival: true, since: Date.now(), reason, strikes: this.rel[a][b]?.strikes ?? 2 };
         save(REL_FILE, this.rel);
-        if (!was) this.log(`[social] ${a} now holds a grudge against ${b} (${reason})`);
+        if (!was) {
+            this.log(`[social] ${a} now holds a grudge against ${b} (${reason})`);
+            this.onGrudge?.(a, b, reason);
+        }
     }
 
     // a strike for a lopsided offer; two strikes make a rival
@@ -194,6 +197,7 @@ export class Social {
     willExtendFavor(creditor, debtor) {
         const c = this.p(creditor);
         if (this.openDebts(debtor).some(i => i.creditor === creditor)) return false; // one at a time per pair
+        if (this.openDebts(debtor).length >= 2) return false; // already stretched thin: nobody extends more credit
         if (this.ious.some(i => i.debtor === debtor && i.status === 'defaulted' && i.creditor === creditor)) return false; // burned before
         const needed = -0.2 + 0.6 * c.caution; // cautious bots need positive trust
         return c.patience > 0.35 && this.trust(creditor, debtor) >= needed;
@@ -221,7 +225,8 @@ export class Social {
         if (coins < iou.owed) return false;
         const p = this.p(debtor);
         const overdue = Date.now() > iou.due;
-        return p.loyalty > 0.5 || overdue || Math.random() < p.loyalty;
+        const reminded = iou.reminded && Date.now() - iou.reminded < 30 * 60_000; // a PM from the creditor nudges it
+        return p.loyalty > 0.5 || overdue || Math.random() < p.loyalty + (reminded ? 0.3 : 0);
     }
 
     settle(iou, repaid) {
@@ -251,6 +256,10 @@ export class Social {
 
     save() {
         save(TRUST_FILE, this.trustMap);
+    }
+
+    saveIous() {
+        save(IOU_FILE, this.ious);
     }
 
     // A short in-character chat line (or null if this bot doesn't feel like talking).

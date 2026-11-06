@@ -9,8 +9,12 @@ fs.mkdirSync(OUT, { recursive: true });
 const API = 'http://127.0.0.1:8899';
 const now = new Date().toISOString();
 
-const groupOf = n =>
-    n.startsWith('script') ? 'Scripted' : n.startsWith('claude') ? 'Individualist' : n.startsWith('guild') ? 'Guild team' : n.startsWith('wolf') ? 'Wolf team' : n.startsWith('hawk') ? 'Hawk team' : n.startsWith('bear') ? 'Bear team' : n.startsWith('legion') ? 'Legion' : 'Other';
+const TEAM_NAMES = { guild: 'Guild team', wolf: 'Wolf team', hawk: 'Hawk team', bear: 'Bear team', legion: 'Legion' };
+const teamsState = fs.existsSync(path.join(HERE, 'market/teams.json')) ? JSON.parse(fs.readFileSync(path.join(HERE, 'market/teams.json'), 'utf8')) : null;
+const liveTeam = n => { for (const [t, d] of Object.entries(teamsState?.teams ?? {})) if (d.members.includes(n)) return TEAM_NAMES[t] ?? t; return null; };
+const groupOf = n => liveTeam(n) ?? groupOfName(n);
+const groupOfName = n =>
+    n.startsWith('script') ? 'Scripted' : /^(claude|guild|wolf|hawk|bear|legion)/.test(n) ? 'Individualist' : n.startsWith('guild') ? 'Guild team' : n.startsWith('wolf') ? 'Wolf team' : n.startsWith('hawk') ? 'Hawk team' : n.startsWith('bear') ? 'Bear team' : n.startsWith('legion') ? 'Legion' : 'Other';
 const readJson = (f, d) => (fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : d);
 const lastTask = name => {
     const f = path.join(HERE, 'logs', `${name}.log`);
@@ -44,7 +48,7 @@ const deals = ledger.slice(-150).reverse().map(r => ({ time: r.t, id: r.id, kind
 const debts = readJson(path.join(HERE, 'market/ious.json'), []).filter(i => !i.test).map(i => ({ id: i.id, debtor: i.debtor, creditor: i.creditor, item: i.item, owed: i.owed, status: i.status, due: new Date(i.due).toISOString(), collected: !!i.collected }));
 const bounties = readJson(path.join(HERE, 'market/bounties.json'), []).filter(b => !b.test).map(b => ({ id: b.id, poster: b.poster, item: b.item, qty: b.qty, reward: b.reward, status: b.status, claimant: b.claimant ?? '', posted: new Date(b.posted).toISOString() }));
 const log = fs.existsSync(path.join(HERE, 'logs/claude_runner.out')) ? fs.readFileSync(path.join(HERE, 'logs/claude_runner.out'), 'utf8').trim().split('\n') : [];
-const events = log.filter(l => /\[social\]|\[market\] deal #\d+:/.test(l)).slice(-80).reverse().map(l => {
+const events = log.filter(l => /\[social\]|\[politics\]|\[market\] deal #\d+:/.test(l)).slice(-80).reverse().map(l => {
     const m = l.match(/^(\S+) \[(\w+)\] (.*)$/);
     return m ? { time: m[1], kind: m[2], text: m[3].slice(0, 160) } : null;
 }).filter(Boolean);

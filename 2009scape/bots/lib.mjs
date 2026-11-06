@@ -29,6 +29,7 @@ export class Bot {
         this.s = null;
         this.since = 0;
         this.msgs = [];
+        this.pms = []; // private messages received: {from, text}
         this.quiet = quiet;
         this.logFile = path.join(LOG_DIR, `${this.name}.log`);
     }
@@ -61,6 +62,12 @@ export class Bot {
             if (!DEBUG_MSG.test(m.text)) this.msgs.push(m.text);
         }
         if (this.msgs.length > 150) this.msgs.splice(0, this.msgs.length - 150);
+        for (const pm of s.pms ?? []) {
+            this.since = Math.max(this.since, pm.id);
+            this.pms.push({ from: pm.from, text: pm.text, t: Date.now() });
+            this.onPm?.(pm);
+        }
+        if (this.pms.length > 100) this.pms.splice(0, this.pms.length - 100);
         this.s = s;
         return s;
     }
@@ -210,12 +217,22 @@ export class Bot {
             const s = await this.state(10);
             if (await this.handleInterrupts()) continue;
             if (dist(s, { x, y }) <= tol) return true;
+            // somehow underground (y > 6000) while heading for the surface: take the nearest way up
+            if (s.y > 6000 && y < 6000) {
+                const up = this.nearestScenery(l => l.ops.some(o => /^climb-up$/i.test(o)), s) ?? this.nearestScenery(l => /ladder|stair/i.test(l.name), s);
+                if (up) {
+                    this.log(`underground at ${s.x},${s.y}; climbing ${up.name}`);
+                    await this.act({ type: 'scenery', x: up.x, y: up.y, id: up.id, op: up.ops.find(o => /climb-up/i.test(o)) ?? up.ops[0] });
+                    await this.waitIdle({ timeout: 15 });
+                    continue;
+                }
+            }
             if (last && dist(last, s) === 0) stuck++;
             else stuck = 0;
             last = { x: s.x, y: s.y };
             if (stuck >= 2) {
                 const door = s.scenery
-                    .filter(l => l.ops.includes('Open') && l.dist <= 5 && /door|gate/i.test(l.name))
+                    .filter(l => l.ops.includes('Open') && l.dist <= 5 && /door|gate/i.test(l.name) && !/trapdoor|trap door/i.test(l.name))
                     .sort((a, b) => dist(a, { x, y }) - dist(b, { x, y }))[0];
                 if (door && stuck < 5) {
                     this.log(`opening ${door.name} at ${door.x},${door.y}`);

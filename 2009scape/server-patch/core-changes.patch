@@ -13,16 +13,20 @@ index 4f9ba87..9134928 100644
          if (entity is Player && entity.rights == Rights.ADMINISTRATOR)
              paused = true
 diff --git a/Server/src/main/core/net/packet/PacketRepository.java b/Server/src/main/core/net/packet/PacketRepository.java
-index e2656b0..3535a41 100644
+index e2656b0..5b3e12a 100644
 --- a/Server/src/main/core/net/packet/PacketRepository.java
 +++ b/Server/src/main/core/net/packet/PacketRepository.java
-@@ -89,6 +89,14 @@ public final class PacketRepository {
+@@ -89,6 +89,18 @@ public final class PacketRepository {
  	@SuppressWarnings({ "rawtypes", "unchecked" })
  	public static void send(Class<? extends OutgoingPacket> clazz, Context context) {
                  if(context.getPlayer() instanceof AIPlayer) return;
 +                if(content.botapi.BotRegistry.INSTANCE.isBot(context.getPlayer())) {
 +                    if (context instanceof core.net.packet.context.GameMessageContext)
 +                        content.botapi.BotRegistry.onMessage(context.getPlayer(), ((core.net.packet.context.GameMessageContext) context).getMessage());
++                    else if (context instanceof core.net.packet.context.MessageContext && ((core.net.packet.context.MessageContext) context).getOpcode() == core.net.packet.context.MessageContext.RECIEVE_MESSAGE) {
++                        core.net.packet.context.MessageContext mc = (core.net.packet.context.MessageContext) context;
++                        content.botapi.BotRegistry.onPm(context.getPlayer(), mc.getOther(), mc.getMessage());
++                    }
 +                    else if (context instanceof core.net.packet.context.StringContext) {
 +                        core.net.packet.context.StringContext sc = (core.net.packet.context.StringContext) context;
 +                        content.botapi.BotRegistry.onString(context.getPlayer(), sc.getInterfaceId(), sc.getLineId(), sc.getString());

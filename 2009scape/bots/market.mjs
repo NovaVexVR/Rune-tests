@@ -20,11 +20,13 @@ import path from 'path';
 
 import { dist, sleep } from './lib.mjs';
 import { Social } from './social.mjs';
+import { teamOf, treasurerOfTeam, onContribution, onHelped } from './politics.mjs';
 
 const DIR = path.join(path.dirname(new URL(import.meta.url).pathname), 'market');
 const VALUES_DIR = path.join(DIR, 'values');
 fs.mkdirSync(VALUES_DIR, { recursive: true });
 const LEDGER = path.join(DIR, 'ledger.jsonl');
+const DMS = path.join(DIR, 'dms.jsonl');
 
 // Teams: every bot name maps to a team; individualists (and scripted bots) are 'individual'.
 export const TEAMS = {
@@ -34,12 +36,10 @@ export const TEAMS = {
     bear: { prefix: 'bearbot', size: 5, treasurer: 'bearbot5' },
     legion: { prefix: 'legion', size: 20, treasurer: 'legion1' }
 };
-export const faction = name => {
-    for (const [team, t] of Object.entries(TEAMS)) if (new RegExp(`^${t.prefix}\\d+$`).test(name)) return team;
-    return 'individual';
-};
+// membership is dynamic (politics.mjs: market/teams.json); TEAMS above only seeds it
+export const faction = name => teamOf(name);
 const sameGuild = (a, b) => faction(a) !== 'individual' && faction(a) === faction(b);
-export const treasurerOf = name => TEAMS[faction(name)]?.treasurer ?? null;
+export const treasurerOf = name => treasurerOfTeam(faction(name));
 export const TREASURER = 'guildbot5'; // legacy name, prefer treasurerOf()
 const COIN_FLOAT = 40; // coins a guild member keeps; the rest goes to the treasurer
 
@@ -59,9 +59,15 @@ export class Market {
         this.bots = new Map(); // name -> { bot, plan() }
         this.deals = new Map();
         this.busy = new Set();
-        this.seq = 0;
+        // deal ids continue from the ledger so they stay unique across restarts
+        this.seq = fs.existsSync(LEDGER) ? fs.readFileSync(LEDGER, 'utf8').trim().split('\n').filter(Boolean).reduce((m, l) => Math.max(m, JSON.parse(l).id ?? 0), 0) : 0;
         this.log = log;
         this.social = new Social(log, faction);
+        // when a bot starts a grudge, it warns the bots it trusts most by PM
+        this.social.onGrudge = (a, b, reason) => {
+            const friends = [...this.bots.keys()].filter(o => o !== a && o !== b && this.social.trust(a, o) > 0.2).sort((x, y) => this.social.trust(a, y) - this.social.trust(a, x)).slice(0, 3);
+            for (const f of friends) this.dm(a, f, `Watch out for ${b}. ${reason}.`);
+        };
         this.lastCallout = {};
         this.lastHound = {};
         this.memory = {}; // item -> recent trade prices seen by everyone (public ledger)
@@ -70,6 +76,23 @@ export class Market {
                 const r = JSON.parse(line);
                 if (r.outcome === 'completed' && r.kind === 'sale' && r.amount) (this.memory[r.item] ??= []).push(r.price / r.amount);
             }
+        }
+    }
+
+    // private message between bots (real in-game PM); logged for the dashboard
+    dm(from, to, text) {
+        const b = this.bots.get(from)?.bot;
+        if (!b?.s?.online || !this.bots.get(to)?.bot.s?.online) return;
+        text = String(text).slice(0, 80);
+        b.act({ type: 'dm', to, text });
+        fs.appendFileSync(DMS, JSON.stringify({ t: new Date().toISOString(), from, to, text }) + '\n');
+        this.log(`[dm] ${from} -> ${to}: ${text}`);
+    }
+
+    // a bot reacts to a PM it received
+    onPm(name, pm) {
+        for (const iou of this.social.openDebts(name)) {
+            if (iou.creditor === pm.from) { iou.reminded = Date.now(); this.social.saveIous?.(); }
         }
     }
 
@@ -160,6 +183,14 @@ export class Market {
         this.social.sweepDefaults();
         this.social.expireBounties();
         this.maybeCallOut(name);
+
+        // creditors chase overdue debts by PM
+        for (const iou of this.social.ious) {
+            if (iou.status !== 'open' || iou.creditor !== name || Date.now() < iou.due) continue;
+            if (Date.now() - (iou.lastReminder ?? 0) < 20 * 60_000) continue;
+            iou.lastReminder = Date.now();
+            this.dm(name, iou.debtor, `Your IOU #${iou.id} is overdue: ${iou.owed} coins. Pay up.`);
+        }
 
         // pay debts first (loyal bots promptly; others when overdue or on a whim)
         for (const iou of this.social.openDebts(name)) {
@@ -272,6 +303,7 @@ export class Market {
         await bot.walkTo(ds.x, ds.y, { tol: 3, timeout: 120 });
         const text = this.social.line(name, 'collect', iou.debtor) ?? `${iou.debtor}, you owe me ${iou.owed}.`;
         await bot.act({ type: 'say', text });
+        this.dm(name, iou.debtor, `I bought your IOU #${iou.id}. ${iou.owed} coins, now.`);
         return true;
     }
 
@@ -294,6 +326,7 @@ export class Market {
         options.sort((a, b) => (p.greed > 0.5 ? b.reward / b.qty - a.reward / a.qty : a.posted - b.posted));
         const b = options[0];
         this.social.setBounty(b, 'claimed', name);
+        this.dm(name, b.poster, `I'll take bounty #${b.id}: ${b.qty} ${b.item} for ${b.reward}gp. Coming to you.`);
         this.open({ buyer: b.poster, seller: name, item: b.item, amount: b.qty, price: b.reward, kind: 'bounty', bountyId: b.id });
         return true;
     }
@@ -343,7 +376,16 @@ export class Market {
         this.busy.delete(deal.buyer);
         this.busy.delete(deal.seller);
         if (outcome === 'completed' && deal.kind === 'sale') (this.memory[deal.item] ??= []).push(deal.price / (deal.amount ?? 1));
-        if (outcome === 'completed' && deal.kind === 'favor') this.social.createIou(deal.buyer, deal.seller, deal.item, deal.value);
+        if (outcome === 'completed' && deal.kind === 'favor') {
+            const iou = this.social.createIou(deal.buyer, deal.seller, deal.item, deal.value);
+            this.dm(deal.seller, deal.buyer, `You owe me ${iou.owed} coins for the ${deal.item}. Due in an hour.`);
+        }
+        if (outcome === 'completed' && deal.kind === 'gift' && sameGuild(deal.buyer, deal.seller)) {
+            // politics: paying into the treasury is taxed; receiving help builds goodwill
+            if (deal.item === 'Coins' && deal.buyer === treasurerOf(deal.buyer)) onContribution(this.social, deal.seller, deal.amount ?? 0);
+            else onHelped(this.social, deal.buyer, deal.seller, deal.item === 'Coins' ? deal.amount ?? 0 : this.storeValue(deal.item));
+            this.social.save();
+        }
         if (deal.kind === 'debtsale' && outcome === 'completed') {
             const iou = this.social.ious.find(i => i.id === deal.iouId);
             if (iou && iou.status === 'open') this.social.transferIou(iou, deal.buyer, deal.price);

@@ -3,6 +3,8 @@
 What's planned for the bot world, in build order. Each item lists what it does, how it fits the
 existing code, and how it's checked in-game before it counts as done.
 
+**Note:** bots will be reset to fresh level-1 characters once the systems are developed; until then, test scenarios are set up by hand to prove each mechanic.
+
 **Already built:** bot API, 60 bots (10 scripted, 10 individualists, four 5-bot teams, one 20-bot
 legion), shops and banking, per-bot perceived prices, team treasurers, personalities, trust, and
 favors/IOUs (`bots/social.mjs`, report with `node bots/social_report.mjs`).
@@ -11,6 +13,8 @@ favors/IOUs (`bots/social.mjs`, report with `node bots/social_report.mjs`).
 
 ## Phase 1: Reputation and conflict
 Builds directly on trust and IOUs.
+
+### Done: Phase 1 (rivalries, debt collectors, bounties) and Phase 2 (scoreboard, taxes/mutiny, leaving/recruiting), plus private messages between bots and caps that scale with the bot population (`capFor` in politics.mjs).
 
 ### 1.1 Rivalries and grudges
 - A bot that is defaulted on (or loses a trade it judged unfair twice) marks the other bot as a **rival** in `market/relations.json`.

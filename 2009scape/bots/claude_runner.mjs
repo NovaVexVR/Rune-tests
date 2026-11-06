@@ -12,6 +12,7 @@ import { Bot, LOG_DIR, sleep, summary } from './lib.mjs';
 import { taskById, RESUPPLY } from './tasks.mjs';
 import { Market, TEAMS } from './market.mjs';
 import { personalityOf } from './social.mjs';
+import { council, STATE as POLITICS } from './politics.mjs';
 
 const market = new Market((...a) => console.log(new Date().toISOString(), ...a));
 
@@ -43,6 +44,7 @@ async function runBot(name, delay) {
     bot.log(`personality: ${pers.archetype} ${JSON.stringify(pers)}`);
     market.register(bot, () => readOrders(name).plan ?? []);
     bot.market = market;
+    bot.onPm = pm => market.onPm(name, pm);
     let lastSeek = 0;
     bot.hook = async b => {
         if (market.dealFor(b.name)) {
@@ -69,7 +71,12 @@ async function runBot(name, delay) {
                 if (o.loop && plan.length) step = 0;
                 else { await sleep(10000); continue; }
             }
-            const item = plan[step];
+            let item = plan[step];
+            // politics: the poorest team spends some of its time making money
+            const team = POLITICS.teams[market.social.teamOf(name)];
+            if (team?.focus === 'money' && team.treasurer !== name && item.task !== 'thieving' && Math.random() < 0.5) {
+                item = { task: 'thieving', minutes: 20, why: 'team is poorest: making money' };
+            }
             const task = taskById(item.task);
             if (!task) { bot.log(`unknown task ${item.task}, skipping`); writeStep(name, step + 1); continue; }
             const ok = task.canRun(bot);
@@ -101,4 +108,7 @@ const names = [
     ...Object.values(TEAMS).flatMap(t => Array.from({ length: t.size }, (_, i) => `${t.prefix}${i + 1}`))
 ];
 console.log(`starting Claude-directed bots: ${names.join(', ')}`);
+// team council (scoreboard, mutiny, leaving, recruiting) every POLITICS_MINUTES
+const POLITICS_MINUTES = Number(process.env.POLITICS_MINUTES ?? 60);
+setInterval(() => { try { council(market); } catch (e) { console.log('council error', e); } }, POLITICS_MINUTES * 60_000);
 await Promise.all(names.map((n, i) => runBot(n, i * 3000)));
