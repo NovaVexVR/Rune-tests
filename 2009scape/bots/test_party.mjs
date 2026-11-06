@@ -7,7 +7,9 @@ import { Market } from './market.mjs';
 import { Parties } from './party.mjs';
 import { stageOf } from './quests.mjs';
 
-const names = process.argv.slice(2).length ? process.argv.slice(2) : ['pbot1', 'pbot2', 'pbot3'];
+// fresh characters each run by default (a bot that has done the quest would pass trivially)
+const tag = String(Date.now() % 100000).padStart(5, '0');
+const names = process.argv.slice(2).length ? process.argv.slice(2) : ['a', 'b', 'c'].map(x => `pt${tag}${x}`);
 const lines = [];
 const log = (...a) => { const l = a.join(' '); lines.push(l); console.log(new Date().toISOString().slice(11, 19), l); };
 const market = new Market(log);

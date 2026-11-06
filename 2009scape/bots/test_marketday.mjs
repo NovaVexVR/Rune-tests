@@ -35,8 +35,9 @@ if (process.argv[2] === 'setup') {
         const inv = (d.core_data.inventory ??= []).filter(i => !Object.keys(items).includes(i.id));
         const free = () => [...Array(28).keys()].find(k => !inv.some(i => Number(i.slot) === k));
         for (const [id, n] of Object.entries(items)) {
-            if (Number(id) === COINS) inv.push({ amount: String(n), charge: '1000', slot: String(free()), id });
-            else for (let k = 0; k < n; k++) inv.push({ amount: '1', charge: '1000', slot: String(free()), id });
+            // only into free slots (a full bag would otherwise get slot 'undefined' and break the save)
+            if (Number(id) === COINS) { const sl = free(); if (sl !== undefined) inv.push({ amount: String(n), charge: '1000', slot: String(sl), id }); }
+            else for (let k = 0; k < n; k++) { const sl = free(); if (sl !== undefined) inv.push({ amount: '1', charge: '1000', slot: String(sl), id }); }
         }
         d.core_data.inventory = inv;
         fs.writeFileSync(f, JSON.stringify(d));

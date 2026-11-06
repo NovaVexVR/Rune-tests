@@ -14,11 +14,14 @@ function stage(name, items) {
     const f = path.join(SAVES, `${name}.json`);
     const d = JSON.parse(fs.readFileSync(f, 'utf8'));
     d.core_data.location = `${GE.x + (name === 'gebot1' ? -2 : 2)},${GE.y - 6},0`;
-    const inv = (d.core_data.inventory ??= []).filter(i => !Object.keys(items).includes(i.id));
+    let inv = (d.core_data.inventory ??= []).filter(i => !Object.keys(items).includes(i.id));
+    // room for the staged items: a test bot's bag fills up over many runs
+    const needed = Object.entries(items).reduce((t, [id, n]) => t + (Number(id) === COINS ? 1 : n), 0);
+    while (inv.length > 28 - needed) inv.pop();
     const free = () => [...Array(28).keys()].find(k => !inv.some(i => Number(i.slot) === k));
     for (const [id, amount] of Object.entries(items)) {
-        if (Number(id) === COINS) { inv.push({ amount: String(amount), charge: '1000', slot: String(free()), id }); continue; }
-        for (let k = 0; k < amount; k++) inv.push({ amount: '1', charge: '1000', slot: String(free()), id });
+        if (Number(id) === COINS) { { const sl = free(); if (sl !== undefined) inv.push({ amount: String(amount), charge: '1000', slot: String(sl), id }); }; continue; }
+        for (let k = 0; k < amount; k++) { const sl = free(); if (sl !== undefined) inv.push({ amount: '1', charge: '1000', slot: String(sl), id }); };
     }
     d.core_data.inventory = inv;
     fs.writeFileSync(f, JSON.stringify(d));
@@ -36,6 +39,12 @@ if (process.argv[2] === 'setup') {
 
 const seller = new Bot('gebot1'), buyer = new Bot('gebot2');
 await seller.login(); await buyer.login();
+// leftover offers from an earlier run: cancel and collect them first
+for (const b of [seller, buyer]) {
+    for (const o of (await b.state(1)).ge ?? []) if (o.done < o.amount) await b.geAbort(o.slot);
+    if ((await b.state(1)).ge?.length) await b.geCollect();
+    await b.closeInterfaces(); await b.state(1);
+}
 const logs = b => b.s.inv.filter(i => /^Logs$/.test(i.name)).reduce((n, i) => n + i.count, 0);
 await seller.state(); await buyer.state();
 console.log(`before: seller ${logs(seller)} logs ${seller.s.coins}gp; buyer ${logs(buyer)} logs ${buyer.s.coins}gp`);

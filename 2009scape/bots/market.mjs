@@ -18,7 +18,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { dist, sleep } from './lib.mjs';
+import { dist, sleep, FOOD } from './lib.mjs';
 import { Social, COLLECTIONS, personalityOf } from './social.mjs';
 import { note, record } from './diary.mjs';
 import { teamOf, treasurerOfTeam, onContribution, onHelped } from './politics.mjs';
@@ -125,6 +125,9 @@ export class Market {
         for (const task of new Set(plan().map(p => p.task))) {
             for (const group of TASK_NEEDS[task] ?? []) if (!group.some(n => this.has(s, n))) needs.push(group[0]);
         }
+        // fighters and thieves with no food carried or banked need some (teammates supply it from the stash)
+        const plans = new Set(plan().map(p => p.task));
+        if (['melee', 'ranged', 'thieving'].some(t => plans.has(t)) && !s.inv.some(i => FOOD.includes(i.name)) && !s.bank?.some(i => FOOD.includes(i.name))) needs.push('Shrimps');
         // collectors also "need" the missing pieces of their set
         const col = this.collectionOf(name);
         if (col) for (const piece of col.missing) needs.push(piece);
@@ -143,6 +146,13 @@ export class Market {
     wantedBy(name) {
         const { plan } = this.bots.get(name);
         return new Set(plan().flatMap(p => (TASK_NEEDS[p.task] ?? []).flat()));
+    }
+
+    // team stash: a teammate (above all the treasurer) can give from its bank, not just its bag
+    stashHas(name, item) {
+        const s = this.bots.get(name)?.bot.s;
+        const n = s?.bank?.find(i => i.name === item)?.count ?? 0;
+        return n > (this.wantedBy(name).has(item) || FOOD.includes(item) ? 2 : 0);
     }
 
     surplusOf(name) {
@@ -239,6 +249,20 @@ export class Market {
             this.open({ buyer: tre, seller: name, item: 'Coins', amount: this.coins(name) - COIN_FLOAT, price: 0, kind: 'gift' });
             return;
         }
+        // ...and now and then their spare goods, which the treasurer banks: the team stash
+        if (tre && name !== tre && Date.now() - (this.lastDonation?.[name] ?? 0) > 60 * 60_000 && this.bots.get(tre)?.bot.s?.online && !this.isBusy(tre)) {
+            const spare = this.surplusOf(name).find(i => !FOOD.includes(i.name) || this.bots.get(name).bot.s.inv.filter(j => FOOD.includes(j.name)).length > 6);
+            if (spare) {
+                (this.lastDonation ??= {})[name] = Date.now();
+                const have = this.bots.get(name).bot.s.inv.filter(i => i.name === spare.name).reduce((t, i) => t + i.count, 0);
+                const room = (this.bots.get(tre).bot.s.invFree ?? 0) - 2; // the treasurer has to have room in its bag
+                const amount = Math.min(have, Math.max(0, room));
+                if (amount < 1) return;
+                this.open({ buyer: tre, seller: name, item: spare.name, amount, price: 0, kind: 'gift' });
+                this.log(`[market] ${name} gives ${amount} ${spare.name} to the ${faction(name)} stash (deal #${this.seq})`);
+                return;
+            }
+        }
 
         this.checkCollection(name);
         if (this.seekWager(name)) return;
@@ -250,7 +274,7 @@ export class Market {
             const others = [...this.bots.keys()].filter(o => o !== name && !this.isBusy(o) && this.bots.get(o).bot.s?.online && !this.social.isRival(name, o) && !this.social.isRival(o, name))
                 .sort((a, b) => Number(sameGuild(name, b)) - Number(sameGuild(name, a)));
             for (const other of others) {
-                if (!this.surplusOf(other).some(i => i.name === need)) continue;
+                if (!this.surplusOf(other).some(i => i.name === need) && !(sameGuild(name, other) && this.stashHas(other, need))) continue;
                 if (sameGuild(name, other)) {
                     this.open({ buyer: name, seller: other, item: need, amount: 1, price: 0, kind: 'gift' });
                     return;
@@ -541,6 +565,17 @@ export class Market {
 
         if (!s.trade) {
             if (deal.state === 'traded') { this.close(deal, 'completed'); return false; }
+            // a seller (e.g. a treasurer giving from the team stash) fetches the goods from its bank first
+            const want = deal.amount ?? 1;
+            const carried = s.inv.filter(i => i.name === deal.item).reduce((t, i) => t + i.count, 0);
+            if (!isBuyer && !['debtsale', 'repay', 'wager'].includes(deal.kind) && deal.item !== 'Coins' && carried < want && s.bank?.some(i => i.name === deal.item) && !deal.fetched) {
+                deal.fetched = true;
+                if (await bot.openBank()) {
+                    for (let k = carried; k < want && bot.s.invFree > 0; k++) await bot.withdraw(deal.item, 1);
+                    await bot.leaveBank();
+                }
+                return true;
+            }
             if (s.z !== 0 || ps.z !== 0) { // get out of the bank tower first
                 if (s.z !== 0) await bot.leaveBank();
                 else await bot.wait(3);

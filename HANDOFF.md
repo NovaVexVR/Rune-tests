@@ -59,6 +59,10 @@ Last session's container had everything under `/home/user`; a new one starts emp
 
 **Death recovery (new):** the gravestone keeps a bot's items where it fell for a couple of minutes; on "you have N minutes to get your items back" the bot travels back and picks them up (`recoverItems` in handleInterrupts). Not if it died inside a fixed DANGER zone or died again within 10 min. The death spot is the last state before the message (the message arrives after the respawn); messages from before a login are ignored. Verified: died at 3240,3245, back from Lumbridge in time, 13 of 12 items (+ bones).
 
+**Tests (new):** `node bots/run_tests.mjs` runs the quick set (random events, GE, quest party, ~20 min; `all` adds stash, social, market day, duel) and writes `bots/tests/last-run.md`. Last quick run: events PASS, GE PASS, party PASS (fresh bots each time). Staging now only uses free bag slots: a full bag had written slot "undefined" into two saves, which made the server refuse the login (repaired).
+
+**Team stash (new):** a teammate can be given an item out of another teammate's bank (above all the treasurer's), and a seller fetches goods from its bank before a trade; members give spare goods to their treasurer about once an hour (capped by its free bag space), who banks them; fighters/thieves with no food carried or banked need Shrimps, which the stash supplies. `test_stash.mjs`: both checks pass.
+
 **Fleet parties:** with the runner left alone, guildbot4+5 and guildbot1+2 each completed Cook's Assistant as parties on their own (17:00, 17:04).
 
 **Fixed (17:xx):** thieving bots kept dying to farmers (a failed pickpocket hits back) with no food; they now eat at half health or rest until healed.
