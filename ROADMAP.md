@@ -123,6 +123,37 @@ Bots handle random events as players do; each type is enabled for bots once its 
 - Bots wear the best gear they have before each task, and fighters carry food from the bank *(done)*.
 - Smiths make bronze armour by level and fighters buy it through the market *(done)*; next: iron/steel bars and armour, buying armour at Varrock's armour shops, and food for bots with an empty bank (buy, fish, or ask teammates).
 
+## Proposed (not started)
+Ideas from watching the fleet run; roughly in priority order.
+
+### Economy and supplies
+- **Reasons to trade:** crafting chains (wool to balls of wool, cowhide to leather to leather armour, ore to bars to armour) and selling surplus to shops, so market days have real supply and demand. The first live market day had none: everyone wanted a knife and nobody had one.
+- **Bank management:** now that bots bank everything, banks will fill. Periodic clear-outs: sell junk to shops, post surplus on the GE, give teammates what they need, keep a small reserve of food and tools.
+- **Team stash:** the treasurer keeps shared goods (food, armour, tools) as well as coins, and hands them out to members who need them.
+- **Food for bots with an empty bank:** buy it, fish it, or ask a teammate, instead of going out without any.
+- **Iron and steel:** iron mining and smelting (iron ore fails half the time), steel bars with coal, iron/steel armour; buying armour at the Varrock shops.
+
+### Survival and progression
+- **Danger memory:** each bot remembers where it died, avoids that area for a while, and warns friends by PM, so the list of dangerous places grows by itself.
+- **Death recovery:** after a death, go back for the dropped items while they're still there (with an escort if it was a fight).
+- **Escorts and apprenticeships:** stronger teammates escort or train weaker ones. This is what unlocks The Knight's Sword and Druidic Ritual.
+- **Careers and life goals:** each bot picks a career (smith, fisher, crafter, fighter) and a long-term goal from its personality (full steel armour, a skill to 50, a quest list), and its plan bends toward it. Diaries and recaps follow the goal.
+- **Use what quests unlock:** the Lumbridge range after Cook's Assistant (fewer burnt fish), Runecrafting after Rune Mysteries (essence via Aubury, air runes for magic training), prayer from buried bones.
+
+### Society
+- **Team alliances and feuds** that go beyond single-bot grudges, with team-level trust.
+- **A public notice board** for bounties, prices and reputations, readable in the recaps.
+- **Disputes and justice:** a respected bot (or the most trusted per team) arbitrates defaults and fines repeat offenders.
+- **Newcomers:** new bots join over time as fresh characters, and teams recruit and mentor them.
+- **Events:** weekly fishing contests, smithing fairs and duel tournaments (once duels work), announced in chat and covered in the recap.
+- **Human players** joining the server and trading or chatting with bots.
+
+### Operations
+- **Stuck-bot watchdog:** flag bots that haven't moved or gained xp in a while, and unstick them.
+- **Regular test runs** of the staged tests (`test_events`, `test_social`, `test_party`, `test_ge`, `test_marketday`, `test_duel`), so server changes can't silently break mechanics.
+- **Daily director pass:** Claude reads the recap and rewrites some bots' plans (`orders/`).
+- **Economy charts:** coins in circulation, prices over time, who's rich and who's poor, on the dashboard.
+
 ## Also planned (from earlier)
 - **Grand Exchange:** *(done)* bot API support for the GE offer screen (`geitem` action, `ge`/`geScreen` state, `geOffer`/`geCollect`/`geAbort` in lib.mjs); bot offers match each other and move the GE price index.
 - **More training:** smelting bronze bars and smithing daggers at the Varrock anvils *(done: `smelt`, `smith`)*; still to do: fly fishing, iron mining, leather crafting, oak/willow bows, agility, as the guides recommend.
