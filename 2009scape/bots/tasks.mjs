@@ -306,10 +306,16 @@ async function fightLoop(bot, until, area, names, { pickup = [], stopIf = null }
         const s = await bot.state(12);
         if (await bot.handleInterrupts()) continue;
         if (stopIf && stopIf(bot)) return;
-        if (s.hp <= 3 && !s.inv.some(i => FOOD.includes(i.name))) {
-            bot.log('low hp and no food, resting');
-            await bot.walkTo(area.x + 10, area.y + 10);
-            await bot.wait(60);
+        // no food: stop at half HP and rest away from the fight until mostly healed (HP comes back ~1 a minute)
+        if (s.hp < s.maxHp * 0.5 && !s.inv.some(i => FOOD.includes(i.name))) {
+            bot.log(`hp ${s.hp}/${s.maxHp} and no food: resting before fighting again`);
+            await bot.walkTo(area.x + 12, area.y + 12, { tol: 3 });
+            while (now() < until && bot.s.hp < bot.s.maxHp * 0.8) {
+                await bot.wait(30);
+                await bot.state(5);
+                if (bot.s.inCombat) await bot.walkTo(area.x + 18, area.y + 15, { tol: 3 });
+                await bot.handleInterrupts();
+            }
             continue;
         }
         if (s.attacking || s.inCombat) { await bot.wait(2); continue; }
