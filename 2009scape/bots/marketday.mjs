@@ -56,11 +56,15 @@ export class MarketDay {
     async browse(bot) {
         const m = this.market, name = bot.name;
         if (m.busy.has(name) || Math.random() < 0.5) return;
+        // no flipping the same goods back and forth: don't buy back what you sold here, don't resell what you bought here
+        const a = this.st.active;
+        a.bought ??= {}; a.sold ??= {};
+        if ((a.bought[name] ?? []).length >= 8) return; // up to 8 purchases per market, not the whole purse
         const stalls = this.st.active.attendees.filter(o => o !== name && !m.busy.has(o) && this.atMarket(o)
             && !m.social.isRival(name, o) && !m.social.isRival(o, name));
         const offers = [];
         for (const o of stalls) for (const it of m.surplusOf(o)) {
-            if (it.name === 'Coins') continue;
+            if (it.name === 'Coins' || (a.sold[name] ?? []).includes(it.name) || (a.bought[o] ?? []).includes(it.name)) continue;
             const ask = Math.round(m.perceived(o, it.name) * m.social.askFactor(o, name) * 10) / 10;
             const bid = Math.round(m.perceived(name, it.name) * m.social.bidFactor(name, o) * 10) / 10;
             const price = Math.max(1, Math.round((ask + bid) / 2));
@@ -70,6 +74,7 @@ export class MarketDay {
         const d = offers.sort((x, y) => y.gain - x.gain)[0];
         await bot.act({ type: 'say', text: `${d.o}, I'll give you ${d.price}gp for your ${d.item}.` });
         m.open({ buyer: name, seller: d.o, item: d.item, amount: 1, price: d.price, kind: 'sale', ask: d.ask, bid: d.bid });
+        (a.bought[name] ??= []).push(d.item); (a.sold[d.o] ??= []).push(d.item); this.save();
         this.log(`${name} haggles with ${d.o} over ${d.item}: ${d.price}gp (ask ${d.ask}, bid ${d.bid})`);
     }
 

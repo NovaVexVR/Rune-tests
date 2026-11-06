@@ -51,6 +51,7 @@ class BotData(val name: String, val session: BotSession) {
     var seq = 0
     // interface id -> (child -> text), captured from outgoing string packets
     val strings = HashMap<Int, HashMap<Int, String>>()
+    val models = HashMap<Int, HashMap<Int, Pair<String, Int>>>() // iface -> child -> (type, model/item id) drawn on it
     @Synchronized fun addMessage(m: String) {
         messages.add(Pair(++seq, m))
         if (messages.size > 200) messages.removeAt(0)
@@ -62,7 +63,8 @@ object BotRegistry {
     // random event types enabled for API bots (others are skipped); change via POST /events.
     // Default: wave 1, the types the bots' handler (lib.mjs handleRandomEvent) is proven to resolve.
     @JvmField val WAVE1_EVENTS = listOf("GENIE", "DRUNKEN_DWARF", "RICK_TURPENTINE", "STRANGE_PLANT",
-        "EVIL_CHICKEN", "RIVER_TROLL", "ROCK_GOLEM", "SHADE", "SWARM", "TREE_SPIRIT", "ZOMBIE")
+        "EVIL_CHICKEN", "RIVER_TROLL", "ROCK_GOLEM", "SHADE", "SWARM", "TREE_SPIRIT", "ZOMBIE",
+        "SANDWICH_LADY", "CERTER") // wave 2: read the dialog / recognise the picture
     @JvmField val allowedEvents: MutableSet<String> = java.util.Collections.synchronizedSet(HashSet<String>(WAVE1_EVENTS))
     private val jobs = ConcurrentLinkedQueue<() -> Unit>()
     private val IF_OPCODES = intArrayOf(155, 196, 124, 199, 234, 168, 166, 64, 53, 9)
@@ -85,6 +87,27 @@ object BotRegistry {
 
     @JvmStatic fun onPm(p: Player, from: String, text: String) {
         bots[p.username.lowercase()]?.let { if (it.player === p) synchronized(it) { it.pms.add(Triple(++it.seq, from.lowercase(), text)); if (it.pms.size > 100) it.pms.removeAt(0) } }
+    }
+
+    @JvmStatic fun onModel(p: Player, iface: Int, child: Int, type: String, id: Int) {
+        bots[p.username.lowercase()]?.let { if (it.player === p) synchronized(it) { it.models.getOrPut(iface) { HashMap() }[child] = type to id } }
+    }
+
+    // What a picture shows, the way a player would describe it: the item whose inventory model it is.
+    // (The Certer's pictures use placeholder items whose names are blank, so those are described by hand.)
+    private val CERTER_PICTURES = mapOf(6189 to "fish", 6190 to "bass", 6191 to "sword", 6192 to "battleaxe", 6193 to "helmet",
+        6194 to "kiteshield", 6195 to "shears", 6196 to "shovel", 6197 to "ring", 6198 to "necklace")
+    private val modelNames: Map<Int, String> by lazy {
+        val m = HashMap<Int, String>()
+        for ((id, name) in CERTER_PICTURES) core.cache.def.impl.ItemDefinition.forId(id)?.let { m[it.interfaceModelId] = name }
+        for (d in core.cache.def.impl.ItemDefinition.getDefinitions().values)
+            if (d.name != null && d.name != "null" && d.isUnnoted && !m.containsKey(d.interfaceModelId)) m[d.interfaceModelId] = d.name.lowercase()
+        m
+    }
+    fun describeModel(type: String, id: Int): String? = when (type) {
+        "ITEM" -> core.cache.def.impl.ItemDefinition.forId(id)?.name?.lowercase()
+        "MODEL" -> modelNames[id]
+        else -> null
     }
 
     @JvmStatic fun onString(p: Player, iface: Int, child: Int, text: String) {
@@ -545,6 +568,13 @@ object BotRegistry {
         // interfaces / dialog
         val chat = p.interfaceManager.chatbox?.id
         o["iface"] = p.interfaceManager.opened?.id
+        // what's on the open interface: its text lines and the pictures drawn on it
+        p.interfaceManager.opened?.id?.let { oi ->
+            synchronized(bot) {
+                bot.strings[oi]?.let { st -> o["ifaceText"] = JSONObject().apply { st.forEach { (c, t) -> val v = strip(t); if (v.isNotBlank()) this[c.toString()] = v } } }
+                bot.models[oi]?.let { md -> o["ifaceModels"] = JSONObject().apply { md.forEach { (c, tm) -> this[c.toString()] = JSONObject().apply { this["type"] = tm.first; this["id"] = tm.second; this["seen"] = describeModel(tm.first, tm.second) } } } }
+            }
+        }
         o["chatbox"] = chat
         if (chat != null && chat != 137) {
             val d = JSONObject()

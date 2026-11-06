@@ -141,6 +141,13 @@ export class Market {
         return s.inv.filter(i => !keep.has(i.name)).filter(i => TRADEABLE.has(i.name) && (!wanted.has(i.name) || s.inv.filter(j => j.name === i.name).length > 1 && !/rune|arrow/i.test(i.name)));
     }
 
+    // can `name` walk over to `other` for a trade? Not if it's underground/upstairs or a long trip away (Varrock vs Lumbridge)
+    reachable(other, name) {
+        const o = this.bots.get(other)?.bot.s, me = this.bots.get(name)?.bot.s;
+        if (!o?.online || !me?.online || o.y > 6000 || me.y > 6000 || (o.z ?? 0) !== (me.z ?? 0)) return false;
+        return dist(o, me) <= 120;
+    }
+
     coins(name) {
         return this.bots.get(name).bot.s?.coins ?? 0;
     }
@@ -213,7 +220,7 @@ export class Market {
         // pay debts first (loyal bots promptly; others when overdue or on a whim)
         for (const iou of this.social.openDebts(name)) {
             const cred = this.bots.get(iou.creditor);
-            if (!cred?.bot.s?.online || this.busy.has(iou.creditor)) continue;
+            if (!this.reachable(iou.creditor, name) || this.busy.has(iou.creditor)) continue;
             if (this.social.wantsToRepay(name, iou, this.coins(name))) {
                 this.open({ buyer: iou.creditor, seller: name, item: 'Coins', amount: iou.owed, price: 0, kind: 'repay', iouId: iou.id });
                 return;
@@ -222,7 +229,7 @@ export class Market {
 
         // guild members send spare coins to the treasurer
         const tre = treasurerOf(name);
-        if (tre && name !== tre && this.coins(name) > COIN_FLOAT + 20 && this.bots.get(tre)?.bot.s?.online && !this.busy.has(tre)) {
+        if (tre && name !== tre && this.coins(name) > COIN_FLOAT + 20 && this.reachable(tre, name) && !this.busy.has(tre)) {
             this.open({ buyer: tre, seller: name, item: 'Coins', amount: this.coins(name) - COIN_FLOAT, price: 0, kind: 'gift' });
             return;
         }
@@ -236,7 +243,7 @@ export class Market {
             // guildmates first (free), then anyone it isn't feuding with
             // on market day, bots at the GE trade only with each other (and nobody drags them away)
             const md = this.marketDay, here = !!md?.atMarket(name);
-            const others = [...this.bots.keys()].filter(o => o !== name && !this.busy.has(o) && this.bots.get(o).bot.s?.online && !this.social.isRival(name, o) && !this.social.isRival(o, name) && (!md || md.atMarket(o) === here))
+            const others = [...this.bots.keys()].filter(o => o !== name && !this.busy.has(o) && this.reachable(o, name) && !this.social.isRival(name, o) && !this.social.isRival(o, name) && (!md || md.atMarket(o) === here))
                 .sort((a, b) => Number(sameGuild(name, b)) - Number(sameGuild(name, a)));
             for (const other of others) {
                 if (!this.surplusOf(other).some(i => i.name === need)) continue;
@@ -333,7 +340,7 @@ export class Market {
         for (const iou of this.social.ious) {
             if (iou.status !== 'open' || Date.now() < iou.due || iou.creditor === name || iou.debtor === name) continue;
             const cred = this.bots.get(iou.creditor);
-            if (!cred?.bot.s?.online || this.busy.has(iou.creditor)) continue;
+            if (!this.reachable(iou.creditor, name) || this.busy.has(iou.creditor)) continue;
             const price = Math.max(1, Math.min(Math.round(iou.owed * 0.8), Math.round(iou.owed * 0.6 * (1 + 0.3 * this.social.trust(name, iou.debtor)))));
             if (this.coins(name) < price) continue;
             if (!this.social.willSellDebt(iou.creditor, iou, price)) continue;
@@ -367,7 +374,7 @@ export class Market {
         const me = this.bots.get(name).bot.s;
         const wanted = this.wantedBy(name);
         const options = this.social.openBounties().filter(b => {
-            if (b.poster === name || this.busy.has(b.poster) || !this.bots.get(b.poster)?.bot.s?.online) return false;
+            if (b.poster === name || this.busy.has(b.poster) || !this.reachable(b.poster, name)) return false;
             if (this.social.isRival(name, b.poster) || this.social.isRival(b.poster, name)) return false;
             if (this.social.trust(name, b.poster) < -0.2 + 0.4 * p.caution - 0.2) return false; // cautious bots only work for people they trust
             const have = me.inv.filter(i => i.name === b.item).reduce((t, i) => t + i.count, 0);

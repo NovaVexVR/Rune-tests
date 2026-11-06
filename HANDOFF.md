@@ -50,6 +50,9 @@ Last session's container had everything under `/home/user`; a new one starts emp
 - **4.3 diaries + recap: running.** `bots/diary.mjs` writes `bots/diaries/<bot>.md` from the runner's log lines and each bot's game messages (deaths, level milestones, trades/records, debts, grudges, wagers, team changes, quests, random events). `node bots/recap.mjs [hours]` prints a news-style recap (also `logs/recap-<date>.md`).
 - **4.2 quests: Cook's Assistant verified solo** (`quests.mjs`, task `cooks_assistant`): egg from Fred's pen (the north farm's eggs are in pens bots can't enter), bucket from the north farm dairy, milk from Gillie's dairy cow, wheat field via its gate, mill hopper on the top floor, flour bin. Party version: leader step `{task:'cooks_assistant', party:{Egg:'<bot>', 'Bucket of milk':'<bot>'}}`, helpers `{task:'quest_fetch', item, for:'<leader>'}`, delivered with deal kind `quest`.
 - **Grand Exchange API verified:** actions `gebuy`/`gesell` {item|slot, amount, price}, `gecollect`, `geabort` {slot}; state `ge` (offers). lib: `walkToGE()` (route east of the dark wizards' circle), `openGE()`, `geOffer()`, `geCollect()`. A bot-to-bot buy/sell matched and both sides collected.
+- **Market days (4.1) working:** `bots/marketday.mjs`, every `MARKET_DAY_HOURS` (default 6). Day #2 (with haggling): 14 bots, 115 deals completed in ~10 minutes, all got home. Bots don't buy back what they sold or resell what they bought at the same market; max 8 purchases per bot per market.
+- **Random events wave 2 verified and enabled:** Sandwich Lady (reads "Have a X, dear", clicks the fixed tray button) and Certer (state `ifaceModels[..].seen` describes the picture; picks the matching option). State also has `ifaceText` for the open interface.
+- `node bots/health.mjs`: quick check for bots underground / far from home / near the dark wizards / low HP.
 - State now has `questPoints`, `quests` (stage per started quest, 100 = done), `questFlags`; scoreboard counts quest points.
 
 ## Known gotchas
@@ -66,7 +69,7 @@ Last session's container had everything under `/home/user`; a new one starts emp
 1. ~~Random events wave 1~~ (done).
 2. ~~Confirm Phase 1–3 mechanics~~ (all observed, incl. collection completion by legion20).
 3. Phase 4: market days at the GE (GE API done), verify quest parties, then The Knight's Sword and Druidic Ritual (both pass dangerous areas: need escorts/levels).
-4. Random events waves 2–3, bounded PvP (Phase 5), more training methods from `guides/`, a cross-platform local launcher.
+4. Random events wave 3 (kidnap puzzles), bounded PvP (Phase 5), more training methods from `guides/`, a cross-platform local launcher.
 5. Reset all bots to level 1 and start the real run.
 
 ## Usage rules (from the user)

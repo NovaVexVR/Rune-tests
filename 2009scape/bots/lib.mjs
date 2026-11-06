@@ -160,16 +160,47 @@ export class Bot {
             await this.wait(3);
             return true;
         }
+        // Sandwich Lady (wave 2): she says what we may have, then shows a tray of seven pictures (always in this order)
+        if (this.s.iface === 297) {
+            const TRAY = { baguette: 7, 'triangle sandwich': 8, 'square sandwich': 9, roll: 10, 'meat pie': 11, kebab: 12, 'chocolate bar': 13 };
+            const want = this._sandwich;
+            this.log(`random event: the sandwich lady offered ${want ?? '?'}`);
+            await this.act({ type: 'button', iface: 297, child: TRAY[want] ?? 7 });
+            this._sandwich = null;
+            await this.wait(2);
+            return true;
+        }
+        // Certer (wave 2): a picture and three descriptions; pick the one that says what the picture shows
+        if (this.s.iface === 184) {
+            const seen = Object.values(this.s.ifaceModels ?? {})[0]?.seen ?? '';
+            const opts = [1, 2, 3].map(c => (this.s.ifaceText?.[c] ?? '').toLowerCase());
+            let pick = opts.findIndex(t => seen && t.includes(seen));
+            if (pick < 0) pick = Math.floor(Math.random() * 3);
+            this.log(`random event: the certer's picture looks like ${seen || '?'}; answering "${opts[pick]}"`);
+            await this.act({ type: 'button', iface: 184, child: 8 + pick });
+            await this.wait(2);
+            return true;
+        }
         const ev = this.s.randomEvent;
         if (!ev) return false;
+        if (ev.type === 'SANDWICH_LADY') {
+            const said = (this.s.dialog?.text ?? []).join(' ').match(/Have an? (.+?), dear/i);
+            if (said) this._sandwich = said[1].toLowerCase();
+        }
         if (ev.type === 'EVIL_CHICKEN') this._chickenAt = Date.now();
-        const TALK = ['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE'];
+        const TALK = ['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE', 'SANDWICH_LADY', 'CERTER'];
         const HOSTILE = ['EVIL_CHICKEN', 'RIVER_TROLL', 'ROCK_GOLEM', 'SHADE', 'SWARM', 'TREE_SPIRIT', 'ZOMBIE'];
         if (this._lastEvent !== ev.type + ev.npc) { this._lastEvent = ev.type + ev.npc; this.log(`random event: ${ev.type} (${ev.name})`); this.onRandomEvent?.(ev.type); }
         if (this.s.dialog) return false; // let the dialog handler click through what the NPC says
         if (TALK.includes(ev.type)) {
             if (Date.now() - (this._reTalk ?? 0) < 6000) return false;
             this._reTalk = Date.now();
+            // couldn't get to it last time (crowded spot, a wall): step right next to it first
+            if (this.msgs.slice(-3).some(t => /can't reach/i.test(t))) {
+                await this.act({ type: 'walk', x: ev.x + rand(-1, 1), y: ev.y + rand(-1, 1) });
+                await this.waitIdle({ timeout: 8 });
+                this.msgs.push('(stepped closer)');
+            }
             const npc = this.s.npcs.find(n => n.npc === ev.npc);
             const op = npc?.ops.find(o => /talk/i.test(o)) ?? 'Talk-to';
             await this.act({ type: 'npc', npc: ev.npc, op });
@@ -284,6 +315,18 @@ export class Bot {
 
     // Long-distance walking in hops, opening doors/gates when stuck.
     async walkTo(x, y, { tol = 2, timeout = 300 } = {}) {
+        // trips between Varrock and Lumbridge go east of the dark wizards' stone circle (~3225,3370)
+        if (!this._corridor) {
+            const s0 = await this.state(5);
+            const crosses = s0.y < 6000 && ((s0.y > 3340 && y < 3330) || (s0.y < 3330 && y > 3340)) && x > 3120 && x < 3330 && s0.x > 3120 && s0.x < 3330;
+            if (crosses) {
+                const south = [[3240, 3300], [3255, 3335], [3290, 3375], [3290, 3415]];
+                const pts = s0.y > 3340 ? [...south].reverse() : south;
+                this._corridor = true;
+                try { for (const [px, py] of pts) if (Math.abs(this.s.y - py) > 3 || Math.abs(this.s.x - px) > 3) await this.walkTo(px, py, { tol: 4, timeout: 180 }); }
+                finally { this._corridor = false; }
+            }
+        }
         const end = Date.now() + timeout * 1000;
         let stuck = 0;
         let last = null;
@@ -292,7 +335,12 @@ export class Bot {
             if (await this.handleInterrupts()) continue;
             if (dist(s, { x, y }) <= tol) return true;
             // somehow underground (y > 6000) while heading for the surface: take the nearest way up
-            if (s.y < 6000) this._undergroundSince = null;
+            if (s.y > 6000) this._wasUnder = true;
+            else if (this._wasUnder) {
+                // just came up (ladder or teleport): plan the rest of the trip from here (it may need the safe corridor)
+                this._wasUnder = false; this._undergroundSince = null;
+                return this.walkTo(x, y, { tol, timeout: Math.max(30, (end - Date.now()) / 1000) });
+            }
             if (s.y > 6000 && y < 6000) {
                 // stuck down here (some cellars have no working way out): Lumbridge Home Teleport
                 this._undergroundSince ??= Date.now();
@@ -438,7 +486,8 @@ export class Bot {
     // ---- Grand Exchange (Varrock) ----
     // Lumbridge -> GE going east of the dark wizards' stone circle south of Varrock (they kill low levels)
     async walkToGE() {
-        const s = await this.state(5);
+        let s = await this.state(5);
+        if (s.y > 6000) { await this.walkTo(3222, 3218, { tol: 6 }); s = await this.state(5); } // out of any cellar first
         if (dist(s, GE) <= 12) return true;
         const route = s.y < 3400 ? [[3240, 3300], [3255, 3335], [3290, 3375], [3290, 3415], [3270, 3428], [3212, 3428], [3175, 3455], [GE.x, GE.y - 8]] : [[GE.x, GE.y - 8]];
         return this.route(route, { tol: 4, timeout: 240 });
