@@ -57,15 +57,17 @@ export class Bot {
 
     async state(r = 15) {
         const s = await http('GET', `/bot/${this.name}/state?r=${r}&since=${this.since}`);
+        // the first poll returns the server's message backlog (e.g. from before a runner restart): keep it, but don't react to it
+        const fresh = this._polled; this._polled = true;
         for (const m of s.messages ?? []) {
             this.since = Math.max(this.since, m.id);
-            if (!DEBUG_MSG.test(m.text)) { this.msgs.push(m.text); this.onMsg?.(m.text); }
+            if (!DEBUG_MSG.test(m.text)) { this.msgs.push(m.text); if (fresh) this.onMsg?.(m.text); }
         }
         if (this.msgs.length > 150) this.msgs.splice(0, this.msgs.length - 150);
         for (const pm of s.pms ?? []) {
             this.since = Math.max(this.since, pm.id);
             this.pms.push({ from: pm.from, text: pm.text, t: Date.now() });
-            this.onPm?.(pm);
+            if (fresh) this.onPm?.(pm);
         }
         if (this.pms.length > 100) this.pms.splice(0, this.pms.length - 100);
         this.s = s;

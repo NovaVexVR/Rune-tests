@@ -48,7 +48,7 @@ async function runBot(name, delay) {
     // mood reacts to what happens in-game
     bot.onMsg = text => {
         if (/Oh dear, you are dead/i.test(text)) market.social.bumpMood(name, -0.4, 'dying');
-        else if (/advanced .* level|reached level/i.test(text)) market.social.bumpMood(name, 0.1, 'a level-up');
+        else if (/advanced .* level|reached level/i.test(text)) market.social.bumpMood(name, 0.1 * (1 - Math.max(0, market.social.mood(name))), 'a level-up'); // diminishing: low levels come fast
     };
     let lastSeek = 0;
     bot.hook = async b => {

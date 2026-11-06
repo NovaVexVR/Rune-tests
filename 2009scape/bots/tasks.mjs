@@ -98,7 +98,12 @@ async function cookAll(bot) {
             if (!s.inv.some(i => i.name === 'Logs')) {
                 if (s.invFree === 0) { await bot.act({ type: 'item', slot: raw[raw.length - 1].slot, op: 'Drop' }); await bot.wait(1); }
                 const tree = bot.nearestScenery(l => l.name === 'Tree' && l.ops.includes('Chop down'));
-                if (!tree) { await bot.walkTo(PLACES.draynorTrees.x, PLACES.draynorTrees.y, { tol: 3 }); continue; }
+                if (!tree) {
+                    // Draynor's dark wizards kill low-level bots: use the Lumbridge trees until combat 20
+                    const trees = bot.s.combat >= 20 ? PLACES.draynorTrees : PLACES.lumbridgeTrees;
+                    await bot.walkTo(trees.x, trees.y, { tol: 3 });
+                    continue;
+                }
                 await gatherOnce(bot, tree, 'Chop down');
                 continue;
             }
