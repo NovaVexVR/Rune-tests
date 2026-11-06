@@ -148,6 +148,66 @@ async function leaveBasement(bot) {
     }
 }
 
+// Sheep Shearer: Fred's farm, his sheep pen, and the spinning wheel on the castle's first floor
+const FRED = { x: 3189, y: 3273 };
+const PEN = { x: 3203, y: 3264 };
+const SHEARS = [{ x: 3192, y: 3272 }, { x: 3152, y: 3306 }];
+const WHEEL = { x: 3209, y: 3212 };
+const FRED_ANSWERS = /yes okay|of course|something of an expert|i have some/i;
+
+async function getShears(bot) {
+    for (const spot of SHEARS) {
+        if (count(bot, 'Shears')) return true;
+        await bot.travel(spot.x, spot.y, { tol: 2 });
+        for (let i = 0; i < 6 && !count(bot, 'Shears'); i++) {
+            const s = await bot.state(6);
+            const g = s.ground?.find(x => x.name === 'Shears');
+            if (!g) { await sleep(10_000); continue; } // respawns
+            await bot.act({ type: 'ground', x: g.x, y: g.y, id: g.id });
+            await bot.waitIdle({ timeout: 10 });
+            await bot.state(5);
+        }
+    }
+    return count(bot, 'Shears') > 0;
+}
+
+async function shear(bot, n) {
+    if (count(bot, 'Wool') >= n) return count(bot, 'Wool');
+    await bot.travel(PEN.x, PEN.y, { tol: 4 });
+    for (let tries = 0; tries < n * 4 && count(bot, 'Wool') < n && bot.s.invFree > 0; tries++) {
+        const s = await bot.state(12);
+        // never the penguin in disguise (id 3579); sheared sheep (5153) have nothing to give
+        const sheep = bot.nearestNpc(x => x.name === 'Sheep' && x.ops.includes('Shear') && x.id !== 3579 && x.id !== 5153, s);
+        if (!sheep) { await bot.walkTo(PEN.x + Math.round(Math.random() * 10 - 5), PEN.y + Math.round(Math.random() * 8 - 4), { tol: 1, direct: true }); continue; }
+        await bot.act({ type: 'npc', npc: sheep.npc, op: 'Shear' });
+        await bot.waitIdle({ timeout: 8 });
+    }
+    await bot.state(5);
+    return count(bot, 'Wool');
+}
+
+async function spin(bot) {
+    await bot.travel(3206, 3210, { tol: 3 });
+    await bot.lumbridgeFloor(1);
+    await bot.walkTo(WHEEL.x + 1, WHEEL.y + 1, { tol: 2, direct: true });
+    for (let i = 0; i < 6 && count(bot, 'Wool'); i++) {
+        const s = await bot.state(6);
+        if (s.iface === 459) { // spinning menu: wool is button 19, the third option spins all of it
+            await bot.act({ type: 'button', iface: 459, child: 19, op: 2 });
+            await bot.waitIdle({ timeout: 90, quiet: 4, cond: st => !st.inv.some(x => x.name === 'Wool') });
+            continue;
+        }
+        const wheel = bot.nearestScenery(l => /spinning wheel/i.test(l.name) && l.ops.includes('Spin'), s);
+        if (!wheel) { await bot.walkTo(WHEEL.x + 1, WHEEL.y + 1, { tol: 1, direct: true }); continue; }
+        await bot.act({ type: 'scenery', x: wheel.x, y: wheel.y, id: wheel.id, op: 'Spin' });
+        await bot.waitIdle({ timeout: 10, cond: st => st.iface === 459 });
+    }
+    await bot.closeInterfaces();
+    await bot.state(5);
+    await bot.lumbridgeFloor(0);
+    return count(bot, 'Ball of wool');
+}
+
 export const QUESTS = {
     cooks_assistant: {
         name: "Cook's Assistant",
@@ -155,6 +215,34 @@ export const QUESTS = {
         items: ['Egg', 'Bucket of milk', 'Pot of flour'],
         async start(bot) { if (stageOf(bot, this.name) === 0) await talkToCook(bot); return stageOf(bot, this.name) > 0; },
         async finish(bot) { await talkToCook(bot); return stageOf(bot, this.name) >= 100; }
+    },
+    sheep_shearer: {
+        name: 'Sheep Shearer',
+        items: [], // 20 balls of wool, done in batches as bag space allows (Fred takes partial deliveries)
+        async start(bot) {
+            if (stageOf(bot, this.name) > 0) return true;
+            await bot.travel(FRED.x + 1, FRED.y, { tol: 2 });
+            await bot.talkTo('Fred the Farmer', { answer: FRED_ANSWERS, maxSteps: 40 });
+            await bot.state(5);
+            return stageOf(bot, this.name) > 0;
+        },
+        async finish(bot) {
+            if (!(await getShears(bot))) { bot.log('quest: no shears to be found'); return false; }
+            for (let batch = 0; batch < 8 && stageOf(bot, this.name) < 100; batch++) {
+                await bot.state(5);
+                const room = bot.s.invFree + count(bot, 'Wool') + count(bot, 'Ball of wool');
+                if (room < 3) { bot.log('quest: bag too full to shear'); return false; }
+                if (!count(bot, 'Ball of wool') || count(bot, 'Wool')) {
+                    await shear(bot, Math.min(20, room) - count(bot, 'Ball of wool'));
+                    await spin(bot);
+                }
+                bot.log(`quest: taking ${count(bot, 'Ball of wool')} balls of wool to Fred`);
+                await bot.travel(FRED.x + 1, FRED.y, { tol: 2 });
+                await bot.talkTo('Fred the Farmer', { answer: FRED_ANSWERS, maxSteps: 40 });
+                await bot.state(5);
+            }
+            return stageOf(bot, this.name) >= 100;
+        }
     },
     rune_mysteries: {
         name: 'Rune Mysteries',

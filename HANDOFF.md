@@ -47,7 +47,7 @@ Last session's container had everything under `/home/user`; a new one starts emp
 
 **Grand Exchange API: done** (`test_ge.mjs`): offers placed through the GE screen, matched bot-to-bot, collected.
 
-**Phase 4.2 quest parties: done.** Cook's Assistant solo (~10 min) and as a 3-bot party (`test_party.mjs`: 3/3 completed, 1 QP and 300 Cooking xp each, 10 party trades). Rune Mysteries solo (16 min, unlocks Runecrafting). Quest points count in the team score (5 levels each). The Knight's Sword and Druidic Ritual are not scripted yet: both need trips through places that kill level-3 bots (ice warriors under Asgarnia, Taverley dungeon), so they wait until combat is higher.
+**Phase 4.2 quest parties: done.** Cook's Assistant solo (~10 min) and as a 3-bot party (`test_party.mjs`: 3/3 completed, 1 QP and 300 Cooking xp each, 10 party trades). Rune Mysteries solo (16 min, unlocks Runecrafting). Sheep Shearer (shears from Fred's house, shear his sheep but never "The Thing" (NPC 3579), spin on the castle wheel (interface 459, button 19), deliver in batches as bag space allows). Quest points count in the team score (5 levels each). The Knight's Sword and Druidic Ritual are not scripted yet: both need trips through places that kill level-3 bots (ice warriors under Asgarnia, Taverley dungeon), so they wait until combat is higher.
 
 **Live 50-bot market day (12:55):** 31 bots travelled to the GE, shouted and called for wants; no haggled deals because everyone wanted knives/tinderboxes and nobody had spares. Expected with fresh characters.
 

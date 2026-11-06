@@ -490,8 +490,20 @@ export class Bot {
 
     // Long trip: plan a route on the server's collision map (around DANGER zones), then walk it waypoint by waypoint.
     async travel(x, y, { avoid = DANGER, tol = 3, timeout = 900 } = {}) {
-        const s = await this.state(1);
-        if (dist(s, { x, y }) <= tol) return true;
+        let s = await this.state(8);
+        if (dist(s, { x, y }) <= tol && s.z === 0) return true;
+        // routes are planned on the ground floor: come down first
+        if (s.z > 0 && s.y < 6000) {
+            if (s.x > 3190 && s.x < 3220 && s.y > 3200 && s.y < 3235) await this.lumbridgeFloor(0);
+            else for (let i = 0; i < 3 && this.s.z > 0; i++) {
+                const down = this.nearestScenery(l => l.ops.some(o => /climb-down/i.test(o)));
+                if (!down) break;
+                await this.act({ type: 'scenery', x: down.x, y: down.y, id: down.id, op: down.ops.find(o => /climb-down/i.test(o)) });
+                await this.waitIdle({ timeout: 12 });
+                await this.state(8);
+            }
+            s = await this.state(1);
+        }
         const q = `/route?from=${s.x},${s.y}&to=${x},${y}&z=${s.z}` + (avoid.length ? `&avoid=${avoid.map(a => `${a.x},${a.y},${a.r}`).join(';')}` : '');
         const r = await http('GET', q).catch(e => ({ ok: false, error: e.message }));
         if (!r.ok) { this.log(`travel to ${x},${y}: ${r.error}; walking straight`); return this.walkTo(x, y, { tol, timeout, direct: true }); }
@@ -690,7 +702,7 @@ export class Bot {
             const s = await this.state(8);
             if (s.z === target) return true;
             if (s.dialog && s.dialog.options.length) { await this.act({ type: 'choose', option: s.z < target ? 'up' : 'down' }); await this.wait(3); continue; }
-            await this.walkTo(3206, 3210, { tol: 3 });
+            await this.walkTo(3206, 3210, { tol: 1, direct: true }); // right up to the stairs: on the upper floors a door can be in the way
             await this.state(15);
             const st = this.nearestScenery(l => /staircase/i.test(l.name));
             if (!st) { await this.wait(2); continue; }
