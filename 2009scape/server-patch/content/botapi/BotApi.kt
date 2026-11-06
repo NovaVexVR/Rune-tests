@@ -65,7 +65,7 @@ object BotRegistry {
     @JvmField val WAVE1_EVENTS = listOf("GENIE", "DRUNKEN_DWARF", "RICK_TURPENTINE", "STRANGE_PLANT",
         "EVIL_CHICKEN", "RIVER_TROLL", "ROCK_GOLEM", "SHADE", "SWARM", "TREE_SPIRIT", "ZOMBIE",
         "SANDWICH_LADY", "CERTER", // wave 2: read the dialog / recognise the picture
-        "QUIZ_MASTER", "FREAKY_FORESTER", "DRILL_DEMON", "MIME", "SURPRISE_EXAM") // wave 3 (kidnaps). MAZE, CANDLELIGHT, EVIL_BOB not solved yet. PILLORY stays off: the kidnap teleport into the cage zone is blocked (server bug)
+        "QUIZ_MASTER", "FREAKY_FORESTER", "DRILL_DEMON", "MIME", "SURPRISE_EXAM", "CANDLELIGHT") // wave 3 (kidnaps). MAZE, EVIL_BOB not solved yet. PILLORY stays off: the kidnap teleport into the cage zone is blocked (server bug)
     @JvmField val allowedEvents: MutableSet<String> = java.util.Collections.synchronizedSet(HashSet<String>(WAVE1_EVENTS))
     private val jobs = ConcurrentLinkedQueue<() -> Unit>()
     private val IF_OPCODES = intArrayOf(155, 196, 124, 199, 234, 168, 166, 64, 53, 9)

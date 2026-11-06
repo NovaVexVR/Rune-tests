@@ -138,7 +138,7 @@ export class Bot {
     // ---- wave 3: kidnap events (the bot is taken somewhere and must solve something to get back) ----
     async handleKidnap() {
         const s = this.s;
-        if (!s.kidnapped) { this._kidnappedAt = null; this._examDoor = null; this._drill = null; this._pheasant = null; this._maze = null; return false; }
+        if (!s.kidnapped) { this._kidnappedAt = null; this._examDoor = null; this._candlesDone = false; this._drill = null; this._pheasant = null; this._maze = null; return false; }
         this._kidnappedAt ??= Date.now();
         const type = s.kidnapType ?? '?';
         if (Date.now() - this._kidnappedAt > 8 * 60_000) {
@@ -193,11 +193,50 @@ export class Bot {
             await this.wait(3);
             return true;
         }
+        if (type === 'CANDLELIGHT' || s.iface === 178 || this.nearestNpc(n => /pious pete/i.test(n.name))) return this.solveCandles();
         if (type === 'SURPRISE_EXAM' || s.iface === 103 || this.nearestNpc(n => /mordaut/i.test(n.name))) return this.solveExam();
         if (type === 'MAZE' || (s.x >= 2880 && s.x <= 2945 && s.y >= 4540 && s.y <= 4610)) return this.solveMaze();
         if (type === 'FREAKY_FORESTER' || this.nearestNpc(n => n.name === 'Freaky Forester')) return this.solveForester();
         if (type === 'DRILL_DEMON' || (s.x >= 3156 && s.x <= 3170 && s.y >= 4814 && s.y <= 4826)) return this.solveDrill();
         return false;
+    }
+
+    // Candlelight: light every tall candle (short ones just refuse), then tell Pious Pete
+    async solveCandles() {
+        const s = this.s;
+        if (s.iface === 178) {
+            // camera buttons: 1 west, 2 east, 4 south, 5 north, 3 light, 9 close. Candles run north from (1967,4997), x alternating 1967/1968
+            const press = child => this.act({ type: 'button', iface: 178, child });
+            for (let i = 0; i < 12; i++) await press(4);
+            await press(1); await press(1);
+            let x = 1967;
+            for (let y = 4997; y <= 5007; y++) {
+                const want = y % 2 === 1 ? 1967 : 1968;
+                if (want !== x) { await press(want > x ? 2 : 1); x = want; }
+                await press(3);
+                if (y < 5007) await press(5);
+            }
+            await press(9);
+            this.log('random event: went along the candles lighting the tall ones');
+            this._candlesDone = true;
+            await this.wait(2);
+            return true;
+        }
+        if (s.dialog) return false;
+        if (!this._candlesDone) {
+            const pillar = this.nearestScenery(l => l.id >= 11364 && l.id <= 11394 && l.ops.includes('Light'));
+            if (pillar) { await this.act({ type: 'scenery', x: pillar.x, y: pillar.y, id: pillar.id, op: 'Light' }); await this.waitIdle({ timeout: 12, cond: st => st.iface === 178 }); return true; }
+        }
+        const pete = this.nearestNpc(n => /pious pete/i.test(n.name));
+        if (pete && Date.now() - (this._peteTalk ?? 0) > 8000) {
+            this._peteTalk = Date.now();
+            if (!this._candlesDone) this._candlesDone = false;
+            await this.act({ type: 'npc', npc: pete.npc, op: 'Talk-to' });
+            await this.wait(3);
+            // if he says not yet, go round again
+            if (this.msgs.slice(-4).some(t => /not yet/i.test(t))) this._candlesDone = false;
+        }
+        return true;
     }
 
     // Surprise Exam: "what comes next?" (same kind of thing as the three shown), then leave by the door he names
