@@ -329,6 +329,15 @@ object BotRegistry {
                 PacketProcessor.enqueue(Packet.PrivateMessage(p, to, text))
                 "dm $to: $text"
             }
+            "geitem" -> {
+                // Grand Exchange buy screen: pick the item to buy (what the client's item search sends), after clicking a buy slot
+                val want = a["item"]
+                val id = if (want is Number) want.toInt() else core.cache.def.impl.ItemDefinition.getDefinitions().values
+                    .filter { it.name.equals(want.toString(), true) && it.isUnnoted && core.game.ge.PriceIndex.canTrade(it.id) }
+                    .minByOrNull { it.id }?.id ?: throw BotError("no GE-tradeable item named $want")
+                PacketProcessor.enqueue(Packet.GESetOfferItem(p, id))
+                "ge item $id"
+            }
             "forceevent" -> {
                 // testing: spawn a specific random event on this bot
                 val ev = content.global.ame.RandomEvents.valueOf(a["event"].toString().uppercase())
@@ -432,6 +441,26 @@ object BotRegistry {
         o["invFree"] = p.inventory.freeSlots()
         o["worn"] = items(p.equipment)
         o["bankCount"] = p.bank.itemCount()
+        // Grand Exchange: the bot's offer slots, and the offer being set up while the GE screen is open
+        val geRecs = core.game.ge.GrandExchangeRecords.getInstance(p)
+        val ge = JSONArray()
+        for (i in 0 until 6) {
+            val off = geRecs.getOffer(i) ?: continue
+            ge.add(JSONObject().apply {
+                this["slot"] = i; this["id"] = off.itemID; this["name"] = core.cache.def.impl.ItemDefinition.forId(off.itemID).name
+                this["sell"] = off.sell; this["amount"] = off.amount; this["done"] = off.completedAmount; this["price"] = off.offeredValue
+                this["state"] = off.offerState.name; this["coins"] = off.totalCoinExchange
+                this["collect"] = JSONArray().apply { off.withdraw.forEachIndexed { wi, w -> if (w != null) add(JSONObject().apply { this["box"] = wi; this["id"] = w.id; this["name"] = w.name; this["count"] = w.amount }) } }
+            })
+        }
+        if (ge.isNotEmpty()) o["ge"] = ge
+        if (p.interfaceManager.opened?.id == 105) {
+            val t = p.getAttribute<core.game.ge.GrandExchangeOffer?>("ge-temp", null)
+            o["geScreen"] = JSONObject().apply {
+                this["slot"] = p.getAttribute("ge-index", -1)
+                if (t != null && t.itemID > 0) { this["id"] = t.itemID; this["name"] = core.cache.def.impl.ItemDefinition.forId(t.itemID).name; this["sell"] = t.sell; this["amount"] = t.amount; this["price"] = t.offeredValue; this["guide"] = core.game.ge.GrandExchange.getRecommendedPrice(t.itemID) }
+            }
+        }
         o["coins"] = p.inventory.getAmount(995)
         val re = core.game.system.timer.impl.AntiMacro.getEventNpc(p)
         if (re != null && re.isActive) {

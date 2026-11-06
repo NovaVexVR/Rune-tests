@@ -22,6 +22,9 @@ export const RANDOM_EVENTS = process.env.BOT_EVENTS != null
        'EVIL_CHICKEN', 'RIVER_TROLL', 'ROCK_GOLEM', 'SHADE', 'SWARM', 'TREE_SPIRIT', 'ZOMBIE'];
 // experience-lamp interface (134) skill buttons
 const LAMP_BUTTON = { attack: 29, strength: 30, defence: 31, ranged: 32, prayer: 33, hitpoints: 34, magic: 35, agility: 36, herblore: 37, thieving: 38, crafting: 39, fletching: 40, mining: 41, smithing: 42, fishing: 43, firemaking: 44, cooking: 45, woodcutting: 46, runecrafting: 47, slayer: 48, hunter: 49, farming: 50, construction: 51, summoning: 52 };
+// Grand Exchange: centre of the building, and interface 105 buttons per offer slot (0-5)
+export const GE = { x: 3165, y: 3487 };
+const GE_BUY = [30, 46, 62, 81, 100, 119], GE_SELL = [31, 47, 63, 82, 101, 120], GE_BOX = [18, 34, 50, 69, 88, 107];
 const DEBUG_MSG = /^(\[|-{3,}|ID:|Option:|SpawnLoc|Wrapper|RCM|Iface|Slot:|Loc:|Index:|Your debug mode)/;
 
 async function http(method, url, body) {
@@ -407,6 +410,85 @@ export class Bot {
             await this.wait(1);
             await this.state(3);
         }
+    }
+
+    // ---- Grand Exchange (Varrock) ----
+    // Open the GE screen (interface 105) through a clerk.
+    async geOpen() {
+        for (let i = 0; i < 4; i++) {
+            const s = await this.state(15);
+            if (s.iface === 105) return true;
+            if (s.dialog) { await this.handleInterrupts(); continue; }
+            const clerk = this.nearestNpc(n => /grand exchange clerk/i.test(n.name) && n.ops.includes('Exchange'));
+            if (!clerk) { await this.walkTo(GE.x, GE.y, { tol: 2 }); continue; }
+            await this.act({ type: 'npc', npc: clerk.npc, op: 'Exchange' });
+            await this.waitIdle({ timeout: 15, cond: st => st.iface === 105 });
+        }
+        return this.s.iface === 105;
+    }
+
+    // Place an offer the way a player does: pick a free slot, choose the item (search box for buys,
+    // inventory click for sells), type the amount and price, confirm. Returns the slot or -1.
+    async geOffer({ item, sell, amount = 1, price }) {
+        if (!(await this.geOpen())) return -1;
+        let s = await this.state(1);
+        const used = new Set((s.ge ?? []).map(o => o.slot));
+        const slot = [0, 1, 2, 3, 4, 5].find(i => !used.has(i));
+        if (slot == null) return -1;
+        if (sell) {
+            const it = s.inv.find(i => i.name === item);
+            if (!it) return -1;
+            await this.act({ type: 'button', iface: 105, child: GE_SELL[slot] });
+            await this.wait(1);
+            await this.act({ type: 'button', iface: 107, child: 18, slot: it.slot });
+        } else {
+            await this.act({ type: 'button', iface: 105, child: GE_BUY[slot] });
+            await this.wait(1);
+            await this.act({ type: 'geitem', item });
+        }
+        await this.wait(2);
+        s = await this.state(1);
+        if (!s.geScreen?.id) { this.log(`GE: could not choose ${item}`); return -1; }
+        if (s.geScreen.amount !== amount) { await this.act({ type: 'button', iface: 105, child: 170 }); await this.wait(1); await this.act({ type: 'input', value: String(amount) }); await this.wait(1); }
+        if (price && s.geScreen.price !== price) { await this.act({ type: 'button', iface: 105, child: 185 }); await this.wait(1); await this.act({ type: 'input', value: price }); await this.wait(1); }
+        s = await this.state(1);
+        const { guide } = s.geScreen ?? {};
+        await this.act({ type: 'button', iface: 105, child: 190 });
+        await this.wait(2);
+        s = await this.state(5);
+        const placed = s.ge?.find(o => o.slot === slot);
+        this.log(placed ? `GE: ${sell ? 'selling' : 'buying'} ${placed.amount}x ${placed.name} at ${placed.price}gp (guide ${guide})` : `GE: offer for ${item} not placed (${s.messages?.map(m => m.text).slice(-1)})`);
+        return placed ? slot : -1;
+    }
+
+    // Take everything waiting in the GE collection boxes (finished items/coins, refunds).
+    async geCollect() {
+        if (!(await this.geOpen())) return 0;
+        let n = 0;
+        for (const off of (await this.state(1)).ge ?? []) {
+            if (!off.collect.length) continue;
+            await this.act({ type: 'button', iface: 105, child: GE_BOX[off.slot] });
+            await this.wait(1);
+            for (const c of off.collect) {
+                // stackables and small amounts as items, big piles of unstackables as notes
+                const notes = c.name !== 'Coins' && c.count > this.s.invFree;
+                await this.act({ type: 'button', iface: 105, child: 209 + 2 * c.box, op: notes ? 0 : 1 });
+                await this.wait(1);
+                n++;
+            }
+            await this.state(1);
+        }
+        return n;
+    }
+
+    // Cancel an offer that hasn't filled; what's left comes back to the collection box.
+    async geAbort(slot) {
+        if (!(await this.geOpen())) return false;
+        await this.act({ type: 'button', iface: 105, child: GE_BOX[slot] });
+        await this.wait(1);
+        await this.act({ type: 'button', iface: 105, child: 203 });
+        await this.wait(2);
+        return true;
     }
 
     // Climb the Lumbridge castle staircase to floor `target` (0-2).
