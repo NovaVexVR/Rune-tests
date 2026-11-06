@@ -133,11 +133,36 @@ export class Bot {
 
     // ---- RuneScape random events (wave 1: talkers, the strange plant, hostile spawns) ----
     async handleRandomEvent() {
+        // Genie's reward: rub the lamp and spend the XP on the weakest of the bot's main skills
+        const LAMP_BTN = { attack: 29, strength: 30, defence: 31, ranged: 32, prayer: 33, hitpoints: 34, magic: 35, woodcutting: 46, fishing: 43, mining: 41, cooking: 45, firemaking: 44, fletching: 40, thieving: 38 };
+        if (this.s.iface === 134) {
+            const skill = Object.keys(LAMP_BTN).sort((a, b) => this.lvl(a) - this.lvl(b))[0];
+            this.log(`random event: lamp xp to ${skill}`);
+            await this.act({ type: 'button', iface: 134, child: LAMP_BTN[skill] });
+            await this.act({ type: 'button', iface: 134, child: 2 });
+            await this.wait(2);
+            return true;
+        }
+        const lamp = !this.s.dialog && this.s.inv.find(i => i.id === 2528);
+        if (lamp && !this.s.randomEvent) {
+            await this.act({ type: 'item', slot: lamp.slot, op: 'Rub' });
+            await this.wait(2);
+            return true;
+        }
+        // Evil Chicken drops a pile of feathers when killed (useful for fletching)
+        const feathers = !this.s.randomEvent && this._chickenAt && Date.now() - this._chickenAt < 60_000 && this.s.invFree > 0 && this.s.ground?.find(g => g.id === 314 && g.dist <= 6);
+        if (feathers) {
+            this._chickenAt = 0;
+            await this.act({ type: 'ground', x: feathers.x, y: feathers.y, id: 314 });
+            await this.wait(3);
+            return true;
+        }
         const ev = this.s.randomEvent;
         if (!ev) return false;
+        if (ev.type === 'EVIL_CHICKEN') this._chickenAt = Date.now();
         const TALK = ['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE'];
         const HOSTILE = ['EVIL_CHICKEN', 'RIVER_TROLL', 'ROCK_GOLEM', 'SHADE', 'SWARM', 'TREE_SPIRIT', 'ZOMBIE'];
-        if (this._lastEvent !== ev.npc) { this._lastEvent = ev.npc; this.log(`random event: ${ev.type} (${ev.name})`); this.onRandomEvent?.(ev.type); }
+        if (this._lastEvent !== ev.type + ev.npc) { this._lastEvent = ev.type + ev.npc; this.log(`random event: ${ev.type} (${ev.name})`); this.onRandomEvent?.(ev.type); }
         if (this.s.dialog) return false; // let the dialog handler click through what the NPC says
         if (TALK.includes(ev.type)) {
             if (Date.now() - (this._reTalk ?? 0) < 6000) return false;
@@ -156,7 +181,8 @@ export class Bot {
             return true;
         }
         if (HOSTILE.includes(ev.type)) {
-            const healthy = this.s.hp > this.s.maxHp * 0.6;
+            // the swarm can't be fought off: just outrun it
+            const healthy = ev.type !== 'SWARM' && (this.s.combat ?? 3) >= 10 && this.s.hp > this.s.maxHp * 0.6;
             if (healthy && !this.s.attacking) {
                 await this.act({ type: 'npc', npc: ev.npc, op: 'Attack' });
                 await this.wait(2);
@@ -166,7 +192,7 @@ export class Bot {
                 // too hurt to fight it: put distance between us until it gives up
                 this._reFlee = Date.now();
                 const dx = Math.sign(this.s.x - ev.x) || 1, dy = Math.sign(this.s.y - ev.y) || 1;
-                this.log(`random event: fleeing ${ev.type} at hp ${this.s.hp}`);
+                this.log(`random event: fleeing ${ev.type} at hp ${this.s.hp} (combat ${this.s.combat})`);
                 await this.act({ type: 'walk', x: this.s.x + dx * 15, y: this.s.y + dy * 15, run: true });
                 await this.wait(6);
                 return true;

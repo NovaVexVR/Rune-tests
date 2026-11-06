@@ -32,6 +32,10 @@
     "caution": 0.54,
     "loyalty": 1,
     "patience": 0.67,
-    "sociability": 0.57
+    "sociability": 0.57,
+    "habits": {
+      "spot": "farm",
+      "food": "Cooked meat"
+    }
   }
 }

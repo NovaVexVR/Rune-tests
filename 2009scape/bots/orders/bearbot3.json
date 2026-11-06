@@ -32,6 +32,11 @@
     "caution": 0.11,
     "loyalty": 0.46,
     "patience": 0.8,
-    "sociability": 0.68
+    "sociability": 0.68,
+    "habits": {
+      "spot": "store",
+      "food": "Anchovies",
+      "gambles": true
+    }
   }
 }

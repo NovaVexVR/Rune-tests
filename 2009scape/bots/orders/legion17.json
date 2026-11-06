@@ -32,6 +32,11 @@
     "caution": 0.12,
     "loyalty": 0.24,
     "patience": 0.64,
-    "sociability": 0.73
+    "sociability": 0.73,
+    "habits": {
+      "spot": "riverbank",
+      "food": "Cooked meat",
+      "gambles": true
+    }
   }
 }

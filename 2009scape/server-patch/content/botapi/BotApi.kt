@@ -59,8 +59,11 @@ class BotData(val name: String, val session: BotSession) {
 
 object BotRegistry {
     val bots = HashMap<String, BotData>()
-    // random event types enabled for API bots (others are skipped); change via POST /events
-    @JvmField val allowedEvents: MutableSet<String> = java.util.Collections.synchronizedSet(HashSet<String>())
+    // random event types enabled for API bots (others are skipped); change via POST /events.
+    // Default: wave 1, the types the bots' handler (lib.mjs handleRandomEvent) is proven to resolve.
+    @JvmField val WAVE1_EVENTS = listOf("GENIE", "DRUNKEN_DWARF", "RICK_TURPENTINE", "STRANGE_PLANT",
+        "EVIL_CHICKEN", "RIVER_TROLL", "ROCK_GOLEM", "SHADE", "SWARM", "TREE_SPIRIT", "ZOMBIE")
+    @JvmField val allowedEvents: MutableSet<String> = java.util.Collections.synchronizedSet(HashSet<String>(WAVE1_EVENTS))
     private val jobs = ConcurrentLinkedQueue<() -> Unit>()
     private val IF_OPCODES = intArrayOf(155, 196, 124, 199, 234, 168, 166, 64, 53, 9)
 
@@ -316,7 +319,7 @@ object BotRegistry {
                 "skill menu option $want x${if (bestAmt < 0) 28 else bestAmt}"
             }
             "rescue" -> {
-                // operator fix: pull a bot out of a random-event area it was kidnapped into (bots are exempt from new ones)
+                // operator fix: pull a bot out of a random-event area it was kidnapped into (kidnap events aren't enabled for bots yet)
                 core.game.system.timer.impl.AntiMacro.terminateEventNpc(p)
                 content.global.ame.returnPlayer(p)
                 "rescued to ${p.getAttribute("/save:original-loc", ServerConstants.HOME_LOCATION)}"
@@ -332,7 +335,7 @@ object BotRegistry {
             "forceevent" -> {
                 // testing: spawn a specific random event on this bot
                 val ev = content.global.ame.RandomEvents.valueOf(a["event"].toString().uppercase())
-                core.game.system.timer.impl.AntiMacro.forceEvent(p, ev)
+                if (!core.game.system.timer.impl.AntiMacro.forceEvent(p, ev)) throw BotError("no antimacro timer on ${p.username}")
                 "forced ${ev.name}"
             }
             "player" -> {
@@ -435,7 +438,7 @@ object BotRegistry {
         o["coins"] = p.inventory.getAmount(995)
         val re = core.game.system.timer.impl.AntiMacro.getEventNpc(p)
         if (re != null && re.isActive) {
-            val type = content.global.ame.RandomEvents.values().firstOrNull { it.npc.id == re.id }?.name ?: "UNKNOWN"
+            val type = p.getAttribute<String?>("re-type", null) ?: content.global.ame.RandomEvents.values().firstOrNull { it.npc::class == re::class }?.name ?: "UNKNOWN"
             o["randomEvent"] = JSONObject().apply { this["type"] = type; this["npc"] = re.index; this["name"] = re.name; this["x"] = re.location.x; this["y"] = re.location.y; this["ticksLeft"] = re.ticksLeft }
         }
         if (p.getAttribute<Any?>("kidnapped-by-random", null) != null) o["kidnapped"] = true

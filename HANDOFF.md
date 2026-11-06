@@ -15,6 +15,7 @@ Last session's container had everything under `/home/user`; a new one starts emp
 2. JDK 11: `apt-get install -y openjdk-11-jdk-headless` (adoptium.net is blocked). Build/run the server with JDK 11.
 3. Node 24: download from nodejs.org (`node-v24.x-linux-x64.tar.xz`); the bots use `fetch` and ESM.
 4. `cd 2009scape && JAVA11_HOME=/usr/lib/jvm/java-11-openjdk-amd64 ./setup.sh` (clones to `../../2009scape-server`, `git lfs pull` for the cache, applies `server-patch/`, builds with Maven).
+   If Maven Central rate-limits (HTTP 429), it caches the error page as .pom/.jar files: delete those (`grep -rl "exceeded rate limits" ~/.m2/repository`, also check jars) and add a `~/.m2/settings.xml` mirror of `central` to `https://maven-central.storage-download.googleapis.com/maven2/`.
    Then `./restart.sh` (server; waits for "started in"), then `bots/start-bots.sh` (10 scripted + 50 Claude-directed bots).
 5. Optional viewer: `rt4-client` from GitLab (`./gradlew :client:build`; Maven Central may rate-limit, just retry), run with **Java 21** under `Xvfb :99` (JDK 11 here is headless), `xdotool` for input, `viewer/snap.sh <bot>` screenshots. The spectator account must skip the tutorial via Skippy, then admin `::tele x y z` works.
 
@@ -37,10 +38,10 @@ Last session's container had everything under `/home/user`; a new one starts emp
 
 **Built but not yet observed in-game:** debt-collector purchase completing (last attempt interrupted by a restart), hounding, call-outs, wagers, collection completion, mood effects.
 
-**In progress (unverified): RuneScape random events, wave 1** (`lib.mjs` `handleRandomEvent`, server `forceevent`, state `randomEvent`).
-- Bots currently get **no** random events: `GET/POST /events` controls the enabled types for API bots, and it is empty.
-- The first test (`node bots/test_events.mjs testbot GENIE DRUNKEN_DWARF RICK_TURPENTINE`) **failed**: no event ever appeared in the bot's state. Debug first: does `AntiMacro.forceEvent` spawn for an API bot (check `server.log` / `getEventNpc`), and is `randomEvent` read correctly in `BotApi.state`?
-- Then hostile events (EVIL_CHICKEN, RIVER_TROLL, ROCK_GOLEM, SHADE, SWARM, TREE_SPIRIT, ZOMBIE) and STRANGE_PLANT, then enable them via `POST /events`.
+**Random events wave 1: done and verified** (`node bots/test_events.mjs testbot <EVENTS...>`, all resolved, no deaths).
+- Root cause of the first failed test: `forceevent` was blocked by the per-type allowlist (which was empty). Forced events now bypass it; the state's `randomEvent.type` comes from a `re-type` attribute (hostile NPCs transform their id by combat level, so id matching failed).
+- Enabled by default for bots (server-side `WAVE1_EVENTS`, survives restarts; `POST /events` overrides): GENIE, DRUNKEN_DWARF, RICK_TURPENTINE, STRANGE_PLANT, EVIL_CHICKEN, RIVER_TROLL, ROCK_GOLEM, SHADE, SWARM, TREE_SPIRIT, ZOMBIE.
+- Handler: talkers are talked to; Genie's lamp is rubbed (XP to the bot's lowest combat/gathering skill); strange plant is picked once grown; hostile events are fought only if combat >= 10 and HP > 60%, otherwise (and always for SWARM) the bot runs until it despawns. Evil Chicken feathers are picked up after a kill (kill path not yet seen in-game; test bots were level 3).
 - Wave 2 needs bots to "see" interface item models (Sandwich Lady, Certer), wave 3 the kidnap puzzles (Surprise Exam, Drill Demon, Freaky Forester, Maze, Mime, Pillory, Quiz Master, Evil Bob, Candlelight). The `rescue` action pulls a bot out of a kidnap area.
 
 ## Known gotchas
@@ -52,7 +53,7 @@ Last session's container had everything under `/home/user`; a new one starts emp
 - Kill runners with `pkill -f "node claude_runner.mjs"` (a broader pattern can kill the calling shell).
 
 ## Next steps (in order)
-1. Fix and verify random events wave 1; enable those types for bots.
+1. ~~Random events wave 1~~ (done).
 2. Confirm the unobserved Phase 1–3 mechanics in-game (collector purchase, wagers, mood).
 3. Phase 4: market days at the Grand Exchange (needs GE API), quest parties (Cook's Assistant, The Knight's Sword, Druidic Ritual), diaries and recaps.
 4. Random events waves 2–3, bounded PvP (Phase 5), more training methods from `guides/`, a cross-platform local launcher.
