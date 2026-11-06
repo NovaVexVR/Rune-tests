@@ -32,6 +32,12 @@
     "caution": 0.56,
     "loyalty": 0.67,
     "patience": 0.63,
-    "sociability": 0.66
+    "sociability": 0.66,
+    "habits": {
+      "spot": "store",
+      "food": "Bread",
+      "collection": "logs",
+      "gambles": true
+    }
   }
 }

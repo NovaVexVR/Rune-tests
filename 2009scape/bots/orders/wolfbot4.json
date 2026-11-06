@@ -32,6 +32,10 @@
     "caution": 0.44,
     "loyalty": 1,
     "patience": 0.47,
-    "sociability": 0.5
+    "sociability": 0.5,
+    "habits": {
+      "spot": "riverbank",
+      "food": "Shrimps"
+    }
   }
 }

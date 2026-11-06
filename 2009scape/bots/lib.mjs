@@ -398,7 +398,7 @@ export class Bot {
             return true;
         }
         // Something we didn't pick a fight with is hurting us: run toward Lumbridge
-        if (s.inCombat && !s.attacking && s.hp < s.maxHp * 0.7 && !this._fleeing) {
+        if (s.inCombat && !s.attacking && s.hp < s.maxHp * 0.7 && !this._fleeing && !this.dueling) {
             this._fleeing = true;
             this.log(`under attack at ${s.x},${s.y} (hp ${s.hp}), fleeing`);
             const dx = Math.sign(3222 - s.x) * 14, dy = Math.sign(3218 - s.y) * 14;
