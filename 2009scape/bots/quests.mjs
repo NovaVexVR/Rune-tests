@@ -216,13 +216,16 @@ async function spinWool(bot) {
     await bot.lumbridgeFloor(SPIN_WHEEL_FLOOR);
     for (let tries = 0; tries < 6 && bot.count('Wool') > 0; tries++) {
         await bot.state(10);
-        if (await bot.handleInterrupts({ answer: /ball of wool/i })) continue; // the "how many" menu
+        if (bot.s.iface === 459) { // spinning screen: wool is button 19; option 3 spins all of it
+            await bot.act({ type: 'button', iface: 459, child: 19, op: 2 });
+            await bot.waitIdle({ timeout: 90, quiet: 5 });
+            continue;
+        }
+        if (await bot.handleInterrupts({ answer: /ball of wool/i })) continue;
         const wheel = bot.nearestScenery(l => /spinning wheel/i.test(l.name) && l.ops.includes('Spin'));
         if (!wheel) { await bot.walkTo(3209, 3213, { tol: 2 }); continue; }
         await bot.act({ type: 'scenery', x: wheel.x, y: wheel.y, id: wheel.id, op: 'Spin' });
-        await bot.wait(3);
-        await bot.handleInterrupts({ answer: /ball of wool/i });
-        await bot.waitIdle({ timeout: 90, quiet: 5 });
+        await bot.waitIdle({ timeout: 10, cond: st => st.iface === 459 });
     }
     await bot.lumbridgeFloor(0);
     return bot.count('Ball of wool');
