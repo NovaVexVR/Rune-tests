@@ -53,7 +53,7 @@
   ],
   "loop": true,
   "paused": false,
-  "step": 1,
+  "step": 2,
   "personality": {
     "archetype": "philanthropist",
     "greed": 0.13,

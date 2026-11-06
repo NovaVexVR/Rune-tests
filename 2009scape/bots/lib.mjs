@@ -299,8 +299,13 @@ export class Bot {
                 if (Date.now() - this._undergroundSince > 90_000) {
                     this.log(`stuck underground at ${s.x},${s.y}: casting Home Teleport`);
                     this._undergroundSince = null;
-                    await this.act({ type: 'button', iface: 192, child: 0 });
-                    await this.waitIdle({ timeout: 25, quiet: 4, cond: st => st.y < 6000 });
+                    // the cast takes ~10s and any movement cancels it: hold off the market hook and just wait
+                    const held = this._inHook; this._inHook = true;
+                    try {
+                        await this.act({ type: 'button', iface: 192, child: 0 });
+                        for (let i = 0; i < 10 && (await this.state(1)).y > 6000; i++) await sleep(2000);
+                    } finally { this._inHook = held; }
+                    if (this.s.y > 6000) { this.log('Home Teleport did not work (cooldown?)'); this._undergroundSince = Date.now() - 60_000; }
                     continue;
                 }
                 this._deadLadders ??= new Set(); // ladders that "don't seem to lead anywhere"

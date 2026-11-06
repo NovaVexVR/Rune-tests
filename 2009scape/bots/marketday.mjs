@@ -52,13 +52,36 @@ export class MarketDay {
         return !!a && a.attendees.includes(name) && near(this.market.bots.get(name)?.bot.s);
     }
 
+    // market haggling: buy another stall's spare item when our bid meets their ask (prices meet in the middle)
+    async browse(bot) {
+        const m = this.market, name = bot.name;
+        if (m.busy.has(name) || Math.random() < 0.5) return;
+        const stalls = this.st.active.attendees.filter(o => o !== name && !m.busy.has(o) && this.atMarket(o)
+            && !m.social.isRival(name, o) && !m.social.isRival(o, name));
+        const offers = [];
+        for (const o of stalls) for (const it of m.surplusOf(o)) {
+            if (it.name === 'Coins') continue;
+            const ask = Math.round(m.perceived(o, it.name) * m.social.askFactor(o, name) * 10) / 10;
+            const bid = Math.round(m.perceived(name, it.name) * m.social.bidFactor(name, o) * 10) / 10;
+            const price = Math.max(1, Math.round((ask + bid) / 2));
+            if (bid >= ask && m.coins(name) >= price && price >= 2) offers.push({ o, item: it.name, ask, bid, price, gain: bid - ask });
+        }
+        if (!offers.length) return;
+        const d = offers.sort((x, y) => y.gain - x.gain)[0];
+        await bot.act({ type: 'say', text: `${d.o}, I'll give you ${d.price}gp for your ${d.item}.` });
+        m.open({ buyer: name, seller: d.o, item: d.item, amount: 1, price: d.price, kind: 'sale', ask: d.ask, bid: d.bid });
+        this.log(`${name} haggles with ${d.o} over ${d.item}: ${d.price}gp (ask ${d.ask}, bid ${d.bid})`);
+    }
+
     // the bot's turn at the market; returns true if it went
     async attend(bot) {
         this.tick();
         const a = this.st.active, name = bot.name, m = this.market;
-        if (!a || !a.attendees.includes(name) || bot._marketDay === a.id || Date.now() > a.closes || bot._questing) return false;
+        if (!a) return false;
+        a.went ??= [];
+        if (!a.attendees.includes(name) || a.went.includes(name) || Date.now() > a.closes || bot._questing) return false;
         if (m.dealFor(name)) return false; // finish what it's doing first
-        bot._marketDay = a.id;
+        a.went.push(name); this.save(); // remembered across runner restarts
         this.log(`${name} sets off for market day #${a.id}`);
         if (!(await bot.walkToGE())) { this.log(`${name} couldn't get to the market`); return true; }
         const until = Math.min(a.closes, Date.now() + MINUTES * 60_000);
@@ -84,7 +107,8 @@ export class MarketDay {
                 if (o) this.log(`${name} put 1 ${it.name} on the GE for ${ask}gp (${o.state})`);
                 await bot.act({ type: 'close' }).catch(() => {});
             }
-            await m.seek(name); // face-to-face deals (limited to bots at the market, see Market.seek)
+            await m.seek(name); // face-to-face deals for what it needs (limited to bots at the market, see Market.seek)
+            if (!m.dealFor(name)) await this.browse(bot);
             if (!m.dealFor(name)) await bot.wait(8);
         }
         if (posted) {
