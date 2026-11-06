@@ -64,7 +64,8 @@ object BotRegistry {
     // Default: wave 1, the types the bots' handler (lib.mjs handleRandomEvent) is proven to resolve.
     @JvmField val WAVE1_EVENTS = listOf("GENIE", "DRUNKEN_DWARF", "RICK_TURPENTINE", "STRANGE_PLANT",
         "EVIL_CHICKEN", "RIVER_TROLL", "ROCK_GOLEM", "SHADE", "SWARM", "TREE_SPIRIT", "ZOMBIE",
-        "SANDWICH_LADY", "CERTER") // wave 2: read the dialog / recognise the picture
+        "SANDWICH_LADY", "CERTER", // wave 2: read the dialog / recognise the picture
+        "QUIZ_MASTER", "FREAKY_FORESTER", "DRILL_DEMON") // wave 3 (kidnaps) solved so far
     @JvmField val allowedEvents: MutableSet<String> = java.util.Collections.synchronizedSet(HashSet<String>(WAVE1_EVENTS))
     private val jobs = ConcurrentLinkedQueue<() -> Unit>()
     private val IF_OPCODES = intArrayOf(155, 196, 124, 199, 234, 168, 166, 64, 53, 9)
@@ -97,8 +98,11 @@ object BotRegistry {
     // (The Certer's pictures use placeholder items whose names are blank, so those are described by hand.)
     private val CERTER_PICTURES = mapOf(6189 to "fish", 6190 to "bass", 6191 to "sword", 6192 to "battleaxe", 6193 to "helmet",
         6194 to "kiteshield", 6195 to "shears", 6196 to "shovel", 6197 to "ring", 6198 to "necklace")
+    // Quiz Master's golden pictures
+    private val QUIZ_PICTURES = mapOf(8828 to "battleaxe", 8829 to "salmon", 8830 to "trout", 8831 to "necklace", 8832 to "shield",
+        8833 to "helmet", 8834 to "ring", 8835 to "secateurs", 8836 to "sword", 8837 to "trowel")
     private val modelNames: Map<Int, String> by lazy {
-        val m = HashMap<Int, String>()
+        val m = HashMap<Int, String>(QUIZ_PICTURES)
         for ((id, name) in CERTER_PICTURES) core.cache.def.impl.ItemDefinition.forId(id)?.let { m[it.interfaceModelId] = name }
         for (d in core.cache.def.impl.ItemDefinition.getDefinitions().values)
             if (d.name != null && d.name != "null" && d.isUnnoted && !m.containsKey(d.interfaceModelId)) m[d.interfaceModelId] = d.name.lowercase()
@@ -188,10 +192,18 @@ object BotRegistry {
     }
 
     /** Resolve scenery at x,y (optionally by id/name) to the node the client would see. */
+    // every visible object on a tile (a wall, a sign on it, a mat on the floor...)
+    private fun tileObjects(x: Int, y: Int, z: Int): List<Scenery> {
+        val l = Location(x, y, z)
+        val chunk = RegionManager.getRegionChunk(l)
+        return chunk.objects[l.chunkOffsetX][l.chunkOffsetY].filterNotNull().filter { it.isRenderable }
+    }
+
     private fun scenery(p: Player, a: JSONObject): Scenery {
         val x = (a["x"] as Number).toInt(); val y = (a["y"] as Number).toInt()
         val idWant = a["id"]
-        val obj = RegionManager.getObject(x, y, p.location.z) ?: throw BotError("no scenery at $x,$y")
+        val obj = (idWant as? Number)?.let { w -> tileObjects(x, y, p.location.z).firstOrNull { it.id == w.toInt() || it.getChild(p).id == w.toInt() } }
+            ?: RegionManager.getObject(x, y, p.location.z) ?: throw BotError("no scenery at $x,$y")
         if (idWant is Number && obj.id != idWant.toInt() && obj.getChild(p).id != idWant.toInt()) throw BotError("scenery at $x,$y is ${obj.id}")
         return obj
     }
@@ -535,7 +547,8 @@ object BotRegistry {
             val type = p.getAttribute<String?>("re-type", null) ?: content.global.ame.RandomEvents.values().firstOrNull { it.npc::class == re::class }?.name ?: "UNKNOWN"
             o["randomEvent"] = JSONObject().apply { this["type"] = type; this["npc"] = re.index; this["name"] = re.name; this["x"] = re.location.x; this["y"] = re.location.y; this["ticksLeft"] = re.ticksLeft }
         }
-        if (p.getAttribute<Any?>("kidnapped-by-random", null) != null) o["kidnapped"] = true
+        // kidnapped from when the event takes the bot until it's returned (the server keeps its original location meanwhile)
+        if (p.getAttribute<Any?>("kidnapped-by-random", null) != null || p.getAttribute<Any?>("/save:original-loc", null) != null) { o["kidnapped"] = true; o["kidnapType"] = p.getAttribute<String?>("re-type", null) }
         o["bank"] = items(p.bank)
         val shop = p.getAttribute<core.game.shops.Shop?>("shop", null)
         val shopCont = p.getAttribute<core.game.container.Container?>("shop-cont", null)
@@ -588,6 +601,7 @@ object BotRegistry {
                 val h = f.get(sk) as core.game.dialogue.SkillDialogueHandler
                 d["skillMenu"] = JSONArray().apply { h.items.forEach { add(it.name) } }
             }
+            synchronized(bot) { bot.models[chat]?.let { md -> d["models"] = JSONObject().apply { md.forEach { (c, tm) -> this[c.toString()] = JSONObject().apply { this["id"] = tm.second; this["seen"] = describeModel(tm.first, tm.second) } } } } }
             o["dialog"] = d
         }
         // messages
@@ -610,13 +624,17 @@ object BotRegistry {
             npcs.add(j)
         }
         val scen = ArrayList<JSONObject>()
-        for (dx in -radius..radius) for (dy in -radius..radius) {
-            val obj = RegionManager.getObject(loc.x + dx, loc.y + dy, loc.z) ?: continue
+        for (dx in -radius..radius) for (dy in -radius..radius) for (obj in tileObjects(loc.x + dx, loc.y + dy, loc.z)) {
             val shown = obj.getChild(p) ?: continue
             val ops = shown.interaction.options.filterNotNull().map { it.name }.filter { it.isNotBlank() && !it.equals("Examine", true) }
-            if (ops.isEmpty() || shown.name == "null") continue
+            // scenery that looks different per player (signs, levers, bins...) is listed even without options: it's something to look at
+            val varies = obj.definition.childrenIds != null
+            if ((ops.isEmpty() && !varies) || shown.name == "null") continue
             val j = JSONObject()
             j["id"] = obj.id; j["name"] = shown.name; j["x"] = obj.location.x; j["y"] = obj.location.y
+            if (varies) j["shownId"] = shown.id
+            // Drill Demon: the sign above each exercise mat (what a player reads off the wall)
+            if (obj.id in 10076..10079) j["sign"] = listOf("jog", "sit ups", "push ups", "star jumps").getOrNull(content.global.ame.events.drilldemon.DrillDemonUtils.getMatTask(obj.id, p))
             j["dist"] = obj.location.getDistance(loc).toInt()
             j["ops"] = JSONArray().apply { addAll(ops) }
             scen.add(j)

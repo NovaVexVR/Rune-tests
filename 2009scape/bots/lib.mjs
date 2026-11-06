@@ -135,7 +135,111 @@ export class Bot {
     }
 
     // ---- RuneScape random events (wave 1: talkers, the strange plant, hostile spawns) ----
+    // ---- wave 3: kidnap events (the bot is taken somewhere and must solve something to get back) ----
+    async handleKidnap() {
+        const s = this.s;
+        if (!s.kidnapped) { this._kidnappedAt = null; return false; }
+        this._kidnappedAt ??= Date.now();
+        const type = s.kidnapType ?? '?';
+        if (Date.now() - this._kidnappedAt > 8 * 60_000) {
+            // safety net: couldn't solve it in time
+            this.log(`random event: stuck in ${type} for 8 minutes; asking for a rescue`);
+            this.onRandomEvent?.(`${type}_rescued`);
+            await this.act({ type: 'rescue' });
+            this._kidnappedAt = null;
+            await this.wait(4);
+            return true;
+        }
+        // Quiz Master: three golden pictures; pick the odd one out
+        if (s.chatbox === 191 && s.dialog?.models) {
+            const KIND = { salmon: 'fish', trout: 'fish', bass: 'fish', fish: 'fish', necklace: 'jewellery', ring: 'jewellery',
+                trowel: 'garden tool', shovel: 'garden tool', secateurs: 'garden tool', shears: 'garden tool',
+                battleaxe: 'weapon', sword: 'weapon', shield: 'armour', kiteshield: 'armour', helmet: 'armour' };
+            const seen = [6, 7, 8].map(c => s.dialog.models[c]?.seen);
+            const kinds = seen.map(n => KIND[n] ?? n);
+            let odd = kinds.findIndex((k, i) => kinds.filter((x, j) => j !== i && x === k).length === 0 && kinds.filter((x, j) => j !== i).every((x, _, a) => x === a[0]));
+            if (odd < 0) odd = Math.floor(Math.random() * 3);
+            this.log(`random event: quiz shows ${seen.join(', ')}; the odd one out is the ${seen[odd]}`);
+            await this.act({ type: 'continue', child: 3 + odd });
+            await this.wait(2);
+            return true;
+        }
+        if (type === 'FREAKY_FORESTER' || this.nearestNpc(n => n.name === 'Freaky Forester')) return this.solveForester();
+        if (type === 'DRILL_DEMON' || (s.x >= 3156 && s.x <= 3170 && s.y >= 4814 && s.y <= 4826)) return this.solveDrill();
+        return false;
+    }
+
+    // Drill Demon: the sergeant shouts an exercise; do it on the mat whose sign shows it
+    async solveDrill() {
+        const s = this.s;
+        if (s.dialog) {
+            const said = (s.dialog.text ?? []).join(' ').toLowerCase();
+            const m = said.match(/\b(jog|star ?jumps|push ?ups|sit ups)\b/);
+            if (m) this._drill = { jog: 'jog', starjumps: 'star jumps', 'star jumps': 'star jumps', pushups: 'push ups', 'push ups': 'push ups', 'sit ups': 'sit ups' }[m[1]];
+            return false; // the dialog handler clicks on
+        }
+        if (s.locked || s.busy) return true; // mid-exercise
+        const mat = this._drill && this.nearestScenery(l => /exercise mat/i.test(l.name) && l.sign === this._drill);
+        if (mat) {
+            this.log(`random event: the sergeant wants ${this._drill}`);
+            this._drill = null;
+            await this.act({ type: 'scenery', x: mat.x, y: mat.y, id: mat.id, op: 'Use' });
+            await this.wait(6);
+            return true;
+        }
+        const sarge = this.nearestNpc(n => /sergeant damien/i.test(n.name));
+        if (sarge && Date.now() - (this._sargeTalk ?? 0) > 8000) {
+            this._sargeTalk = Date.now();
+            await this.act({ type: 'npc', npc: sarge.npc, op: 'Talk-to' });
+            await this.wait(3);
+        }
+        return true;
+    }
+
+    async solveForester() {
+        const s = this.s;
+        if (s.dialog) {
+            const said = (s.dialog.text ?? []).join(' ');
+            const m = said.match(/kill the (one|two|three|four) tailed pheasant/i);
+            if (m) this._pheasant = 2458 + ['one', 'two', 'three', 'four'].indexOf(m[1].toLowerCase()) + 1; // what each pheasant looks like
+            if (/you may leave/i.test(said)) this._foresterDone = true;
+            return false; // let the dialog handler click through
+        }
+        const raw = s.inv.find(i => i.name === 'Raw pheasant');
+        const forester = this.nearestNpc(n => n.name === 'Freaky Forester');
+        if (this._foresterDone || s.messages?.some(m => /may leave/i.test(m.text))) {
+            const portal = this.nearestScenery(l => /portal/i.test(l.name) && l.ops.some(o => /enter/i.test(o)));
+            if (portal) {
+                this.log('random event: the forester let us go; leaving through the portal');
+                await this.act({ type: 'scenery', x: portal.x, y: portal.y, id: portal.id, op: portal.ops.find(o => /enter/i.test(o)) });
+                await this.waitIdle({ timeout: 20 });
+                this._foresterDone = false; this._pheasant = null;
+                return true;
+            }
+        }
+        if (raw || !this._pheasant) {
+            if (forester && Date.now() - (this._foresterTalk ?? 0) > 6000) {
+                this._foresterTalk = Date.now();
+                await this.act({ type: 'npc', npc: forester.npc, op: 'Talk-to' });
+                await this.wait(3);
+            }
+            return true;
+        }
+        const drop = s.ground.find(g => g.name === 'Raw pheasant' && g.dist <= 10);
+        if (drop) { await this.act({ type: 'ground', x: drop.x, y: drop.y, id: drop.id }); await this.waitIdle({ timeout: 12 }); return true; }
+        if (!s.attacking) {
+            const bird = this.nearestNpc(n => n.id === this._pheasant && n.ops.includes('Attack'));
+            if (bird) {
+                this.log(`random event: hunting the pheasant with ${['one', 'two', 'three', 'four'][this._pheasant - 2459]} tail(s)`);
+                await this.act({ type: 'npc', npc: bird.npc, op: 'Attack' });
+                await this.waitIdle({ timeout: 25, quiet: 3 });
+            }
+        }
+        return true;
+    }
+
     async handleRandomEvent() {
+        if (this.s?.kidnapped && (await this.handleKidnap())) return true;
         // Genie's reward: rub the lamp and spend the XP on the weakest of the bot's main skills
         const LAMP_BTN = { attack: 29, strength: 30, defence: 31, ranged: 32, prayer: 33, hitpoints: 34, magic: 35, woodcutting: 46, fishing: 43, mining: 41, cooking: 45, firemaking: 44, fletching: 40, thieving: 38 };
         if (this.s.iface === 134) {
