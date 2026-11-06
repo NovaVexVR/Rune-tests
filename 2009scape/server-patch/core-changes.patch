@@ -1,17 +1,19 @@
 diff --git a/Server/src/main/core/game/system/timer/impl/AntiMacro.kt b/Server/src/main/core/game/system/timer/impl/AntiMacro.kt
-index 4f9ba87..0309cb4 100644
+index 4f9ba87..2a52687 100644
 --- a/Server/src/main/core/game/system/timer/impl/AntiMacro.kt
 +++ b/Server/src/main/core/game/system/timer/impl/AntiMacro.kt
-@@ -26,6 +26,8 @@ class AntiMacro : PersistTimer(0, "antimacro", isAuto = true), Commands {
+@@ -25,7 +25,10 @@ class AntiMacro : PersistTimer(0, "antimacro", isAuto = true), Commands {
+         setNextExecution()
  
          if (!canSpawn(entity)) return true
++        val forced = nextRandom != null
          val eventSelection = rollEventPool(entity)
-+        // API bots only get the event types that have been enabled for them (BotRegistry.allowedEvents)
-+        if (content.botapi.BotRegistry.isBot(entity) && !content.botapi.BotRegistry.allowedEvents.contains(eventSelection.name)) return true
++        // API bots only get the event types that have been enabled for them (BotRegistry.allowedEvents); forced events (testing) always fire
++        if (!forced && content.botapi.BotRegistry.isBot(entity) && !content.botapi.BotRegistry.allowedEvents.contains(eventSelection.name)) return true
          val eventNpc = eventSelection.npc.create(entity, eventSelection.loot, eventSelection.type)
          if (eventNpc.spawnLocation == null) {
              entity.debug("[AntiMacro] Attempted to spawn random, but spawnLoc was null.")
-@@ -39,6 +41,7 @@ class AntiMacro : PersistTimer(0, "antimacro", isAuto = true), Commands {
+@@ -39,6 +42,7 @@ class AntiMacro : PersistTimer(0, "antimacro", isAuto = true), Commands {
      }
  
      override fun onRegister(entity: Entity) {

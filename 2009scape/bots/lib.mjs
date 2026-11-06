@@ -13,7 +13,15 @@ export const rand = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 export const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 
 export const SKILLS = ['attack', 'defence', 'strength', 'hitpoints', 'ranged', 'prayer', 'magic', 'cooking', 'woodcutting', 'fletching', 'fishing', 'firemaking', 'crafting', 'smithing', 'mining', 'herblore', 'agility', 'thieving', 'slayer', 'farming', 'runecrafting', 'hunter', 'construction', 'summoning'];
-export const FOOD = ['Shrimps', 'Anchovies', 'Bread', 'Cooked chicken', 'Cooked meat', 'Sardine', 'Herring', 'Trout', 'Salmon', 'Pike', 'Tuna', 'Lobster', 'Cake', 'Meat pie', 'Swordfish'];
+export const FOOD = ['Shrimps', 'Anchovies', 'Bread', 'Cooked chicken', 'Cooked meat', 'Sardine', 'Herring', 'Trout', 'Salmon', 'Pike', 'Tuna', 'Lobster', 'Cake', 'Meat pie', 'Swordfish', 'Kebab'];
+// Random event types the server may give bots: the ones with a proven solver (wave 1).
+// Sent to the server on every login, so it survives server restarts. Override: BOT_EVENTS=GENIE,ZOMBIE or BOT_EVENTS=none
+export const RANDOM_EVENTS = process.env.BOT_EVENTS != null
+    ? process.env.BOT_EVENTS.split(',').map(e => e.trim().toUpperCase()).filter(e => e && e !== 'NONE')
+    : ['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE', 'STRANGE_PLANT',
+       'EVIL_CHICKEN', 'RIVER_TROLL', 'ROCK_GOLEM', 'SHADE', 'SWARM', 'TREE_SPIRIT', 'ZOMBIE'];
+// experience-lamp interface (134) skill buttons
+const LAMP_BUTTON = { attack: 29, strength: 30, defence: 31, ranged: 32, prayer: 33, hitpoints: 34, magic: 35, agility: 36, herblore: 37, thieving: 38, crafting: 39, fletching: 40, mining: 41, smithing: 42, fishing: 43, firemaking: 44, cooking: 45, woodcutting: 46, runecrafting: 47, slayer: 48, hunter: 49, farming: 50, construction: 51, summoning: 52 };
 const DEBUG_MSG = /^(\[|-{3,}|ID:|Option:|SpawnLoc|Wrapper|RCM|Iface|Slot:|Loc:|Index:|Your debug mode)/;
 
 async function http(method, url, body) {
@@ -41,6 +49,7 @@ export class Bot {
     }
 
     async login() {
+        await http('POST', '/events', RANDOM_EVENTS).catch(() => {});
         await http('POST', `/bot/${this.name}/login`);
         for (let i = 0; i < 30; i++) {
             await sleep(600);
@@ -137,7 +146,7 @@ export class Bot {
         if (!ev) return false;
         const TALK = ['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE'];
         const HOSTILE = ['EVIL_CHICKEN', 'RIVER_TROLL', 'ROCK_GOLEM', 'SHADE', 'SWARM', 'TREE_SPIRIT', 'ZOMBIE'];
-        if (this._lastEvent !== ev.npc) { this._lastEvent = ev.npc; this.log(`random event: ${ev.type} (${ev.name})`); this.onRandomEvent?.(ev.type); }
+        if (this._lastEvent !== ev.type + ev.npc) { this._lastEvent = ev.type + ev.npc; this.log(`random event: ${ev.type} (${ev.name})`); this.onRandomEvent?.(ev.type); }
         if (this.s.dialog) return false; // let the dialog handler click through what the NPC says
         if (TALK.includes(ev.type)) {
             if (Date.now() - (this._reTalk ?? 0) < 6000) return false;
@@ -175,6 +184,29 @@ export class Bot {
         return false;
     }
 
+    // Experience lamps (the Genie's reward): rub, pick a skill on interface 134, confirm (button 2).
+    // Skill: this.lampSkill (set by a runner) or else the highest-level skill, since the genie lamp gives level x 10 xp.
+    async useLamp() {
+        const s = this.s;
+        if (s.iface === 134) {
+            const ok = SKILLS.filter(k => !['herblore', 'runecrafting', 'summoning'].includes(k) && LAMP_BUTTON[k]);
+            const skill = (typeof this.lampSkill === 'function' ? this.lampSkill(s) : this.lampSkill)
+                ?? ok.sort((a, b) => (s.stats[b]?.level ?? 1) - (s.stats[a]?.level ?? 1))[0];
+            this.log(`rubbing lamp: ${skill}`);
+            await this.act({ type: 'button', iface: 134, child: LAMP_BUTTON[skill] });
+            await this.wait(1);
+            await this.act({ type: 'button', iface: 134, child: 2 });
+            await this.wait(2);
+            return true;
+        }
+        const lamp = s.inv?.find(i => /lamp/i.test(i.name) && i.ops.includes('Rub'));
+        if (!lamp || s.dialog || s.attacking || s.inCombat || Date.now() - (this._lampAt ?? 0) < 10000) return false;
+        this._lampAt = Date.now();
+        await this.act({ type: 'item', slot: lamp.slot, op: 'Rub' });
+        await this.wait(2);
+        return true;
+    }
+
     // Level-ups, dialogs, random events, low HP. Returns true if it did something.
     async handleInterrupts({ answer = null } = {}) {
         // market/trading hook (set by the runner); guarded against re-entry while it walks
@@ -184,6 +216,19 @@ export class Bot {
         }
         const s = this.s;
         if (await this.handleRandomEvent()) return true;
+        if (await this.useLamp()) return true;
+        // safety net: stuck in a kidnap area we have no solver for (shouldn't happen while only wave 1 is enabled)
+        if (s.kidnapped) {
+            this._kidnappedAt ??= Date.now();
+            if (Date.now() - this._kidnappedAt > 5 * 60_000) {
+                this.log(`random event: stuck in a kidnap area for 5 min at ${s.x},${s.y}, rescued`);
+                this.onRandomEvent?.('RESCUED');
+                await this.act({ type: 'rescue' });
+                this._kidnappedAt = null;
+                await this.wait(4);
+                return true;
+            }
+        } else this._kidnappedAt = null;
         const unreachable = s.messages?.some(m => /can't reach that/i.test(m.text));
         if (unreachable && !this._gateCooldown) {
             this._gateCooldown = true;

@@ -50,6 +50,11 @@ async function runBot(name, delay) {
         if (/Oh dear, you are dead/i.test(text)) market.social.bumpMood(name, -0.4, 'dying');
         else if (/advanced .* level|reached level/i.test(text)) market.social.bumpMood(name, 0.1, 'a level-up');
     };
+    // random events: gifts cheer a bot up, ambushes and kidnappings shake it
+    bot.onRandomEvent = type => {
+        if (['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE', 'STRANGE_PLANT'].includes(type)) market.social.bumpMood(name, 0.05, `a ${type.toLowerCase().replace('_', ' ')} visit`);
+        else market.social.bumpMood(name, type === 'RESCUED' ? -0.2 : -0.05, type === 'RESCUED' ? 'being stuck in a random event' : `a ${type.toLowerCase().replace('_', ' ')} ambush`);
+    };
     let lastSeek = 0;
     bot.hook = async b => {
         if (market.dealFor(b.name)) {

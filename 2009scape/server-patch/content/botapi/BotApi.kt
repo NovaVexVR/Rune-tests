@@ -435,7 +435,7 @@ object BotRegistry {
         o["coins"] = p.inventory.getAmount(995)
         val re = core.game.system.timer.impl.AntiMacro.getEventNpc(p)
         if (re != null && re.isActive) {
-            val type = content.global.ame.RandomEvents.values().firstOrNull { it.npc.id == re.id }?.name ?: "UNKNOWN"
+            val type = content.global.ame.RandomEvents.values().firstOrNull { it.npc::class == re::class }?.name ?: "UNKNOWN" // by class: hostile events transform to a combat-level id
             o["randomEvent"] = JSONObject().apply { this["type"] = type; this["npc"] = re.index; this["name"] = re.name; this["x"] = re.location.x; this["y"] = re.location.y; this["ticksLeft"] = re.ticksLeft }
         }
         if (p.getAttribute<Any?>("kidnapped-by-random", null) != null) o["kidnapped"] = true
