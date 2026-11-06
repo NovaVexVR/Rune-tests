@@ -1,17 +1,24 @@
 diff --git a/Server/src/main/core/game/system/timer/impl/AntiMacro.kt b/Server/src/main/core/game/system/timer/impl/AntiMacro.kt
-index 4f9ba87..9134928 100644
+index 4f9ba87..0309cb4 100644
 --- a/Server/src/main/core/game/system/timer/impl/AntiMacro.kt
 +++ b/Server/src/main/core/game/system/timer/impl/AntiMacro.kt
-@@ -39,7 +39,8 @@ class AntiMacro : PersistTimer(0, "antimacro", isAuto = true), Commands {
+@@ -26,6 +26,8 @@ class AntiMacro : PersistTimer(0, "antimacro", isAuto = true), Commands {
+ 
+         if (!canSpawn(entity)) return true
+         val eventSelection = rollEventPool(entity)
++        // API bots only get the event types that have been enabled for them (BotRegistry.allowedEvents)
++        if (content.botapi.BotRegistry.isBot(entity) && !content.botapi.BotRegistry.allowedEvents.contains(eventSelection.name)) return true
+         val eventNpc = eventSelection.npc.create(entity, eventSelection.loot, eventSelection.type)
+         if (eventNpc.spawnLocation == null) {
+             entity.debug("[AntiMacro] Attempted to spawn random, but spawnLoc was null.")
+@@ -39,6 +41,7 @@ class AntiMacro : PersistTimer(0, "antimacro", isAuto = true), Commands {
      }
  
      override fun onRegister(entity: Entity) {
--        if (entity !is Player || entity.isArtificial)
-+        // bots driven through the bot API are exempt, like the game's own AI players
-+        if (entity !is Player || entity.isArtificial || content.botapi.BotRegistry.isBot(entity))
++        // the game's own AI players are exempt; API bots keep the timer, gated per event type in run()
+         if (entity !is Player || entity.isArtificial)
              entity.timers.removeTimer(this)
          if (entity is Player && entity.rights == Rights.ADMINISTRATOR)
-             paused = true
 diff --git a/Server/src/main/core/net/packet/PacketRepository.java b/Server/src/main/core/net/packet/PacketRepository.java
 index e2656b0..5b3e12a 100644
 --- a/Server/src/main/core/net/packet/PacketRepository.java

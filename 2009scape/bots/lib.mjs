@@ -131,6 +131,50 @@ export class Bot {
         return true;
     }
 
+    // ---- RuneScape random events (wave 1: talkers, the strange plant, hostile spawns) ----
+    async handleRandomEvent() {
+        const ev = this.s.randomEvent;
+        if (!ev) return false;
+        const TALK = ['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE'];
+        const HOSTILE = ['EVIL_CHICKEN', 'RIVER_TROLL', 'ROCK_GOLEM', 'SHADE', 'SWARM', 'TREE_SPIRIT', 'ZOMBIE'];
+        if (this._lastEvent !== ev.npc) { this._lastEvent = ev.npc; this.log(`random event: ${ev.type} (${ev.name})`); this.onRandomEvent?.(ev.type); }
+        if (this.s.dialog) return false; // let the dialog handler click through what the NPC says
+        if (TALK.includes(ev.type)) {
+            if (Date.now() - (this._reTalk ?? 0) < 6000) return false;
+            this._reTalk = Date.now();
+            const npc = this.s.npcs.find(n => n.npc === ev.npc);
+            const op = npc?.ops.find(o => /talk/i.test(o)) ?? 'Talk-to';
+            await this.act({ type: 'npc', npc: ev.npc, op });
+            await this.wait(3);
+            return true;
+        }
+        if (ev.type === 'STRANGE_PLANT') {
+            if (Date.now() - (this._rePick ?? 0) < 5000) return false;
+            this._rePick = Date.now();
+            await this.act({ type: 'npc', npc: ev.npc, op: 'Pick' });
+            await this.wait(2);
+            return true;
+        }
+        if (HOSTILE.includes(ev.type)) {
+            const healthy = this.s.hp > this.s.maxHp * 0.6;
+            if (healthy && !this.s.attacking) {
+                await this.act({ type: 'npc', npc: ev.npc, op: 'Attack' });
+                await this.wait(2);
+                return true;
+            }
+            if (!healthy && Date.now() - (this._reFlee ?? 0) > 8000) {
+                // too hurt to fight it: put distance between us until it gives up
+                this._reFlee = Date.now();
+                const dx = Math.sign(this.s.x - ev.x) || 1, dy = Math.sign(this.s.y - ev.y) || 1;
+                this.log(`random event: fleeing ${ev.type} at hp ${this.s.hp}`);
+                await this.act({ type: 'walk', x: this.s.x + dx * 15, y: this.s.y + dy * 15, run: true });
+                await this.wait(6);
+                return true;
+            }
+        }
+        return false;
+    }
+
     // Level-ups, dialogs, random events, low HP. Returns true if it did something.
     async handleInterrupts({ answer = null } = {}) {
         // market/trading hook (set by the runner); guarded against re-entry while it walks
@@ -139,6 +183,7 @@ export class Bot {
             try { if (await this.hook(this)) return true; } finally { this._inHook = false; }
         }
         const s = this.s;
+        if (await this.handleRandomEvent()) return true;
         const unreachable = s.messages?.some(m => /can't reach that/i.test(m.text));
         if (unreachable && !this._gateCooldown) {
             this._gateCooldown = true;

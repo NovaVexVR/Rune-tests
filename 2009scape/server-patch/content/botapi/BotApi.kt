@@ -59,6 +59,8 @@ class BotData(val name: String, val session: BotSession) {
 
 object BotRegistry {
     val bots = HashMap<String, BotData>()
+    // random event types enabled for API bots (others are skipped); change via POST /events
+    @JvmField val allowedEvents: MutableSet<String> = java.util.Collections.synchronizedSet(HashSet<String>())
     private val jobs = ConcurrentLinkedQueue<() -> Unit>()
     private val IF_OPCODES = intArrayOf(155, 196, 124, 199, 234, 168, 166, 64, 53, 9)
 
@@ -327,6 +329,12 @@ object BotRegistry {
                 PacketProcessor.enqueue(Packet.PrivateMessage(p, to, text))
                 "dm $to: $text"
             }
+            "forceevent" -> {
+                // testing: spawn a specific random event on this bot
+                val ev = content.global.ame.RandomEvents.valueOf(a["event"].toString().uppercase())
+                core.game.system.timer.impl.AntiMacro.forceEvent(p, ev)
+                "forced ${ev.name}"
+            }
             "player" -> {
                 // e.g. {"type":"player","name":"claudebot2","op":"Trade with"}
                 val other = Repository.getPlayerByName(a["name"].toString()) ?: throw BotError("${a["name"]} not online")
@@ -425,6 +433,12 @@ object BotRegistry {
         o["worn"] = items(p.equipment)
         o["bankCount"] = p.bank.itemCount()
         o["coins"] = p.inventory.getAmount(995)
+        val re = core.game.system.timer.impl.AntiMacro.getEventNpc(p)
+        if (re != null && re.isActive) {
+            val type = content.global.ame.RandomEvents.values().firstOrNull { it.npc.id == re.id }?.name ?: "UNKNOWN"
+            o["randomEvent"] = JSONObject().apply { this["type"] = type; this["npc"] = re.index; this["name"] = re.name; this["x"] = re.location.x; this["y"] = re.location.y; this["ticksLeft"] = re.ticksLeft }
+        }
+        if (p.getAttribute<Any?>("kidnapped-by-random", null) != null) o["kidnapped"] = true
         o["bank"] = items(p.bank)
         val shop = p.getAttribute<core.game.shops.Shop?>("shop", null)
         val shopCont = p.getAttribute<core.game.container.Container?>("shop-cont", null)
@@ -531,6 +545,16 @@ object BotRegistry {
                 val q = (ex.requestURI.query ?: "").split("&").filter { it.contains("=") }.associate { it.substringBefore("=") to it.substringAfter("=") }
                 val body = ex.requestBody.readBytes().toString(Charsets.UTF_8)
                 when {
+                    parts == listOf("events") -> {
+                        if (ex.requestMethod == "POST") {
+                            val arr = JSONParser().parse(body) as JSONArray
+                            allowedEvents.clear(); arr.forEach { allowedEvents.add(it.toString().uppercase()) }
+                        }
+                        JSONObject().apply {
+                            this["enabled"] = JSONArray().apply { addAll(allowedEvents.sorted()) }
+                            this["all"] = JSONArray().apply { content.global.ame.RandomEvents.values().forEach { add(it.name) } }
+                        }
+                    }
                     parts == listOf("bots") -> JSONArray().apply {
                         bots.values.forEach { b -> add(JSONObject().apply { this["name"] = b.name; this["online"] = b.player?.isActive == true }) }
                     }
