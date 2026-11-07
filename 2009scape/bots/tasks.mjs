@@ -39,7 +39,7 @@ export const BRONZE_PIECES = [
 ];
 
 // what a bot keeps on it when it banks: its tools and some food
-const KEEP = name => /pickaxe$|(^| )axe$|^Hammer$|^Tinderbox$|^Small fishing net$|^Knife$|^Chisel$|^Shears$|^Fly fishing rod$|^Feather$|^Coins$/.test(name) || FOOD.includes(name);
+const KEEP = name => /pickaxe$|(^| )axe$|^Hammer$|^Tinderbox$|^Small fishing net$|^Knife$|^Chisel$|^Shears$|^Fly fishing rod$|^Feather$|^Needle$|^Thread$|^Air talisman$|^Coins$/.test(name) || FOOD.includes(name);
 
 // ---- bank clear-outs ----
 // Bots bank everything. Goods normally leave the bank through trades and market days (marketday.mjs takes surplus
@@ -93,10 +93,44 @@ export async function prepare(bot, taskId) {
     }
     if (taskId === 'fish_cook') await flyKit(bot).catch(e => bot.log(`fly fishing kit: ${e.message}`));
     await bot.gearUp({ weapon: !['ranged', 'magic'].includes(taskId) }).catch(() => {});
+    if (taskId === 'melee') await buyArmour(bot).catch(e => bot.log(`armour: ${e.message}`));
     if (['melee', 'ranged', 'magic', 'thieving'].includes(taskId)) {
         const food = await bot.ensureFood(4).catch(() => 0);
         if (food < 2) await catchFood(bot, 6).catch(e => bot.log(`food: ${e.message}`)); // nothing banked: catch and cook some
     }
+}
+
+// Armour from the Varrock shops for fighters who can afford it: at most once every 6 hours, spending no more than
+// 30% of its coins (bank + carried) and only once it has 200+, so wealth still grows. Body, legs and shield
+// (helms come from smiths and the market). Steel needs Defence 5.
+export const HORVIK = { x: 3229, y: 3436, npcs: ['Horvik'], sells: { 'Bronze sq shield': 48, 'Bronze chainbody': 60, 'Bronze platelegs': 80, 'Bronze platebody': 160, 'Iron sq shield': 168, 'Iron chainbody': 210, 'Iron platelegs': 280, 'Iron platebody': 560, 'Steel platebody': 2000 } };
+export async function buyArmour(bot) {
+    if (Date.now() < (bot._armourTry ?? 0)) return 0;
+    bot._armourTry = Date.now() + 6 * 3600_000;
+    const banked = (bot.s.bank ?? []).find(i => i.name === 'Coins')?.count ?? 0;
+    const wealth = bot.s.coins + banked;
+    if (wealth < 200) return 0;
+    let budget = Math.floor(wealth * 0.3);
+    const best = slot => Math.max(-1, ...[...bot.s.worn, ...bot.s.inv, ...(bot.s.bank ?? [])].map(i => gearInfo(i.name)).filter(g => g?.slot === slot).map(g => g.score));
+    const want = [];
+    for (const slot of ['body', 'legs', 'shield']) {
+        const pick = Object.entries(HORVIK.sells)
+            .filter(([name, price]) => gearInfo(name).slot === slot && gearInfo(name).score > best(slot) && price <= budget && (!/^Steel/.test(name) || bot.lvl('defence') >= 5))
+            .sort((a, b) => gearInfo(b[0]).score - gearInfo(a[0]).score)[0];
+        if (pick) { want.push(pick); budget -= pick[1]; }
+    }
+    if (!want.length) return 0;
+    const cost = want.reduce((t, [, p]) => t + p, 0);
+    bot.log(`armour: shopping at Horvik's for ${want.map(w => w[0]).join(', ')} (${cost}gp of ${wealth}gp)`);
+    if (bot.s.coins < cost && (await bot.openBank())) { await bot.withdrawN('Coins', cost - bot.s.coins); await bot.leaveBank(); }
+    let bought = 0;
+    if (await bot.openShop(HORVIK)) {
+        for (const [name, price] of want) if (bot.s.coins >= price && (await bot.buy(name, 1))) bought++;
+        await bot.closeInterfaces();
+    }
+    await bot.gearUp().catch(() => {});
+    if (bot.s.coins > 50) await bot.bankItems(i => i.name === 'Coins'); // don't walk around with savings
+    return bought;
 }
 
 // Fly fishing from Fishing 20: carry the rod and the banked feathers (chicken fighters bank them);
