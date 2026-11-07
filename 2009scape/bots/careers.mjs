@@ -55,7 +55,8 @@ export function careerOf(bot) {
     if (all[bot.name]) return all[bot.name];
     if (!bot.s?.stats || (bot.s.totalLevel ?? 0) < CAREER_AT) return null;
     const lean = LEAN[personalityOf(bot.name).archetype] ?? {};
-    const scored = Object.entries(CAREERS).map(([k, c]) => [k, bot.lvl(c.skill) + (lean[k] ?? 0) + Math.random() * 2]).sort((a, b) => b[1] - a[1]);
+    const taught = taughtCareers(bot.name); // an apprentice leans toward what it was taught
+    const scored = Object.entries(CAREERS).map(([k, c]) => [k, bot.lvl(c.skill) + (lean[k] ?? 0) + (taught.has(k) ? 4 : 0) + Math.random() * 2]).sort((a, b) => b[1] - a[1]);
     const career = scored[0][0];
     const rec = { career, goal: nextGoal(bot, career), since: new Date().toISOString(), goalsReached: 0 };
     all[bot.name] = rec;
@@ -97,3 +98,40 @@ export function careerBonus(bot, taskId) {
     const rec = read()[bot.name];
     return rec && CAREERS[rec.career].tasks.includes(taskId) ? -6 : 0;
 }
+
+// ---- Apprenticeships (roadmap C12): once a day per mentor, a bot with a career and 20+ in its skill takes on a
+// weaker teammate (no career yet, or the same career 10+ levels behind) and gives it the trade's starter goods
+// from its own stock, through the market's gift trade. The apprentice leans toward the mentor's career.
+const STARTER = {
+    smith: [['Bronze bar', 5], ['Hammer', 1]], fisher: [['Fly fishing rod', 1], ['Feather', 20], ['Small fishing net', 1]],
+    crafter: [['Needle', 1], ['Thread', 5], ['Cowhide', 5]], fletcher: [['Knife', 1], ['Logs', 10]],
+    fighter: [['Bronze sq shield', 1], ['Bronze med helm', 1], ['Shrimps', 5]], thief: [['Shrimps', 5]], mystic: [['Air rune', 30], ['Mind rune', 30]]
+};
+export function apprenticeships(market, teamOf, log = console.log) {
+    const all = read(), now = Date.now();
+    const has = (name, item) => { const s = market.bots.get(name)?.bot.s; return [...(s?.inv ?? []), ...(s?.bank ?? [])].filter(i => i.name === item).reduce((t, i) => t + i.count, 0); };
+    for (const [mentor, rec] of Object.entries(all)) {
+        const mb = market.bots.get(mentor)?.bot;
+        if (!mb?.s?.online || market.isBusy(mentor) || now - (rec.lastApprentice ?? 0) < 86400_000) continue;
+        const c = CAREERS[rec.career], lv = mb.lvl(c.skill);
+        if (lv < 20 || teamOf(mentor) === 'individual') continue;
+        const pupil = [...market.bots.keys()].filter(n => n !== mentor && teamOf(n) === teamOf(mentor) && market.bots.get(n).bot.s?.online && !market.isBusy(n))
+            .filter(n => { const r = all[n]; return (!r || r.career === rec.career) && market.bots.get(n).bot.lvl(c.skill) <= lv - 10; })
+            .sort((a, b) => market.bots.get(a).bot.lvl(c.skill) - market.bots.get(b).bot.lvl(c.skill))[0];
+        if (!pupil) continue;
+        const gift = STARTER[rec.career].find(([item, n]) => has(mentor, item) >= n && has(pupil, item) < n);
+        rec.lastApprentice = now;
+        rec.apprentices = [...new Set([...(rec.apprentices ?? []), pupil])];
+        const lean = (mentorsOf[pupil] ??= new Set()); lean.add(rec.career);
+        if (gift) market.open({ buyer: pupil, seller: mentor, item: gift[0], amount: gift[1], price: 0, kind: 'gift' });
+        market.social.adjustTrust(pupil, mentor, 0.1);
+        market.social.adjustTrust(mentor, pupil, 0.05);
+        note(mentor, `Took ${pupil} on as an apprentice ${c.title.replace(/^an? /, '')}${gift ? `, and gave it ${gift[1]} ${gift[0]}` : ''}.`);
+        note(pupil, `${mentor} is teaching me to be ${c.title}${gift ? ` (gave me ${gift[1]} ${gift[0]})` : ''}.`);
+        log(`[career] ${mentor} (${rec.career}, ${c.skill} ${lv}) takes on ${pupil} as an apprentice${gift ? `: ${gift[1]} ${gift[0]}` : ''}`);
+    }
+    write(all);
+}
+// careers the bot has been taught (in this process): a lean toward them when it chooses its own
+const mentorsOf = {};
+export const taughtCareers = name => mentorsOf[name] ?? new Set();

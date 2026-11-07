@@ -19,7 +19,7 @@ import { Parties } from './party.mjs';
 import { note, noteLevel } from './diary.mjs';
 import { Escorts } from './escort.mjs';
 import { buildBoard } from './noticeboard.mjs';
-import { careerTask, checkGoal } from './careers.mjs';
+import { careerTask, checkGoal, apprenticeships } from './careers.mjs';
 import { TownEvents } from './events.mjs';
 import { sampleEconomy } from './economy.mjs';
 
@@ -180,6 +180,7 @@ console.log(`starting Claude-directed bots: ${names.join(', ')}`);
 // team council (scoreboard, mutiny, leaving, recruiting) every POLITICS_MINUTES
 const POLITICS_MINUTES = Number(process.env.POLITICS_MINUTES ?? 60);
 setInterval(() => { try { council(market); } catch (e) { console.log('council error', e); } }, POLITICS_MINUTES * 60_000);
+setInterval(() => { try { apprenticeships(market, n => market.social.teamOf(n), (...a) => console.log(new Date().toISOString(), ...a)); } catch (e) { console.log('apprenticeship error', e); } }, 60 * 60_000);
 setInterval(() => market.social.driftMoods(), 10 * 60_000);
 setInterval(() => { try { buildBoard(); } catch (e) { console.log('notice board:', e.message); } }, 10 * 60_000); // the public notice board
 watchdog(ALL_BOTS, (...a) => console.log(new Date().toISOString(), ...a));
