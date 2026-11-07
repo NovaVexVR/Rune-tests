@@ -2,6 +2,7 @@
 // usage: node export_dashboard.mjs <outdir>
 import fs from 'fs';
 import path from 'path';
+import { readEconomy } from './economy.mjs';
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
 const OUT = process.argv[2] ?? path.join(HERE, 'dashboard');
@@ -59,4 +60,9 @@ write('deals.json', deals);
 write('debts.json', debts);
 write('bounties.json', bounties);
 write('events.json', events);
+// economy over time (E23): totals, inequality, per-group wealth and going prices per sample; the latest rich/poor
+const econ = readEconomy();
+write('economy.json', econ.map(r => ({ time: r.t, bots: r.bots, coins: r.coins, goods: r.goods, wealth: r.coins + r.goods, medianWealth: r.medianWealth, gini: r.gini,
+    ...Object.fromEntries(Object.entries(r.groups ?? {}).map(([g, v]) => [`wealth_${g}`, v.coins + v.goods])), prices: r.prices })));
+write('wealth_latest.json', econ.length ? [...econ.at(-1).richest.map(x => ({ ...x, side: 'richest' })), ...econ.at(-1).poorest.map(x => ({ ...x, side: 'poorest' }))] : []);
 console.log(`exported ${bots.length} bots, ${deals.length} deals, ${debts.length} debts, ${bounties.length} bounties, ${events.length} events -> ${OUT} at ${now}`);

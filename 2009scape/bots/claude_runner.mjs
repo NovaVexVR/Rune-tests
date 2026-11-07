@@ -21,6 +21,7 @@ import { Escorts } from './escort.mjs';
 import { buildBoard } from './noticeboard.mjs';
 import { careerTask, checkGoal } from './careers.mjs';
 import { TownEvents } from './events.mjs';
+import { sampleEconomy } from './economy.mjs';
 
 const ALL_BOTS = [];
 const market = new Market((...a) => console.log(new Date().toISOString(), ...a));
@@ -182,6 +183,7 @@ setInterval(() => { try { council(market); } catch (e) { console.log('council er
 setInterval(() => market.social.driftMoods(), 10 * 60_000);
 setInterval(() => { try { buildBoard(); } catch (e) { console.log('notice board:', e.message); } }, 10 * 60_000); // the public notice board
 watchdog(ALL_BOTS, (...a) => console.log(new Date().toISOString(), ...a));
+setInterval(() => sampleEconomy().catch(e => console.log('economy sample:', e.message)), 30 * 60_000); // wealth over time (E23)
 setInterval(() => { try { townEvents.tick(); } catch (e) { console.log('town event error', e); } }, 60_000);
 setInterval(() => { try { marketDay.tick(); } catch (e) { console.log('market day error', e); } }, 60_000);
 setInterval(() => { try { if (!marketDay.upcoming()) parties.tick(); } catch (e) { console.log('party error', e); } }, 5 * 60_000);

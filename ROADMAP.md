@@ -46,7 +46,7 @@ What's planned for the bot world, in priority order, plus how the built systems 
 
 ### E. Operations and outreach
 22. **Daily director pass:** Claude reads the recap and rewrites some bots' plans (`orders/`).
-23. **Economy charts:** coins in circulation, prices over time, who's rich and who's poor, on the dashboard.
+23. *(data done: `bots/economy.mjs` samples every 30 min into `market/economy.jsonl` (coins, goods, median wealth, Gini, per-group wealth, prices, richest/poorest); `export_dashboard.mjs` writes `economy.json` and `wealth_latest.json`; the charts go on the dashboard at the next snapshot)* **Economy charts:** coins in circulation, prices over time, who's rich and who's poor, on the dashboard.
 24. **Test the launcher on Windows.**
 
 ### Milestone: reset to level 1 and start the real run
