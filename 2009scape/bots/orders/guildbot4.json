@@ -2,24 +2,19 @@
   "role": "Guild cook: food for the guild, also fights and chops",
   "plan": [
     {
-      "task": "fish_cook",
-      "minutes": 45,
-      "why": "food"
+      "task": "melee",
+      "minutes": 30,
+      "why": "combat 4 and 7 deaths: toughen up"
     },
     {
-      "task": "melee",
-      "minutes": 20,
-      "why": "combat"
+      "task": "fish_cook",
+      "minutes": 40,
+      "why": "career: fishing"
     },
     {
       "task": "woodcut_fire",
-      "minutes": 20,
-      "why": "fires"
-    },
-    {
-      "task": "mine",
       "minutes": 15,
-      "why": "mining"
+      "why": "variety"
     }
   ],
   "loop": true,

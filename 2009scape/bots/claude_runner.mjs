@@ -23,6 +23,7 @@ import { careerTask, checkGoal, apprenticeships } from './careers.mjs';
 import { TownEvents } from './events.mjs';
 import { sampleEconomy } from './economy.mjs';
 import { GrudgeDuels } from './duel.mjs';
+import { checkAlerts } from './director.mjs';
 
 const ALL_BOTS = [];
 const market = new Market((...a) => console.log(new Date().toISOString(), ...a));
@@ -189,6 +190,7 @@ setInterval(() => market.social.driftMoods(), 10 * 60_000);
 setInterval(() => { try { buildBoard(); } catch (e) { console.log('notice board:', e.message); } }, 10 * 60_000); // the public notice board
 watchdog(ALL_BOTS, (...a) => console.log(new Date().toISOString(), ...a));
 setInterval(() => { try { if (!marketDay.upcoming()) duels.tick(); } catch (e) { console.log('duel error', e); } }, 30 * 60_000);
+setInterval(() => { try { const a = checkAlerts(); if (a.length) console.log(new Date().toISOString(), `[director] alert: ${a.join('; ')}`); } catch (e) { console.log('director alerts:', e.message); } }, 30 * 60_000); // trouble that calls for an early director pass
 setInterval(() => sampleEconomy().catch(e => console.log('economy sample:', e.message)), 30 * 60_000); // wealth over time (E23)
 setInterval(() => { try { townEvents.tick(); } catch (e) { console.log('town event error', e); } }, 60_000);
 setInterval(() => { try { marketDay.tick(); } catch (e) { console.log('market day error', e); } }, 60_000);

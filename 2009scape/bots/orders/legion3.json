@@ -3,23 +3,28 @@
   "plan": [
     {
       "task": "mine",
-      "minutes": 45,
-      "why": "copper/tin to bank"
+      "minutes": 40,
+      "why": "ore for the furnace"
+    },
+    {
+      "task": "smelt",
+      "minutes": 20,
+      "why": "turn the ore into bars"
+    },
+    {
+      "task": "smith",
+      "minutes": 20,
+      "why": "bars into armour and goods"
     },
     {
       "task": "melee",
       "minutes": 20,
-      "why": "combat"
-    },
-    {
-      "task": "fletch",
-      "minutes": 15,
-      "why": "arrow shafts"
+      "why": "enough combat for the iron mine"
     },
     {
       "task": "fish_cook",
       "minutes": 15,
-      "why": "food"
+      "why": "own food"
     }
   ],
   "loop": true,

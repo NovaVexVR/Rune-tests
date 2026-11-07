@@ -45,7 +45,7 @@ What's planned for the bot world, in priority order, plus how the built systems 
 21. **Rest of random events wave 3:** Surprise Exam, Mime, Pillory, Quiz Master, Evil Bob, Candlelight (need item models or animations).
 
 ### E. Operations and outreach
-22. **Daily director pass:** Claude reads the recap and rewrites some bots' plans (`orders/`).
+22. *(done: `bots/director.mjs` (brief / due / done / alerts), `DIRECTOR.md` (the pass's instructions), `run_director.sh` / `.cmd` for a local hourly schedule that runs `claude -p` only when a pass is due (daily, or sooner on an alert); the runner checks alerts every 30 min; first pass done 2026-11-07)* **Daily director pass:** Claude reads the recap and rewrites some bots' plans (`orders/`).
 23. *(data done: `bots/economy.mjs` samples every 30 min into `market/economy.jsonl` (coins, goods, median wealth, Gini, per-group wealth, prices, richest/poorest); `export_dashboard.mjs` writes `economy.json` and `wealth_latest.json`; the charts go on the dashboard at the next snapshot)* **Economy charts:** coins in circulation, prices over time, who's rich and who's poor, on the dashboard.
 24. **Test the launcher on Windows.**
 

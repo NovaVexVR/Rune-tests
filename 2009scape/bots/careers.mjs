@@ -36,6 +36,14 @@ const LEAN = {
 const CAREER_AT = 60; // total level before a bot settles on a career
 const ARMOUR = ['head', 'body', 'legs', 'shield'];
 
+// how suited a bot is to a career: its skill, counting the skills that feed it (a miner is half a smith already,
+// a woodcutter half a fletcher, a strong fighter a fighter)
+const FEEDS = { smith: ['mining', 0.8], fletcher: ['woodcutting', 0.6], fighter: ['strength', 1], crafter: ['firemaking', 0], fisher: ['cooking', 0.6], thief: ['thieving', 1], mystic: ['magic', 0.6] };
+function aptitude(bot, k) {
+    const [feed, w] = FEEDS[k] ?? [null, 0];
+    return Math.max(bot.lvl(CAREERS[k].skill), feed ? bot.lvl(feed) * w : 0);
+}
+
 function nextGoal(bot, career) {
     const c = CAREERS[career];
     if (c.gear) {
@@ -56,7 +64,7 @@ export function careerOf(bot) {
     if (!bot.s?.stats || (bot.s.totalLevel ?? 0) < CAREER_AT) return null;
     const lean = LEAN[personalityOf(bot.name).archetype] ?? {};
     const taught = taughtCareers(bot.name); // an apprentice leans toward what it was taught
-    const scored = Object.entries(CAREERS).map(([k, c]) => [k, bot.lvl(c.skill) + (lean[k] ?? 0) + (taught.has(k) ? 4 : 0) + Math.random() * 2]).sort((a, b) => b[1] - a[1]);
+    const scored = Object.entries(CAREERS).map(([k, c]) => [k, aptitude(bot, k) + (lean[k] ?? 0) + (taught.has(k) ? 4 : 0) + Math.random() * 2]).sort((a, b) => b[1] - a[1]);
     const career = scored[0][0];
     const rec = { career, goal: nextGoal(bot, career), since: new Date().toISOString(), goalsReached: 0 };
     all[bot.name] = rec;

@@ -2,23 +2,23 @@
   "role": "Thief (own goal: farmers at 10, coin stack)",
   "plan": [
     {
-      "task": "thieving",
-      "minutes": 45,
-      "why": "main goal"
+      "task": "fish_cook",
+      "minutes": 20,
+      "why": "food before thieving"
     },
     {
       "task": "melee",
-      "minutes": 20,
-      "why": "hp for stuns"
+      "minutes": 30,
+      "why": "hitpoints: 6 deaths at combat 3"
     },
     {
-      "task": "fish_cook",
-      "minutes": 20,
-      "why": "food for stuns"
+      "task": "thieving",
+      "minutes": 30,
+      "why": "coins"
     },
     {
-      "task": "fletch",
-      "minutes": 10,
+      "task": "woodcut_fire",
+      "minutes": 15,
       "why": "variety"
     }
   ],

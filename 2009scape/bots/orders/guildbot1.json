@@ -7,9 +7,9 @@
       "why": "equip the guild + manage pool"
     },
     {
-      "task": "melee",
+      "task": "fish_cook",
       "minutes": 20,
-      "why": "hp/combat"
+      "why": "food: 6 deaths"
     },
     {
       "task": "treasury",
