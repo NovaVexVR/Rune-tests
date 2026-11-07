@@ -127,8 +127,83 @@ async function huntBeads(bot, minutes = 25) {
     return BEADS.every(b => count(bot, b));
 }
 
+// Druidic Ritual (Taverley): Kaqemeex at the stone circle, Sanfew upstairs in the village (ladder 2898,3428), four
+// raw meats dipped in the Cauldron of Thunder deep in Taverley Dungeon, behind a gate two suits of armour (level 19)
+// guard. For bots with combat 25+.
+const DR = { kaqemeex: { x: 2925, y: 3486 }, sanfewLadder: { x: 2898, y: 3427 }, dungeonLadder: { x: 2884, y: 3398 }, gate: { x: 2888, y: 9830 }, cauldron: { x: 2893, y: 9831 } };
+const DR_ANSWERS = /in search of a quest|ok, i will try and help|sent to help purify the varrock stone circle/i;
+const MEATS = { 'Raw beef': ['Cow', { x: 3257, y: 3263 }], 'Raw rat meat': ['Giant rat', { x: 3180, y: 3190 }], 'Raw chicken': ['Chicken', { x: 3187, y: 3279 }], 'Raw bear meat': ['Black bear', { x: 2960, y: 3450 }] };
+async function killFor(bot, npcName, item, at, n = 1) {
+    await bot.travel(at.x, at.y, { tol: 5 });
+    for (let i = 0; i < 20 && count(bot, item) < n; i++) {
+        const s = await bot.state(12);
+        if (await bot.handleInterrupts()) continue;
+        const drop = s.ground.find(g => g.name === item && g.dist <= 8);
+        if (drop && s.invFree > 0) { await bot.act({ type: 'ground', x: drop.x, y: drop.y, id: drop.id }); await bot.waitIdle({ timeout: 10 }); continue; }
+        if (s.attacking || s.inCombat) { await bot.wait(2); continue; }
+        const t = bot.nearestNpc(x => x.name === npcName && x.ops.includes('Attack') && !x.inCombat);
+        if (!t) { await bot.walkTo(at.x + Math.floor(Math.random() * 9) - 4, at.y + Math.floor(Math.random() * 9) - 4, { tol: 2 }); continue; }
+        await bot.act({ type: 'npc', npc: t.npc, op: 'Attack' });
+        await bot.waitIdle({ timeout: 40, quiet: 3, cond: st => !st.attacking && !st.inCombat });
+        await bot.wait(2); // the drop lands a tick later
+    }
+    return count(bot, item) >= n;
+}
+async function toSanfew(bot) {
+    if (bot.s.z !== 1) {
+        await bot.travel(DR.sanfewLadder.x, DR.sanfewLadder.y, { tol: 2 });
+        await bot.state(8);
+        await climb(bot, 'Climb-up', 1);
+    }
+    if (bot.s.z !== 1) { bot.log('quest: could not get up to Sanfew'); return false; }
+    await bot.talkTo('Sanfew', { answer: DR_ANSWERS, maxSteps: 60 });
+    await bot.state(8);
+    await climb(bot, 'Climb-down', 0);
+    return true;
+}
+async function cauldronRun(bot) {
+    // down the ladder, north to the gate, deal with the armour, dip the meats, come back up
+    await bot.travel(DR.dungeonLadder.x, DR.dungeonLadder.y, { tol: 2 });
+    await bot.state(8);
+    const lad = bot.nearestScenery(l => /ladder/i.test(l.name) && l.ops.includes('Climb-down'));
+    if (!lad) { bot.log('quest: no ladder into Taverley Dungeon'); return false; }
+    await bot.act({ type: 'scenery', x: lad.x, y: lad.y, id: lad.id, op: 'Climb-down' });
+    await bot.waitIdle({ timeout: 12, cond: x => x.y > 9000 });
+    if ((await bot.state(10)).y < 9000) return false;
+    await bot.walkTo(DR.gate.x - 1, DR.gate.y, { tol: 1, timeout: 240, direct: true });
+    for (let i = 0; i < 12 && (await bot.state(12)).x < DR.gate.x + 1; i++) {
+        if (await bot.handleInterrupts()) continue;
+        const suit = bot.s.npcs.find(n => /suit of armour/i.test(n.name) && n.ops.includes('Attack') && n.dist <= 8);
+        if (suit) { await bot.act({ type: 'npc', npc: suit.npc, op: 'Attack' }); await bot.waitIdle({ timeout: 60, quiet: 3, cond: st => !st.attacking && !st.inCombat }); continue; }
+        const gate = bot.nearestScenery(l => /gate/i.test(l.name) && l.ops.includes('Open') && Math.abs(l.x - DR.gate.x) <= 1);
+        if (!gate) { await bot.walkTo(DR.gate.x - 1, DR.gate.y, { tol: 1, timeout: 30, direct: true }); continue; }
+        await bot.act({ type: 'scenery', x: gate.x, y: gate.y, id: gate.id, op: 'Open' });
+        await bot.waitIdle({ timeout: 8, quiet: 2 });
+    }
+    if (bot.s.x < DR.gate.x + 1) { bot.log('quest: could not get through the gate to the cauldron'); return false; }
+    await bot.walkTo(DR.cauldron.x - 1, DR.cauldron.y, { tol: 1, timeout: 30, direct: true });
+    for (const meat of Object.keys(MEATS)) {
+        const c = (await bot.state(8), bot.nearestScenery(l => /cauldron/i.test(l.name)));
+        if (!c || !count(bot, meat)) continue;
+        await bot.act({ type: 'useitem', item: meat, x: c.x, y: c.y, id: c.id });
+        await bot.waitIdle({ timeout: 8, quiet: 2 });
+    }
+    const enchanted = (await bot.state(3)).inv.filter(i => /^Enchanted/.test(i.name)).length;
+    bot.log(`quest: ${enchanted} enchanted meats`);
+    // back out the way we came (the gate opens from this side without a fight)
+    for (let i = 0; i < 4 && (await bot.state(10)).x > DR.gate.x; i++) {
+        const gate = bot.nearestScenery(l => /gate/i.test(l.name) && l.ops.includes('Open'));
+        if (gate) { await bot.act({ type: 'scenery', x: gate.x, y: gate.y, id: gate.id, op: 'Open' }); await bot.waitIdle({ timeout: 8, quiet: 2 }); }
+    }
+    await bot.walkTo(DR.dungeonLadder.x, DR.dungeonLadder.y + 6400, { tol: 2, timeout: 240, direct: true });
+    const up = (await bot.state(8), bot.nearestScenery(l => /ladder/i.test(l.name) && l.ops.includes('Climb-up')));
+    if (up) { await bot.act({ type: 'scenery', x: up.x, y: up.y, id: up.id, op: 'Climb-up' }); await bot.waitIdle({ timeout: 12, cond: x => x.y < 9000 }); }
+    return enchanted >= 4;
+}
+
 // Ways to get one quest item (each returns true once the bot holds it). `n`: how many to get.
 export const GATHER = {
+    ...Object.fromEntries(Object.entries(MEATS).map(([item, [npc, at]]) => [item, (bot, n = 1) => killFor(bot, npc, item, at, n)])),
     async 'Cadava berries'(bot, n = 1) {
         await bot.travel(RJ.bushes.x, RJ.bushes.y, { tol: 3 });
         for (let i = 0; i < 12 && count(bot, 'Cadava berries') < n; i++) {
@@ -343,6 +418,37 @@ export const QUESTS = {
                 await bot.travel(FRED.x + 1, FRED.y, { tol: 2 });
                 await bot.talkTo('Fred the Farmer', { answer: FRED_ANSWERS, maxSteps: 40 });
                 await bot.state(5);
+            }
+            return stageOf(bot, this.name) >= 100;
+        }
+    },
+    druidic_ritual: {
+        name: 'Druidic Ritual',
+        items: Object.keys(MEATS),
+        async start(bot) {
+            if (stageOf(bot, this.name) > 0) return true;
+            if ((bot.s.combat ?? 3) < 25) { bot.log('quest: Druidic Ritual waits until combat 25 (the armour guarding the cauldron)'); return false; }
+            await bot.travel(DR.kaqemeex.x, DR.kaqemeex.y, { tol: 3 });
+            await bot.talkTo('Kaqemeex', { answer: DR_ANSWERS, maxSteps: 60 });
+            await bot.state(5);
+            return stageOf(bot, this.name) > 0;
+        },
+        async finish(bot) {
+            for (let i = 0; i < 8 && stageOf(bot, this.name) < 100; i++) {
+                const st = stageOf(bot, this.name);
+                if (st === 10) await toSanfew(bot);
+                else if (st === 20) {
+                    if (!bot.s.inv.some(x => /^Enchanted/.test(x.name)) || bot.s.inv.filter(x => /^Enchanted/.test(x.name)).length < 4) {
+                        for (const m of Object.keys(MEATS)) if (!count(bot, m)) await GATHER[m](bot, 1);
+                        if (!(await cauldronRun(bot))) return false;
+                    }
+                    await toSanfew(bot);
+                } else if (st === 99) {
+                    await bot.travel(DR.kaqemeex.x, DR.kaqemeex.y, { tol: 3 });
+                    await bot.talkTo('Kaqemeex', { answer: DR_ANSWERS, maxSteps: 60 });
+                    await bot.state(5);
+                } else break;
+                bot.log(`quest: Druidic Ritual stage ${st} -> ${stageOf(bot, this.name)}`);
             }
             return stageOf(bot, this.name) >= 100;
         }
