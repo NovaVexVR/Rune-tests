@@ -436,7 +436,7 @@ export class Bot {
             const shown = [6, 7, 8].map(c => ({ c, kind: KIND[Number(String(models[c] ?? '').split(':')[1])] ?? `?${c}` }));
             const odd = shown.find(x => shown.filter(y => y.kind === x.kind).length === 1) ?? shown[0];
             this.log(`random event: quiz master shows ${shown.map(x => x.kind).join(', ')}; the odd one is the ${odd.kind}`);
-            await this.act({ type: 'button', iface: 191, child: odd.c - 4 });
+            await this.act({ type: 'continue', child: odd.c - 4 }); // a dialogue box: answered with the dialogue packet (a plain button press closes it)
             await this.wait(3);
             return true;
         }

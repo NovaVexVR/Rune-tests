@@ -40,6 +40,7 @@ export const BRONZE_PIECES = [
     { name: 'Bronze sq shield', lvl: 8, bars: 2, button: 160 },
     { name: 'Bronze full helm', lvl: 7, bars: 2, button: 152 },
     { name: 'Bronze med helm', lvl: 3, bars: 1, button: 48 },
+    { name: 'Bronze arrowtips', lvl: 5, bars: 1, button: 112 }, // 10 a bar, for the fletchers' arrows (kept in stock)
     { name: 'Bronze dagger', lvl: 1, bars: 1, button: 24 }
 ];
 
@@ -193,6 +194,7 @@ export const IRON_PIECES = [
     { name: 'Iron sq shield', lvl: 23, bars: 2, button: 160 },
     { name: 'Iron full helm', lvl: 22, bars: 2, button: 152 },
     { name: 'Iron med helm', lvl: 18, bars: 1, button: 48 },
+    { name: 'Iron arrowtips', lvl: 20, bars: 1, button: 112 },
     { name: 'Iron dagger', lvl: 15, bars: 1, button: 24 }
 ];
 
@@ -696,6 +698,7 @@ export const FLETCH = {
     canRun: bot => (bot.has('Knife') || !!FREE_SPAWNS.Knife) && ['Bronze axe', 'Iron axe', 'Steel axe'].some(a => bot.has(a)) || 'need an axe (and a knife)',
     async run(bot, until) {
         if (!bot.has('Knife') && !(await pickupFree(bot, 'Knife'))) return;
+        await makeArrows(bot); // shafts + feathers + arrowtips -> arrows, when it has the parts
         // oaks once it can (Fletching 20, Woodcutting 15): oak shortbows, oak longbows from 25
         // willows once it can (Fletching 35, Woodcutting 30): willow shortbows, willow longbows from 40
         const fl0 = bot.lvl('fletching'), wc = bot.lvl('woodcutting');
@@ -1076,6 +1079,30 @@ export const HERBLORE = {
     }
 };
 TASKS.push(HERBLORE);
+
+// Arrows from parts: arrow shafts + feathers -> headless arrows; + bronze/iron arrowtips (smiths make them) -> arrows.
+// Rangers need them (the most common reason a step couldn't run), so they're goods too.
+async function makeArrows(bot) {
+    const banked = n => (bot.s.bank ?? []).filter(i => i.name === n).reduce((t, i) => t + i.count, 0);
+    const tips = ['Bronze arrowtips', 'Iron arrowtips'].find(t => bot.count(t) + banked(t) > 0);
+    if (!(bot.count('Arrow shaft') + banked('Arrow shaft') >= 15 && bot.count('Feather') + banked('Feather') >= 15) && !(tips && bot.count('Headless arrow') + banked('Headless arrow') > 0)) return;
+    if (await bot.openBank()) {
+        for (const n of ['Arrow shaft', 'Feather', 'Headless arrow', ...(tips ? [tips] : [])]) if (banked(n)) await bot.withdraw(n, 'all');
+        await bot.leaveBank();
+    }
+    for (let i = 0; i < 12; i++) {
+        const s = await bot.state(2);
+        if (bot.count('Arrow shaft') && bot.count('Feather')) await bot.act({ type: 'useitem', item: 'Feather', onItem: 'Arrow shaft' });
+        else if (tips && bot.count(tips) && bot.count('Headless arrow')) await bot.act({ type: 'useitem', item: tips, onItem: 'Headless arrow' });
+        else break;
+        await bot.wait(3);
+        if ((await bot.state(2)).dialog?.skillMenu) await bot.act({ type: 'skillmenu', index: 0 });
+        await bot.waitIdle({ timeout: 20, quiet: 3 });
+    }
+    const arrows = s => s.inv.filter(i => /^(Bronze|Iron) arrow$/.test(i.name)).reduce((t, i) => t + i.count, 0);
+    bot.log(`fletch: arrows made, ${arrows(bot.s)} in the bag`);
+    await bot.bankItems(i => /^(Bronze|Iron) arrow$|^Headless arrow$|arrowtips$/.test(i.name));
+}
 
 // ---- Merchants (roadmap 35): buy low, sell high at the Grand Exchange, guided by the notice board's going prices.
 // Collect last time's offers, bid ~80% of the going price on popular goods, list own stock at ~120%, spending at

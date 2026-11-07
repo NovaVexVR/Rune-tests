@@ -25,7 +25,7 @@ What's planned for the bot world, in priority order, plus how the built systems 
 
 ### B. A real economy
 7. *(done)* **Team stash:** the treasurer keeps shared goods (food, armour, tools) as well as coins, and hands them out to members who need them.
-8. *(done: wool to balls of wool (`spin`), cowhide to leather to leather armour (`leather`, Al Kharid), ore to bars to armour, bank notes for trading)* **Reasons to trade:** crafting chains and selling surplus, so market days have real supply and demand.
+8. *(done: wool to balls of wool (`spin`), cowhide to leather to leather armour (`leather`, Al Kharid), ore to bars to armour, bank notes for trading; arrows: smiths make bronze/iron arrowtips, fletchers turn shafts + feathers + tips into arrows for the rangers (verified: 20 arrows))* **Reasons to trade:** crafting chains and selling surplus, so market days have real supply and demand.
 9. *(done and verified: iron; steel (coal at Barbarian Village from Mining 40, steel bars from Smithing 30, steel armour); fighters buy armour at Horvik's with 30% of their savings)* **Iron and steel.**
 10. *(done: oak bows (willow bows and Lumbridge willows written, not yet tested in-game), fly fishing (rod from Port Sarim, feathers from chickens), leather crafting; agility blocked: the Gnome course is too far for the route planner (its box tops out at 700x700 tiles) and its gates are untested)* **More training methods.**
 11. *(done: the castle range after Cook's Assistant, Runecrafting after Rune Mysteries (essence via Aubury, air runes at the air altar; verified: 63 runes in 3 trips), prayer from buried bones)* **Use what quests unlock.**
