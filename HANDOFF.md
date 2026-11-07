@@ -63,6 +63,8 @@ Last session's container had everything under `/home/user`; a new one starts emp
 
 **Team stash (new):** a teammate can be given an item out of another teammate's bank (above all the treasurer's), and a seller fetches goods from its bank before a trade; members give spare goods to their treasurer about once an hour (capped by its free bag space), who banks them; fighters/thieves with no food carried or banked need Shrimps, which the stash supplies. `test_stash.mjs`: both checks pass.
 
+**New production (B8/B9):** `spin` (shear Fred's sheep, spin balls of wool, bank them; verified 47 balls, Crafting 1 -> 4). `mine_iron` (Mining 20 and combat 10: a level-6 Mugger roams the Varrock south-west mine; banks at Varrock West; verified 15 ore). `smelt` smelts banked iron first at Smithing 15 (button 24; verified 9 bars from 15 ore). `smith` uses iron bars at Smithing 15 (IRON_PIECES: dagger 15 ... platebody 33). `openBank()` now goes to the nearest bank (Lumbridge or Varrock West; banks are one shared account). Before any task, a bot that has the task's tool banked but not carried fetches it.
+
 **Fleet parties:** with the runner left alone, guildbot4+5 and guildbot1+2 each completed Cook's Assistant as parties on their own (17:00, 17:04).
 
 **Fixed (17:xx):** thieving bots kept dying to farmers (a failed pickpocket hits back) with no food; they now eat at half health or rest until healed.

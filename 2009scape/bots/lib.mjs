@@ -896,6 +896,23 @@ export class Bot {
 
     // ---- bank: Lumbridge castle top floor (safe for low levels) ----
     async openBank() {
+        // the nearest bank: Lumbridge castle's top floor, or Varrock West (next to the anvils and the iron mine)
+        const s0 = await this.state(1);
+        const varrock = { x: 3185, y: 3440 };
+        if (s0.z === 0 && s0.y < 6000 && dist(s0, varrock) < dist(s0, { x: 3208, y: 3220 })) {
+            await this.travel(varrock.x, varrock.y, { tol: 3 });
+            for (let i = 0; i < 4; i++) {
+                const s = await this.state(8);
+                if (s.iface === 762) return true;
+                const booth = this.nearestScenery(l => /bank booth/i.test(l.name) && l.ops.some(o => /bank|use/i.test(o)));
+                const op = booth?.ops.find(o => /^use-quickly$/i.test(o)) ?? booth?.ops.find(o => /^bank$/i.test(o)) ?? booth?.ops.find(o => /use/i.test(o));
+                if (!booth) { await this.walkTo(varrock.x, varrock.y, { tol: 1, direct: true }); continue; }
+                await this.act({ type: 'scenery', x: booth.x, y: booth.y, id: booth.id, op });
+                await this.waitIdle({ timeout: 15, cond: st => st.iface === 762 });
+                await this.handleInterrupts();
+            }
+            return this.s.iface === 762;
+        }
         if (!(await this.lumbridgeFloor(2))) return false;
         await this.walkTo(3208, 3220, { tol: 2 });
         for (let i = 0; i < 4; i++) {

@@ -155,7 +155,7 @@ const SHEARS = [{ x: 3192, y: 3272 }, { x: 3152, y: 3306 }];
 const WHEEL = { x: 3209, y: 3212 };
 const FRED_ANSWERS = /yes okay|of course|something of an expert|i have some/i;
 
-async function getShears(bot) {
+export async function getShears(bot) {
     for (const spot of SHEARS) {
         if (count(bot, 'Shears')) return true;
         await bot.travel(spot.x, spot.y, { tol: 2 });
@@ -171,7 +171,7 @@ async function getShears(bot) {
     return count(bot, 'Shears') > 0;
 }
 
-async function shear(bot, n) {
+export async function shear(bot, n) {
     if (count(bot, 'Wool') >= n) return count(bot, 'Wool');
     await bot.travel(PEN.x, PEN.y, { tol: 4 });
     for (let tries = 0; tries < n * 4 && count(bot, 'Wool') < n && bot.s.invFree > 0; tries++) {
@@ -186,7 +186,7 @@ async function shear(bot, n) {
     return count(bot, 'Wool');
 }
 
-async function spin(bot) {
+export async function spin(bot) {
     await bot.travel(3206, 3210, { tol: 3 });
     await bot.lumbridgeFloor(1);
     await bot.walkTo(WHEEL.x + 1, WHEEL.y + 1, { tol: 2, direct: true });

@@ -24,7 +24,7 @@
   ],
   "loop": true,
   "paused": false,
-  "step": 1,
+  "step": 2,
   "personality": {
     "archetype": "miser",
     "greed": 0.91,

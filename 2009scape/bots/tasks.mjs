@@ -1,7 +1,8 @@
 // Skill-training tasks shared by scripted bots and Claude-directed bots (2009Scape).
 // Each task: { id, skills, canRun(bot) -> true | reason, run(bot, untilMs) }
 import { dist, rand, sleep, FOOD, gearInfo } from './lib.mjs';
-import { faction } from './market.mjs';
+import { faction, TASK_NEEDS } from './market.mjs';
+import { getShears, shear, spin } from './quests.mjs';
 
 export const PLACES = {
     lumbridge: { x: 3222, y: 3219 },
@@ -18,6 +19,7 @@ export const PLACES = {
     swampMine: { x: 3229, y: 3148 },
     furnace: { x: 3226, y: 3254 },
     varrockAnvils: { x: 3187, y: 3423, anvil: { x: 3188, y: 3424 } },
+    varrockIron: { x: 3178, y: 3369 }, // Varrock south-west mine: iron rocks (11954-11956), west of the dark wizards
     farmers: { x: 3228, y: 3293 }
 };
 
@@ -78,6 +80,14 @@ export async function clearOut(bot) {
 // Before any task: wear the best gear carried (no melee weapon swap for ranged/magic), and fighters
 // and thieves carry some food from the bank.
 export async function prepare(bot, taskId) {
+    // the task's tools: if one is banked but not carried, fetch it
+    const missing = (TASK_NEEDS[taskId] ?? []).filter(g => !g.some(n => bot.s.inv.some(i => i.name === n) || bot.s.worn.some(i => i.name === n)))
+        .map(g => g.find(n => bot.s.bank?.some(i => i.name === n))).filter(Boolean);
+    if (missing.length && (await bot.openBank().catch(() => false))) {
+        for (const t of missing) await bot.withdraw(t, 1).catch(() => {});
+        await bot.leaveBank();
+        bot.log(`tools: took ${missing.join(', ')} out of the bank`);
+    }
     await bot.gearUp({ weapon: !['ranged', 'magic'].includes(taskId) }).catch(() => {});
     if (['melee', 'ranged', 'magic', 'thieving'].includes(taskId)) {
         const food = await bot.ensureFood(4).catch(() => 0);
@@ -109,6 +119,17 @@ export async function catchFood(bot, n = 6) {
     bot.log(`food: caught and cooked, carrying ${cooked()}`);
     return cooked() > 0;
 }
+
+export const IRON_PIECES = [
+    { name: 'Iron platebody', lvl: 33, bars: 5, button: 248 },
+    { name: 'Iron platelegs', lvl: 31, bars: 3, button: 240 },
+    { name: 'Iron kiteshield', lvl: 27, bars: 3, button: 208 },
+    { name: 'Iron chainbody', lvl: 26, bars: 3, button: 200 },
+    { name: 'Iron sq shield', lvl: 23, bars: 2, button: 160 },
+    { name: 'Iron full helm', lvl: 22, bars: 2, button: 152 },
+    { name: 'Iron med helm', lvl: 18, bars: 1, button: 48 },
+    { name: 'Iron dagger', lvl: 15, bars: 1, button: 24 }
+];
 
 export const SHOPS = {
     bob: { x: 3229, y: 3203, npcs: ['Bob'], sells: { 'Bronze axe': 16, 'Bronze pickaxe': 1, 'Iron axe': 56, 'Steel axe': 200 } },
@@ -330,9 +351,27 @@ export const TASKS = [
         async run(bot, until) {
             const COPPER = [11936, 11937, 11938], TIN = [11933, 11934, 11935]; // the rocks' ore shows in their colour
             const n = name => bot.s.inv.filter(i => i.name === name).reduce((t, i) => t + i.count, 0);
-            // ore already in the bank comes first
             await bot.state(5);
             const bankOre = x => bot.s.bank?.find(i => i.name === x)?.count ?? 0;
+            // iron ore in the bank and Smithing 15: smelt iron bars first (iron fails about half the time, as in the game)
+            if (bot.lvl('smithing') >= 15 && bankOre('Iron ore') >= 3 && (await bot.openBank())) {
+                await bot.depositAll(i => !KEEP(i.name));
+                await bot.withdraw('Iron ore', 'all');
+                await bot.leaveBank();
+                await bot.walkTo(PLACES.furnace.x, PLACES.furnace.y, { tol: 2 });
+                for (let i = 0; i < 40 && n('Iron ore') > 0 && now() < until; i++) {
+                    const st = await bot.state(6);
+                    if (st.iface === 311 || st.chatbox === 311) { await bot.act({ type: 'button', iface: 311, child: 24 }); await bot.wait(5); continue; } // iron, make 1
+                    const f = bot.nearestScenery(l => l.name === 'Furnace' && l.ops.includes('Smelt'));
+                    if (!f) break;
+                    await bot.act({ type: 'scenery', x: f.x, y: f.y, id: f.id, op: 'Smelt' });
+                    await bot.waitIdle({ timeout: 10, cond: x => x.iface === 311 || x.chatbox === 311 });
+                }
+                await bot.closeInterfaces();
+                bot.log(`smelted: ${n('Iron bar')} iron bars`);
+                await bot.bankItems(i => /^Iron (bar|ore)$/.test(i.name));
+            }
+            // bronze: ore already in the bank comes first
             if (Math.min(bankOre('Copper ore'), bankOre('Tin ore')) >= 3 && (await bot.openBank())) {
                 await bot.depositAll(i => /^Bronze bar$|ore$/.test(i.name));
                 await bot.withdraw('Copper ore', 10);
@@ -379,18 +418,22 @@ export const TASKS = [
         // take bronze bars from the bank to the Varrock west anvils, smith daggers, bring them home to the bank
         id: 'smith',
         skills: ['smithing'],
-        canRun: bot => !bot.has('Hammer') ? 'need a hammer' : (bot.has('Bronze bar') || bot.s.bank?.some(i => i.name === 'Bronze bar') ? true : 'need bronze bars'),
+        canRun: bot => !bot.has('Hammer') ? 'need a hammer' : (['Bronze bar', 'Iron bar'].some(b => bot.has(b) || bot.s.bank?.some(i => i.name === b)) ? true : 'need bars'),
         async run(bot, until) {
             const n = name => bot.s.inv.filter(i => i.name === name).reduce((t, i) => t + i.count, 0);
+            // iron once it can (Smithing 15) and has iron bars, else bronze
+            const hasBars = b => n(b) > 0 || bot.s.bank?.some(i => i.name === b);
+            const BAR = bot.lvl('smithing') >= 15 && hasBars('Iron bar') ? 'Iron bar' : 'Bronze bar';
+            const PIECES = BAR === 'Iron bar' ? IRON_PIECES : BRONZE_PIECES;
             while (now() < until) {
                 await bot.state(10);
-                if (!n('Bronze bar')) {
+                if (!n(BAR)) {
                     if (!(await bot.openBank())) return;
                     await bot.depositAll(i => !KEEP(i.name));
-                    if (!bot.s.bank?.some(i => i.name === 'Bronze bar')) { await bot.leaveBank(); return; }
-                    await bot.withdraw('Bronze bar', 26);
+                    if (!bot.s.bank?.some(i => i.name === BAR)) { await bot.leaveBank(); return; }
+                    await bot.withdraw(BAR, 'all');
                     await bot.leaveBank();
-                    if (!n('Bronze bar')) return;
+                    if (!n(BAR)) return;
                 }
                 const A = PLACES.varrockAnvils;
                 if (!(await bot.travel(A.x, A.y, { tol: 2 }))) return;
@@ -398,19 +441,63 @@ export const TASKS = [
                 // the rest go to the bank as goods for fighters), else daggers for the practice
                 const owned = name => bot.has(name) || bot.s.bank?.some(i => i.name === name);
                 const lvl = bot.lvl('smithing');
-                const pick = () => BRONZE_PIECES.find(p => lvl >= p.lvl && n('Bronze bar') >= p.bars && (!owned(p.name) || p.name === 'Bronze dagger')) ?? BRONZE_PIECES.at(-1);
-                for (let i = 0; i < 60 && n('Bronze bar') && now() < until + 5 * 60_000; i++) {
+                const pick = () => PIECES.find(p => lvl >= p.lvl && n(BAR) >= p.bars && (!owned(p.name) || p.name === PIECES.at(-1).name)) ?? PIECES.at(-1);
+                for (let i = 0; i < 60 && n(BAR) && now() < until + 5 * 60_000; i++) {
                     const st = await bot.state(6);
                     if (await bot.handleInterrupts()) continue;
                     if (st.iface === 300) { const p = pick(); await bot.act({ type: 'button', iface: 300, child: p.button }); await bot.wait(4 + 2 * p.bars); await bot.gearUp(); continue; } // make 1
-                    const bar = st.inv.find(x => x.name === 'Bronze bar');
+                    const bar = st.inv.find(x => x.name === BAR);
                     if (!bar) break; // all smithed
                     await bot.act({ type: 'useitem', slot: bar.slot, x: A.anvil.x, y: A.anvil.y }).catch(e => bot.log(`smith: ${e.message}`));
                     await bot.waitIdle({ timeout: 10, cond: x => x.iface === 300 });
                 }
                 await bot.closeInterfaces();
-                bot.log(`smithed: ${bot.s.inv.filter(i => /^Bronze (?!bar)/.test(i.name)).map(i => i.name).join(', ')}; heading home to bank them`);
+                bot.log(`smithed: ${bot.s.inv.filter(i => /^(Bronze|Iron) (?!bar)/.test(i.name)).map(i => i.name).join(', ')}; banking them`);
                 if (await bot.openBank()) { await bot.depositAll(i => !KEEP(i.name)); await bot.leaveBank(); }
+            }
+        }
+    },
+    {
+        // iron at the Varrock south-west mine (Mining 20), banked at Varrock West next door
+        id: 'mine_iron',
+        skills: ['mining'],
+        // at Mining 15 a bronze pickaxe hardly ever gets iron; and a Mugger (level 6) roams this mine
+        canRun: bot => !['Bronze pickaxe', 'Iron pickaxe', 'Steel pickaxe'].some(a => bot.has(a)) ? 'need a pickaxe' : bot.lvl('mining') < 20 ? 'need Mining 20' : (bot.s.combat ?? 3) >= 10 || 'need combat 10 (muggers)',
+        async run(bot, until) {
+            const IRON = [11954, 11955, 11956];
+            const M = PLACES.varrockIron;
+            if (!(await bot.travel(M.x, M.y, { tol: 4 }))) return;
+            while (now() < until) {
+                const s = await bot.state(12);
+                if (await bot.handleInterrupts()) continue;
+                if (s.invFree <= 1) {
+                    if (!(await bot.bankItems(i => /ore$|^Uncut/.test(i.name)))) { await bot.wait(10); continue; }
+                    await bot.travel(M.x, M.y, { tol: 4 });
+                    continue;
+                }
+                const rock = bot.nearestScenery(l => l.ops.includes('Mine') && IRON.includes(l.id));
+                if (!rock) { await bot.wait(4); continue; } // mined out: wait for the respawn
+                await gatherOnce(bot, rock, 'Mine', 'scenery', 30);
+            }
+            await bot.bankItems(i => /ore$|^Uncut/.test(i.name)); // end of the shift: bank it, don't walk home loaded
+        }
+    },
+    {
+        // shear Fred's sheep, spin the wool on the castle wheel, bank the balls of wool (a good others want:
+        // 20 of them finish Sheep Shearer)
+        id: 'spin',
+        skills: ['crafting'],
+        canRun: () => true,
+        async run(bot, until) {
+            if (!(await getShears(bot))) { bot.log('spin: no shears to be found'); return; }
+            while (now() < until) {
+                await bot.state(5);
+                if (bot.s.invFree < 6) await bot.bankItems(i => !KEEP(i.name)); // room for wool
+                await shear(bot, Math.min(20, bot.s.invFree - 1));
+                await spin(bot);
+                const balls = bot.s.inv.filter(i => i.name === 'Ball of wool').length;
+                bot.log(`spin: ${balls} balls of wool, banking them`);
+                await bot.bankItems(i => i.name === 'Ball of wool' || i.name === 'Wool');
             }
         }
     },
