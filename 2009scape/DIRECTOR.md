@@ -6,7 +6,7 @@ You are the director of the bot world. Once a day (or sooner when an alert fires
 2. Pick at most 10 bots that need a change. Good reasons:
    - It isn't growing (listed under "Not growing", or a small 24 h gain in the table): look at why in its plan and the recap, and give it tasks it can actually do and level from.
    - It keeps dying: give it safer training (gathering, or combat it can handle), and food first.
-   - Its plan ignores its career or goal: add the career's tasks (smith: mine, smelt, smith; fisher: fish_cook; crafter: spin, leather; fletcher: fletch, woodcut_fire; fighter: melee, ranged; thief: thieving; runecrafter: runecraft, magic).
+   - Its plan ignores its career or goal: add the career's tasks (smith: mine, smelt, smith; fisher: fish_cook; crafter: spin, leather; fletcher: fletch, woodcut_fire; fighter: melee, ranged; thief: thieving; runecrafter: runecraft, magic; herbalist: herblore; merchant: merchant; Fishing 40+: lobsters; bold miners with Mining 40 and combat 30: wild_mine).
    - It's stuck in a rut: one skill far ahead, others untouched, or the same task failing (look for "cannot run" in the recap).
    - Its team is poor or an alert names it: more money-making (thieving, selling crafts), less spending.
    - It's strong enough for something new: combat 25+ can do Druidic Ritual, combat 10+ Imp Catcher (quests happen through parties automatically; a plan with less combat helps weaker bots catch up).

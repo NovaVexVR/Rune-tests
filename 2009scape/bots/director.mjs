@@ -16,7 +16,7 @@ const DIR = path.join(HERE, 'director');
 const STATE = path.join(HERE, 'market', 'director.json');
 const API = process.env.BOT_API ?? 'http://127.0.0.1:8899';
 const EVERY_HOURS = Number(process.env.DIRECTOR_EVERY_HOURS ?? 24);
-const TASKS = ['woodcut_fire', 'fish_cook', 'mine', 'smelt', 'smith', 'mine_iron', 'spin', 'melee', 'ranged', 'magic', 'thieving', 'fletch', 'leather', 'runecraft', 'treasury', 'resupply'];
+const TASKS = ['woodcut_fire', 'fish_cook', 'mine', 'smelt', 'smith', 'mine_iron', 'spin', 'melee', 'ranged', 'magic', 'thieving', 'fletch', 'leather', 'runecraft', 'herblore', 'merchant', 'lobsters', 'wild_mine', 'treasury', 'resupply'];
 const read = (f, d) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return d; } };
 const state = () => read(STATE, { lastPass: 0, alerts: [] });
 const saveState = s => { fs.mkdirSync(path.dirname(STATE), { recursive: true }); fs.writeFileSync(STATE, JSON.stringify(s, null, 1)); };
