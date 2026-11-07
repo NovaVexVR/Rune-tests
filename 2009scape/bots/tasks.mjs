@@ -43,7 +43,7 @@ export const BRONZE_PIECES = [
 ];
 
 // what a bot keeps on it when it banks: its tools and some food
-const KEEP = name => /pickaxe$|(^| )axe$|^Hammer$|^Tinderbox$|^Small fishing net$|^Knife$|^Chisel$|^Shears$|^Fly fishing rod$|^Feather$|^Needle$|^Thread$|^Air talisman$|^(Red|Yellow|Black|White) bead$|^Enchanted (beef|rat meat|bear meat|chicken)$|^Cadava (berries|potion)$|^Coins$/.test(name) || FOOD.includes(name);
+const KEEP = name => /pickaxe$|(^| )axe$|^Hammer$|^Tinderbox$|^Small fishing net$|^Knife$|^Chisel$|^Shears$|^Fly fishing rod$|^Lobster pot$|^Feather$|^Needle$|^Thread$|^Air talisman$|^(Red|Yellow|Black|White) bead$|^Enchanted (beef|rat meat|bear meat|chicken)$|^Cadava (berries|potion)$|^Coins$/.test(name) || FOOD.includes(name);
 
 // ---- bank clear-outs ----
 // Bots bank everything. Goods normally leave the bank through trades and market days (marketday.mjs takes surplus
@@ -210,7 +210,7 @@ export const SHOPS = {
     bob: { x: 3229, y: 3203, npcs: ['Bob'], sells: { 'Bronze axe': 16, 'Bronze pickaxe': 1, 'Iron axe': 56, 'Steel axe': 200 } },
     general: { x: 3216, y: 3241, npcs: ['Shopkeeper', 'Shop assistant'], sells: { Tinderbox: 1, Hammer: 1, Chisel: 1, Bucket: 2, 'Empty pot': 1 } },
     // Port Sarim fishing shop (shops.json "Gerrant's Fishy Business"): rods and feathers for fly fishing
-    gerrant: { x: 3013, y: 3224, npcs: ['Gerrant'], sells: { 'Fly fishing rod': 5, Feather: 6, 'Small fishing net': 5 } }
+    gerrant: { x: 3013, y: 3224, npcs: ['Gerrant'], sells: { 'Fly fishing rod': 5, Feather: 6, 'Small fishing net': 5, 'Lobster pot': 20 } }
     // runes are only sold in Varrock: bots trade for those
 };
 // Free respawning ground items near Lumbridge (wiki guides; coordinates from the server's ground spawns)
@@ -728,7 +728,7 @@ export const FLETCH = {
     }
 };
 
-async function fightLoop(bot, until, area, names, { pickup = [], stopIf = null } = {}) {
+export async function fightLoop(bot, until, area, names, { pickup = [], stopIf = null } = {}) {
     const feared = fearOf(bot.name); // a phobia (killed by one recently): leave those alone
     if (feared && names.includes(feared)) { names = names.filter(n => n !== feared); bot.log(`not fighting ${feared}s (still shaken)`); if (!names.length) return; }
     await bot.walkTo(area.x, area.y, { tol: 6 });
@@ -1113,3 +1113,60 @@ export const MERCHANT = {
 };
 const TRADE_OK = item => !/^(Coins|Bones)$/.test(item);
 TASKS.push(MERCHANT);
+
+// ---- Karamja trips (roadmap 34): Fishing 40+, a lobster pot (Gerrant's, 20gp) and 60 coins for the two fares.
+// Port Sarim (a seaman, 30gp) -> Musa Point -> the lobster spots (Cage) until the bag is full -> the customs officer
+// (30gp, a search for rum) -> Port Sarim -> bank the raw lobsters (cooked later by fish_cook's cookAll, or traded).
+const SARIM_DOCK = { x: 3028, y: 3219 }, MUSA_DOCK = { x: 2954, y: 3148 }, LOBSTERS = { x: 2924, y: 3179 };
+const BOAT_ANSWERS = /^yes, please\.?$|can i journey on this ship|search away|^ok\.?$/i;
+const onKaramja = s => s.x < 2990 && s.y < 3200 && s.x > 2750;
+async function sail(bot, toKaramja) {
+    const at = toKaramja ? SARIM_DOCK : MUSA_DOCK, who = toKaramja ? /^Seaman (Lorris|Thresnor)$|^Captain Tobias$/ : /^Customs officer$/;
+    await bot.travel(at.x, at.y, { tol: 3 });
+    for (let i = 0; i < 3 && onKaramja(await bot.state(8)) !== toKaramja; i++) {
+        const npc = bot.nearestNpc(n => who.test(n.name) && n.ops.some(o => /talk/i.test(o)));
+        if (!npc) { await bot.walkTo(at.x, at.y, { tol: 1 }); continue; }
+        await bot.talkTo(npc.name, { answer: BOAT_ANSWERS, maxSteps: 40 });
+        await bot.waitIdle({ timeout: 30, quiet: 4, cond: s => onKaramja(s) === toKaramja });
+        // the crossing is a short cutscene: wait it out, then step off the gangplank
+        for (let k = 0; k < 10 && (await bot.state(6)).locked; k++) await bot.wait(3);
+        const plank = bot.nearestScenery(l => /gangplank/i.test(l.name) && l.ops.some(o => /cross/i.test(o)));
+        if (plank) { await bot.act({ type: 'scenery', x: plank.x, y: plank.y, id: plank.id, op: plank.ops.find(o => /cross/i.test(o)) }); await bot.waitIdle({ timeout: 10 }); }
+    }
+    return onKaramja(bot.s) === toKaramja;
+}
+export const LOBSTER = {
+    id: 'lobsters',
+    skills: ['fishing', 'cooking'],
+    canRun: bot => {
+        if (bot.lvl('fishing') < 40) return 'needs Fishing 40';
+        const coins = bot.s.coins + ((bot.s.bank ?? []).find(i => i.name === 'Coins')?.count ?? 0);
+        if (!bot.has('Lobster pot') && !bot.s.bank?.some(i => i.name === 'Lobster pot') && coins < 80) return 'needs a lobster pot (20gp) and 60gp for fares';
+        return coins >= 60 || 'needs 60gp for the boat fares';
+    },
+    async run(bot, until) {
+        if (await bot.openBank()) {
+            await bot.depositAll(i => !KEEP(i.name) && i.name !== 'Lobster pot');
+            if (!bot.has('Lobster pot') && bot.s.bank?.some(i => i.name === 'Lobster pot')) await bot.withdraw('Lobster pot', 1);
+            if (bot.s.coins < 80) await bot.withdrawN('Coins', 80 - bot.s.coins);
+            await bot.leaveBank();
+        }
+        if (!bot.has('Lobster pot')) {
+            if (await bot.openShop(SHOPS.gerrant)) { await bot.buy('Lobster pot', 1); await bot.closeInterfaces(); }
+            if (!bot.has('Lobster pot')) { bot.log('lobsters: no lobster pot'); return; }
+        }
+        if (!(await sail(bot, true))) { bot.log('lobsters: could not get a boat to Karamja'); return; }
+        bot.log('lobsters: on Karamja');
+        await bot.walkTo(LOBSTERS.x, LOBSTERS.y, { tol: 4 });
+        while (now() < until && (await bot.state(12)).invFree > 0) {
+            if (await bot.handleInterrupts()) continue;
+            const fs = bot.nearestNpc(n => n.name === 'Fishing spot' && n.ops.includes('Cage'));
+            if (!fs) { await bot.walkTo(LOBSTERS.x + rand(-3, 3), LOBSTERS.y + rand(-3, 3), { tol: 2 }); continue; }
+            await gatherOnce(bot, fs, 'Cage', 'npc', 60);
+        }
+        bot.log(`lobsters: caught ${bot.count('Raw lobster')}`);
+        if (!(await sail(bot, false))) { bot.log('lobsters: stuck on Karamja (no fare?)'); return; }
+        await bot.bankItems(i => /^Raw (lobster|tuna|swordfish)$/.test(i.name));
+    }
+};
+TASKS.push(LOBSTER);
