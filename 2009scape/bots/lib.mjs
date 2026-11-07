@@ -577,8 +577,19 @@ export class Bot {
             await this.wait(1);
             return true;
         }
-        // Something we didn't pick a fight with is hurting us: run toward Lumbridge
-        if (s.inCombat && !s.attacking && s.hp < s.maxHp * 0.7 && !this._fleeing && !this.dueling) {
+        // Something we didn't pick a fight with is hurting us. Fight back if it's much weaker than us, if we're
+        // underground (running blind down there gets you cornered), or if the task said to stand our ground;
+        // else run toward Lumbridge. Eat first if it's getting low.
+        const attacker = s.inCombat && !s.attacking ? (s.npcs ?? []).find(n => String(n.target ?? '').toLowerCase() === this.name.toLowerCase() && (n.ops ?? []).includes('Attack')) : null;
+        if (attacker && !this.dueling && (s.y > 6000 || this.standGround || (attacker.level ?? 99) * 1.5 < (s.combat ?? 3))) {
+            const food = s.inv.find(i => FOOD.includes(i.name) && i.ops.includes('Eat'));
+            if (s.hp <= s.maxHp * 0.4 && food) { await this.act({ type: 'item', slot: food.slot, op: 'Eat' }); await this.wait(2); return true; }
+            this.log(`fighting back: ${attacker.name} (level ${attacker.level}) at ${s.x},${s.y}`);
+            await this.act({ type: 'npc', npc: attacker.npc, op: 'Attack' });
+            await this.wait(3);
+            return true;
+        }
+        if (s.inCombat && !s.attacking && s.hp < s.maxHp * 0.7 && !this._fleeing && !this.dueling && s.y < 6000) {
             this._fleeing = true;
             this.log(`under attack at ${s.x},${s.y} (hp ${s.hp}), fleeing`);
             const dx = Math.sign(3222 - s.x) * 14, dy = Math.sign(3218 - s.y) * 14;

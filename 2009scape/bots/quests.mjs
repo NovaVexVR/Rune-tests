@@ -173,6 +173,10 @@ async function toSanfew(bot) {
     return true;
 }
 async function cauldronRun(bot) {
+    bot.standGround = true; // skeletons and spiders on the way: fight them, don't run deeper in
+    try { return await cauldronRunInner(bot); } finally { bot.standGround = false; }
+}
+async function cauldronRunInner(bot) {
     // down the ladder, north to the gate, deal with the armour, dip the meats, come back up
     await bot.travel(DR.dungeonLadder.x, DR.dungeonLadder.y, { tol: 2 });
     await bot.state(8);
