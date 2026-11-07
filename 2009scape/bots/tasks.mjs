@@ -584,27 +584,31 @@ export const FLETCH = {
     canRun: bot => (bot.has('Knife') || !!FREE_SPAWNS.Knife) && ['Bronze axe', 'Iron axe', 'Steel axe'].some(a => bot.has(a)) || 'need an axe (and a knife)',
     async run(bot, until) {
         if (!bot.has('Knife') && !(await pickupFree(bot, 'Knife'))) return;
-        await bot.walkTo(PLACES.lumbridgeTrees.x, PLACES.lumbridgeTrees.y, { tol: 6 });
+        // oaks once it can (Fletching 20, Woodcutting 15): oak shortbows, oak longbows from 25
+        const oak = bot.lvl('fletching') >= 20 && bot.lvl('woodcutting') >= 15;
+        const LOG = oak ? 'Oak logs' : 'Logs', TREE = oak ? 'Oak' : 'Tree', AT = oak ? PLACES.lumbridgeOaks : PLACES.lumbridgeTrees;
+        await bot.walkTo(AT.x, AT.y, { tol: 6 });
         while (now() < until) {
             const s = await bot.state(14);
             if (await bot.handleInterrupts()) continue;
-            const logs = s.inv.filter(i => i.name === 'Logs');
+            const logs = s.inv.filter(i => i.name === LOG);
             if (s.invFree === 0 || (logs.length >= 10)) {
-                // fletching guide: arrow shafts to 10, then shortbows (u) / longbows (u)
+                // fletching guide: arrow shafts to 10, then shortbows (u) / longbows (u); oak: shortbows, longbows from 25
                 const fl = bot.lvl('fletching');
-                const option = fl >= 10 ? 2 : fl >= 5 ? 1 : 0; // menu order for normal logs: shafts, shortbow, longbow
-                await bot.act({ type: 'useitem', item: 'Knife', onItem: 'Logs' });
+                const want = oak ? (fl >= 25 ? /oak longbow/i : /oak shortbow/i) : (fl >= 10 ? /longbow/i : fl >= 5 ? /shortbow/i : /shaft/i);
+                await bot.act({ type: 'useitem', item: 'Knife', onItem: LOG });
                 await bot.wait(2);
                 await bot.state(3);
-                if (bot.s.dialog?.skillMenu) await bot.act({ type: 'skillmenu', index: Math.min(option, bot.s.dialog.skillMenu.length - 1) });
+                const menu = bot.s.dialog?.skillMenu;
+                if (menu) await bot.act({ type: 'skillmenu', index: Math.max(0, menu.findIndex(n => want.test(n))) });
                 await bot.waitIdle({ timeout: 90, quiet: 4 });
                 await bot.state();
                 // unstrung bows and spare logs are goods: bank them (arrow shafts stack, so they stay in the bag)
-                if (bot.s.invFree <= 4) await bot.bankItems(i => /^(Logs|Oak logs|Shortbow \(u\)|Longbow \(u\))$/.test(i.name));
+                if (bot.s.invFree <= 4) await bot.bankItems(i => /^(Logs|Oak logs|(Oak )?[Ss]hortbow \(u\)|(Oak )?[Ll]ongbow \(u\))$/.test(i.name));
                 continue;
             }
-            const tree = bot.nearestScenery(l => l.name === 'Tree' && l.ops.includes('Chop down'));
-            if (!tree) { await bot.walkTo(PLACES.lumbridgeTrees.x + rand(-6, 6), PLACES.lumbridgeTrees.y + rand(-6, 6), { tol: 3 }); continue; }
+            const tree = bot.nearestScenery(l => l.name === TREE && l.ops.includes('Chop down'));
+            if (!tree) { await bot.walkTo(AT.x + rand(-6, 6), AT.y + rand(-6, 6), { tol: 3 }); continue; }
             await gatherOnce(bot, tree, 'Chop down', 'scenery', 45);
         }
     }
