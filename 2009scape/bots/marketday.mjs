@@ -186,7 +186,7 @@ export class MarketDay {
             if (counter > sh.ask) { this.log(`[marketday] ${seller} won't go near ${open}gp for ${sh.item}`); await sb.act({ type: 'say', text: `No chance, ${buyer}.` }).catch(() => {}); continue; }
             await sb.act({ type: 'say', text: counter === open ? `Deal, ${buyer}.` : `${counter}gp and it's yours.` }).catch(() => {});
             if (counter > max || counter * 1 > m.coins(buyer)) {
-                this.log(`[marketday] ${buyer} walks away from ${seller}'s ${counter}gp for ${sh.item} (would pay ${max.toFixed(1)})`);
+                this.log(counter > max ? `[marketday] ${buyer} walks away from ${seller}'s ${counter}gp for ${sh.item} (would pay ${max.toFixed(1)})` : `[marketday] ${buyer} can't afford ${seller}'s ${counter}gp for ${sh.item} (has ${m.coins(buyer)}gp)`);
                 await bot.act({ type: 'say', text: `Too rich for me.` });
                 continue;
             }

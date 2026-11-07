@@ -27,7 +27,8 @@ What's planned for the bot world, in priority order, plus how the built systems 
 7. *(done)* **Team stash:** the treasurer keeps shared goods (food, armour, tools) as well as coins, and hands them out to members who need them.
 8. *(started: `spin` makes balls of wool; iron goods below)* **Reasons to trade:** crafting chains (wool to balls of wool, cowhide to leather to leather armour, ore to bars to armour) and selling surplus to shops, so market days have real supply and demand. The first live market day had none: everyone wanted a knife and nobody had one.
 9. *(iron done: `mine_iron`, iron smelting and smithing; steel and the Varrock armour shops still to do)* **Iron and steel:** iron mining and smelting (iron ore fails half the time), steel bars with coal, iron and steel armour; buying armour at the Varrock shops.
-10. **More training methods** from the guides: fly fishing, leather crafting, oak/willow bows, agility.
+10. **More training methods** from the guides: fly fishing, leather crafting, willow bows, agility. *(Started: oak shortbows/longbows at Fletching 20, Woodcutting 15.)*
+    - Trading uses bank notes for multiples (one bag slot per stack): trades, market-day goods, clear-outs. Done.
 11. **Use what quests unlock:** the Lumbridge range after Cook's Assistant (fewer burnt fish), Runecrafting after Rune Mysteries (essence via Aubury, air runes for magic training), prayer from buried bones.
 
 ### Milestone: reset to level 1 and start the real run
