@@ -202,9 +202,12 @@ async function cauldronRunInner(bot) {
     await bot.walkTo(DR.cauldron.x - 1, DR.cauldron.y, { tol: 1, timeout: 30, direct: true });
     for (const meat of Object.keys(MEATS)) {
         const c = (await bot.state(8), bot.nearestScenery(l => /cauldron/i.test(l.name)));
-        if (!c || !count(bot, meat)) continue;
-        await bot.act({ type: 'useitem', item: meat, x: c.x, y: c.y, id: c.id });
+        if (!c) { bot.log(`quest: no cauldron in view at ${bot.s.x},${bot.s.y} (${bot.s.scenery.slice(0, 8).map(l => `${l.name}@${l.x},${l.y}`).join('; ')})`); break; }
+        if (!count(bot, meat)) continue;
+        const m0 = bot.msgs.length;
+        const r = await bot.act({ type: 'useitem', item: meat, x: c.x, y: c.y, id: c.id }).catch(e => `error ${e.message}`);
         await bot.waitIdle({ timeout: 8, quiet: 2 });
+        bot.log(`quest: ${meat} on the ${c.name} (${c.x},${c.y}): ${r} ${bot.msgs.slice(m0).join(' | ')}`);
     }
     const enchanted = (await bot.state(3)).inv.filter(i => /^Enchanted/.test(i.name)).length;
     bot.log(`quest: ${enchanted} enchanted meats`);
