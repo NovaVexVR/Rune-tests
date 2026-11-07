@@ -65,6 +65,17 @@ async function brief() {
     const teams = read(path.join(HERE, 'market', 'teams.json'), { teams: {} }).teams;
     const teamOf = n => Object.entries(teams).find(([, d]) => d.members.includes(n))?.[0] ?? 'individual';
     const day = readDiaries(Date.now() - 86400_000);
+    // total-level gain per bot over the last day (logs/progress.jsonl), to spot bots that stopped growing
+    const gain = {};
+    try {
+        const since = Date.now() - 86400_000;
+        for (const l of fs.readFileSync(path.join(HERE, 'logs', 'progress.jsonl'), 'utf8').trim().split('\n')) {
+            let r; try { r = JSON.parse(l); } catch { continue; }
+            if (r.t < since) continue;
+            const g = (gain[r.bot] ??= { first: r.total, last: r.total }); g.last = r.total;
+        }
+    } catch {}
+    const grew = n => (gain[n] ? gain[n].last - gain[n].first : null);
     const rows = [];
     const list = await fetch(`${API}/bots`).then(r => r.json()).catch(() => []);
     for (const f of fs.readdirSync(path.join(HERE, 'orders')).filter(f => f.endsWith('.json')).sort()) {
@@ -74,7 +85,7 @@ async function brief() {
         const top = s?.stats ? Object.entries(s.stats).sort((a, b) => b[1].level - a[1].level).slice(0, 3).map(([k, v]) => `${k} ${v.level}`).join(', ') : '';
         const c = careers[name];
         const deaths = day.filter(e => e.bot === name && /^Died/.test(e.text)).length;
-        rows.push(`| ${name} | ${teamOf(name)} | ${s ? s.combat : 'offline'} | ${s?.totalLevel ?? ''} | ${top} | ${coins} | ${c ? `${c.career}: ${c.goal.text}` : ''} | ${deaths || ''} | ${o.paused ? 'PAUSED ' : ''}${(o.plan ?? []).map(p => `${p.task} ${p.minutes}m`).join(', ')} |`);
+        rows.push(`| ${name} | ${teamOf(name)} | ${s ? s.combat : 'offline'} | ${s?.totalLevel ?? ''} (${grew(name) === null ? '?' : '+' + grew(name)}) | ${top} | ${coins} | ${c ? `${c.career}: ${c.goal.text}` : ''} | ${deaths || ''} | ${o.paused ? 'PAUSED ' : ''}${(o.plan ?? []).map(p => `${p.task} ${p.minutes}m`).join(', ')} |`);
     }
     const s = state();
     const text = [
@@ -83,7 +94,8 @@ async function brief() {
         ...s.alerts.map(a => `- ${a.text} (${a.t.slice(0, 16)})`), '',
         `Valid tasks: ${TASKS.join(', ')}.`, '',
         `Coin flows, last 24 h (task: in / out): ${(() => { const f = flowSummary(24); return Object.entries(f.byTask).sort((a, b) => (b[1].in - b[1].out) - (a[1].in - a[1].out)).map(([t, v]) => `${t} +${v.in}/-${v.out}`).join(', ') + ` (net ${f.net >= 0 ? '+' : ''}${f.net}gp)`; })()}`, '',
-        '## Bots', '', '| bot | team | combat | total | best skills | coins | career / goal | deaths 24h | plan |', '|---|---|---|---|---|---|---|---|---|', ...rows, '',
+        `Not growing (no total-level gain in a day): ${Object.keys(gain).filter(n => grew(n) === 0).join(', ') || 'none'}.`, '',
+        '## Bots', '', '| bot | team | combat | total (24 h gain) | best skills | coins | career / goal | deaths 24h | plan |', '|---|---|---|---|---|---|---|---|---|', ...rows, '',
         '## The last 24 hours', '', recap.trim()
     ].join('\n');
     fs.writeFileSync(path.join(DIR, 'brief.md'), text + '\n');
