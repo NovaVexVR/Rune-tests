@@ -1,3 +1,36 @@
+diff --git a/Server/src/main/core/game/node/entity/player/Player.java b/Server/src/main/core/game/node/entity/player/Player.java
+index 4a375fd..1f0e6ad 100644
+--- a/Server/src/main/core/game/node/entity/player/Player.java
++++ b/Server/src/main/core/game/node/entity/player/Player.java
+@@ -765,6 +765,11 @@ public class Player extends Entity {
+ 		super.fullRestore();
+ 	}
+ 
++	/** In one of the Duel Arena's fighting areas (zones named "Duel Area - n"). */
++	private static boolean inDuelArea(Player x) {
++		return x.getZoneMonitor().getZones().stream().anyMatch(z -> z.getZone().getName() != null && z.getZone().getName().startsWith("Duel Area"));
++	}
++
+ 	@Override
+ 	public boolean isAttackable(Entity entity, CombatStyle style, boolean message) {
+ 		if (entity instanceof NPC && !((NPC) entity).getDefinition().hasAction("attack") && !((NPC) entity).isIgnoreAttackRestrictions(this)) {
+@@ -772,6 +777,8 @@ public class Player extends Entity {
+ 		}
+ 		if (entity instanceof Player) {
+ 			Player p = (Player) entity;
++			// duels flag both players as "wilderness", but they're fought under the duel's own rules (DuelArea), not the wilderness PvP switch
++			if (inDuelArea(p) && inDuelArea(this)) return super.isAttackable(entity, style, message);
+ 			if (p.getSkullManager().isWilderness() && skullManager.isWilderness()) {
+ 				if (!GameWorld.getSettings().getWild_pvp_enabled())
+ 					return false;
+@@ -800,6 +807,7 @@ public class Player extends Entity {
+ 		}
+ 		if (target instanceof Player) {
+ 			Player p = (Player) target;
++			if (inDuelArea(p) && inDuelArea(this)) return true; // the duel's rules are checked by its zone
+ 			if (p.getSkullManager().isWilderness() && skullManager.isWilderness()) {
+ 				if (GameWorld.getSettings() == null || !GameWorld.getSettings().getWild_pvp_enabled()) {
+ 					return false;
 diff --git a/Server/src/main/core/game/system/timer/impl/AntiMacro.kt b/Server/src/main/core/game/system/timer/impl/AntiMacro.kt
 index 4f9ba87..2a52687 100644
 --- a/Server/src/main/core/game/system/timer/impl/AntiMacro.kt
