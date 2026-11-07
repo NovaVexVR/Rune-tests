@@ -51,7 +51,7 @@ export function watchdog(bots, log = console.log) {
 }
 export const RANDOM_EVENTS = process.env.BOT_EVENTS != null
     ? process.env.BOT_EVENTS.split(',').map(e => e.trim().toUpperCase()).filter(e => e && e !== 'NONE')
-    : ['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE', 'STRANGE_PLANT', 'SANDWICH_LADY', 'CERTER', 'DRILL_DEMON', 'FREAKY_FORESTER', 'MAZE', 'QUIZ_MASTER', 'PILLORY', 'SURPRISE_EXAM', 'MIME', 'EVIL_BOB',
+    : ['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE', 'STRANGE_PLANT', 'SANDWICH_LADY', 'CERTER', 'DRILL_DEMON', 'FREAKY_FORESTER', 'MAZE', 'QUIZ_MASTER', 'PILLORY', 'SURPRISE_EXAM', 'MIME', 'EVIL_BOB', 'CANDLELIGHT',
        'EVIL_CHICKEN', 'RIVER_TROLL', 'ROCK_GOLEM', 'SHADE', 'SWARM', 'TREE_SPIRIT', 'ZOMBIE'];
 const PILLORY_CAGES = [[3226, 3407], [3228, 3407], [3230, 3407], [2681, 3489], [2683, 3489], [2685, 3489], [2604, 3105], [2606, 3105], [2608, 3105]].map(([x, y]) => ({ x, y }));
 // ---- gear: which slot an item goes in, and how good it is (metal tier x 10 + the piece's rank within its slot) ----
@@ -291,6 +291,28 @@ export class Bot {
         if (inBox(1860, 5000, 1915, 5050)) return this.surpriseExam();
         if (inBox(1984, 4736, 2047, 4799)) return this.mime();
         if (inBox(3390, 4750, 3450, 4800)) return this.evilBob();
+        if (inBox(1920, 4992, 1983, 5055)) return this.candlelight();
+        return false;
+    }
+
+    // Candlelight (Pious Pete): light every candle that will take a flame. Each candle's "Light" opens the candle view
+    // (interface 178) on that candle; button 3 lights it (short ones refuse), 9 closes. Then tell Pious Pete.
+    async candlelight() {
+        const s = this.s;
+        if (s.dialog) return this.answerDialog();
+        if (s.iface === 178) { await this.act({ type: 'button', iface: 178, child: 3 }); await this.wait(2); await this.act({ type: 'button', iface: 178, child: 9 }).catch(() => {}); await this.wait(1); return true; }
+        this._candles ??= new Set();
+        const candle = this.nearestScenery(l => l.id >= 11364 && l.id <= 11394 && l.ops.some(o => /light/i.test(o)) && !this._candles.has(`${l.x},${l.y}`));
+        if (candle) {
+            this._candles.add(`${candle.x},${candle.y}`);
+            await this.act({ type: 'scenery', x: candle.x, y: candle.y, id: candle.id, op: candle.ops.find(o => /light/i.test(o)) });
+            await this.waitIdle({ timeout: 10, cond: st => st.iface === 178 });
+            return true;
+        }
+        // all tried: Pious Pete checks our work (and if one was missed, we go round again)
+        this._candles = null;
+        const pete = this.nearestNpc(n => /pious pete/i.test(n.name));
+        if (pete) { this.log('random event: candles done, telling Pious Pete'); await this.act({ type: 'npc', npc: pete.npc, op: pete.ops.find(o => /talk/i.test(o)) ?? 'Talk-to' }); await this.wait(4); return true; }
         return false;
     }
 
