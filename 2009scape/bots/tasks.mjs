@@ -1,3 +1,4 @@
+import fs from 'fs';
 // Skill-training tasks shared by scripted bots and Claude-directed bots (2009Scape).
 // Each task: { id, skills, canRun(bot) -> true | reason, run(bot, untilMs) }
 import { fearOf } from './phobias.mjs';
@@ -1170,3 +1171,42 @@ export const LOBSTER = {
     }
 };
 TASKS.push(LOBSTER);
+
+// ---- Wilderness mining (roadmap 33): risk for reward. Bold bots only (caution under 0.5).
+//  - the shallow mine north of Edgeville (3103,3567, wilderness level 2): coal and iron, no crowd (Mining 40, combat 20)
+//  - the deep mine (3020,3800, wilderness level ~30): mithril from Mining 55, adamantite from 70 (combat 40)
+// Dying in the wilderness loses the bag, so it banks after every load. Wilderness PvP is on: other players can attack.
+const WILD_SHALLOW = { x: 3103, y: 3568, rocks: [14850, 14851, 14852, 14856, 14857, 14858] };
+const WILD_DEEP = { x: 3020, y: 3800, rocks: [14853, 14854, 14855, 14862, 14863, 14864, 14850, 14851, 14852] };
+export const WILD_MINE = {
+    id: 'wild_mine',
+    skills: ['mining'],
+    canRun: bot => {
+        if (!['Bronze pickaxe', 'Iron pickaxe', 'Steel pickaxe', 'Mithril pickaxe'].some(p => bot.has(p))) return 'need a pickaxe';
+        if (bot.lvl('mining') < 40 || (bot.s.combat ?? 3) < 20) return 'needs Mining 40 and combat 20';
+        return (bot.market?.social?.p?.(bot.name)?.caution ?? personalityCaution(bot.name)) < 0.5 || 'too cautious for the wilderness';
+    },
+    async run(bot, until) {
+        const deep = bot.lvl('mining') >= 55 && (bot.s.combat ?? 3) >= 40;
+        const M = deep ? WILD_DEEP : WILD_SHALLOW;
+        const lvl = bot.lvl('mining');
+        const ok = id => (id >= 14862 && id <= 14864 ? lvl >= 70 : id >= 14853 && id <= 14855 ? lvl >= 55 : true);
+        bot.log(`wild mine: heading for the ${deep ? 'deep' : 'shallow'} wilderness mine`);
+        bot.standGround = true; // in the wilderness: fight what attacks, running blind is worse
+        try {
+            while (now() < until) {
+                if (!(await bot.travel(M.x, M.y, { tol: 4, timeout: 600 }))) return;
+                while (now() < until && (await bot.state(12)).invFree > 1) {
+                    if (await bot.handleInterrupts()) continue;
+                    const rock = bot.nearestScenery(l => l.ops.includes('Mine') && M.rocks.includes(l.id) && ok(l.id));
+                    if (!rock) { await bot.wait(4); continue; }
+                    await gatherOnce(bot, rock, 'Mine', 'scenery', 30);
+                }
+                // never carry a load around the wilderness: bank it (Edgeville is the nearest ground-floor bank)
+                if (!(await bot.bankItems(i => /ore$|^Coal$|^Uncut/.test(i.name)))) return;
+            }
+        } finally { bot.standGround = false; }
+    }
+};
+const personalityCaution = name => { try { return JSON.parse(fs.readFileSync(new URL(`./orders/${name}.json`, import.meta.url), 'utf8')).personality?.caution ?? 1; } catch { return 1; } };
+TASKS.push(WILD_MINE);

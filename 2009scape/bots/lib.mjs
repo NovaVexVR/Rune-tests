@@ -15,7 +15,7 @@ export const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 
 export const SKILLS = ['attack', 'defence', 'strength', 'hitpoints', 'ranged', 'prayer', 'magic', 'cooking', 'woodcutting', 'fletching', 'fishing', 'firemaking', 'crafting', 'smithing', 'mining', 'herblore', 'agility', 'thieving', 'slayer', 'farming', 'runecrafting', 'hunter', 'construction', 'summoning'];
 // bank booths on the ground floor (where to stand)
-export const GROUND_BANKS = [{ x: 3185, y: 3440, name: 'Varrock West' }, { x: 3253, y: 3420, name: 'Varrock East' }, { x: 3013, y: 3356, name: 'Falador East' }, { x: 3270, y: 3167, name: 'Al Kharid' }];
+export const GROUND_BANKS = [{ x: 3094, y: 3492, name: 'Edgeville' }, { x: 3185, y: 3440, name: 'Varrock West' }, { x: 3253, y: 3420, name: 'Varrock East' }, { x: 3013, y: 3356, name: 'Falador East' }, { x: 3270, y: 3167, name: 'Al Kharid' }];
 export const FOOD = ['Shrimps', 'Anchovies', 'Bread', 'Cooked chicken', 'Cooked meat', 'Sardine', 'Herring', 'Trout', 'Salmon', 'Pike', 'Tuna', 'Lobster', 'Cake', 'Meat pie', 'Swordfish', 'Kebab'];
 // Random event types the server may give bots: the ones with a proven solver (wave 1).
 // Sent to the server on every login, so it survives server restarts. Override: BOT_EVENTS=GENIE,ZOMBIE or BOT_EVENTS=none

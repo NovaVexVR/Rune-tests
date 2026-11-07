@@ -16,7 +16,7 @@ const read = () => { try { return JSON.parse(fs.readFileSync(FILE, 'utf8')); } c
 const write = all => { fs.mkdirSync(path.dirname(FILE), { recursive: true }); fs.writeFileSync(FILE + '.tmp', JSON.stringify(all, null, 1)); fs.renameSync(FILE + '.tmp', FILE); };
 
 export const CAREERS = {
-    smith: { skill: 'smithing', tasks: ['smith', 'smelt', 'mine', 'mine_iron'], title: 'a smith' },
+    smith: { skill: 'smithing', tasks: ['smith', 'smelt', 'mine', 'mine_iron', 'wild_mine'], title: 'a smith' },
     fisher: { skill: 'fishing', tasks: ['fish_cook', 'lobsters'], title: 'a fisher' },
     crafter: { skill: 'crafting', tasks: ['leather', 'spin'], title: 'a crafter' },
     fletcher: { skill: 'fletching', tasks: ['fletch', 'woodcut_fire'], title: 'a fletcher' },
