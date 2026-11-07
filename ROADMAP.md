@@ -49,10 +49,27 @@ What's planned for the bot world, in priority order, plus how the built systems 
 23. *(data done: `bots/economy.mjs` samples every 30 min into `market/economy.jsonl` (coins, goods, median wealth, Gini, per-group wealth, prices, richest/poorest); `export_dashboard.mjs` writes `economy.json` and `wealth_latest.json`; the charts go on the dashboard at the next snapshot)* **Economy charts:** coins in circulation, prices over time, who's rich and who's poor, on the dashboard.
 24. **Test the launcher on Windows.**
 
+### F. Before the real run (planned)
+26. **Automatic backups:** daily snapshots of the player saves, `bots/market/`, diaries and recaps, plus one before every reset or restart; keep the last 14 days. Weeks of history shouldn't be one broken save or full disk away.
+27. **Economy balance watch:** track where coins enter (thieving, shop sales, quest rewards) and leave (tolls, shops, tanning, fines); a director alert on runaway inflation or deflation, so wealth keeps growing slowly.
+28. **Performance check for running locally:** CPU and memory of the server and 60+ bots with every feature on; tune polling and bot count to the user's machine before the switch.
+
 ### Milestone: reset to level 1 and start the real run
 Clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, remove the test bots (`testbot`, `qbot*`, `pbot*`, `mbot*`, `gebot*`, `dbot*`, `lbot*`, `sbot*`, `abot*`, `ebot*`, `rjbot*`, `icbot*`, `drbot*`) and the newcomers' orders (`orders/newbie*.json`), and start the fleet with `launch.mjs`. Human players join the fresh world.
 
 25. **Human players** joining the server and trading or chatting with bots.
+
+### G. With human players (planned)
+29. **Talk to the bots:** a human's chat or private message to a bot is answered by Claude in that bot's personality (its diary, grudges, career, mood), rate-limited to keep usage low.
+30. **Bots trade with humans:** accept human trade requests at the bot's own perceived prices; humans can post bounties on the notice board and bots fill them.
+
+### H. Deeper gameplay and story (planned)
+31. **Herblore:** unlocked by Druidic Ritual: clean herbs from drops, attack potions (guam + eye of newt), a herbalist career; potions become goods to trade.
+32. **Group combat outings:** teams go together to the Varrock sewers or the moss giants, with roles (front fighter, food carrier, looter), building on escorts.
+33. **Wilderness risk and reward:** wilderness mines and resources that bold bots visit for better pay, with a real risk of being attacked (wilderness PvP is on).
+34. **Karamja trips:** the boat from Port Sarim for lobsters and better food at higher fishing levels.
+35. **Merchants:** a trading career that buys low and sells high on the Grand Exchange and at market days (the merchant personality exists, no career uses it yet).
+36. **Records and hall of fame:** firsts and milestones (first to Smithing 50, richest bot, most duels won) kept in `market/records.json`, shown in the recap and on the dashboard.
 
 ---
 
