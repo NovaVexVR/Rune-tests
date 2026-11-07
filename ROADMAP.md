@@ -41,7 +41,7 @@ What's planned for the bot world, in priority order, plus how the built systems 
 17. *(done: `bots/justice.mjs` in the council: the most trusted bot hears recent defaults; warning first, then a court-ordered fine (debt + 50%, due in a day) for 2+ defaults a week, the treasurer is told; judges gain respect)* **Disputes and justice:** a respected bot (or the most trusted per team) arbitrates defaults and fines repeat offenders.
 18. *(done: `claude_runner.mjs`: a fresh `newbie<n>` every 6 h, up to 10, on a starter plan; a team's most generous member welcomes it with a gift and the trust lets the council recruit it; `market/newcomers.json`)* **Newcomers:** new bots join over time as fresh characters; teams recruit and mentor them.
 19. **PvP (Phase 5):** fix the duel blocker (bots reach the arena but "Fight" starts no combat), wire duels into grudges, then bounded wilderness fights (details below).
-20. **Events:** weekly fishing contests, smithing fairs, and duel tournaments once duels work, announced in chat and covered in the recap.
+20. *(fishing contests and smithing fairs done: `bots/events.mjs`, alternating every 84 h (twice a week each), announced an hour ahead, most xp in an hour wins, in the recap; duel tournaments wait for item 19)* **Events:** weekly fishing contests, smithing fairs, and duel tournaments once duels work, announced in chat and covered in the recap.
 21. **Rest of random events wave 3:** Surprise Exam, Mime, Pillory, Quiz Master, Evil Bob, Candlelight (need item models or animations).
 
 ### E. Operations and outreach

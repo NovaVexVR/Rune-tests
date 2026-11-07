@@ -20,10 +20,12 @@ import { note, noteLevel } from './diary.mjs';
 import { Escorts } from './escort.mjs';
 import { buildBoard } from './noticeboard.mjs';
 import { careerTask, checkGoal } from './careers.mjs';
+import { TownEvents } from './events.mjs';
 
 const ALL_BOTS = [];
 const market = new Market((...a) => console.log(new Date().toISOString(), ...a));
 const escorts = new Escorts(market, (...a) => console.log(new Date().toISOString(), ...a), note);
+const townEvents = new TownEvents(market, (...a) => console.log(new Date().toISOString(), ...a));
 const marketDay = new MarketDay(market, (...a) => console.log(new Date().toISOString(), ...a));
 const parties = new Parties(market, (...a) => console.log(new Date().toISOString(), ...a));
 
@@ -124,6 +126,9 @@ async function runBot(name, delay) {
             // career: some of the time, a task from the bot's chosen career instead (once it has one)
             const ct = item.task !== 'treasury' && careerTask(bot, id => taskById(id)?.canRun(bot));
             if (ct && ct !== item.task) item = { task: ct, minutes: item.minutes ?? 20, why: 'career' };
+            // a town event (fishing contest, smithing fair) is on: entrants do the event's skill until it ends
+            const et = item.task !== 'treasury' && townEvents.taskFor(bot, id => taskById(id)?.canRun(bot));
+            if (et) item = { task: et, minutes: Math.max(5, Math.ceil((townEvents.current.end - Date.now()) / 60_000)), why: `the ${townEvents.current.kind} event` };
             const task = taskById(item.task);
             if (!task) { bot.log(`unknown task ${item.task}, skipping`); writeStep(name, step + 1); continue; }
             let ok = task.canRun(bot);
@@ -177,6 +182,7 @@ setInterval(() => { try { council(market); } catch (e) { console.log('council er
 setInterval(() => market.social.driftMoods(), 10 * 60_000);
 setInterval(() => { try { buildBoard(); } catch (e) { console.log('notice board:', e.message); } }, 10 * 60_000); // the public notice board
 watchdog(ALL_BOTS, (...a) => console.log(new Date().toISOString(), ...a));
+setInterval(() => { try { townEvents.tick(); } catch (e) { console.log('town event error', e); } }, 60_000);
 setInterval(() => { try { marketDay.tick(); } catch (e) { console.log('market day error', e); } }, 60_000);
 setInterval(() => { try { if (!marketDay.upcoming()) parties.tick(); } catch (e) { console.log('party error', e); } }, 5 * 60_000);
 // ---- D18 newcomers: a fresh level-1 bot joins every NEWCOMER_HOURS (up to MAX_NEWCOMERS). A team with room
