@@ -13,6 +13,8 @@ export const rand = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 export const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 
 export const SKILLS = ['attack', 'defence', 'strength', 'hitpoints', 'ranged', 'prayer', 'magic', 'cooking', 'woodcutting', 'fletching', 'fishing', 'firemaking', 'crafting', 'smithing', 'mining', 'herblore', 'agility', 'thieving', 'slayer', 'farming', 'runecrafting', 'hunter', 'construction', 'summoning'];
+// bank booths on the ground floor (where to stand)
+export const GROUND_BANKS = [{ x: 3185, y: 3440, name: 'Varrock West' }, { x: 3253, y: 3420, name: 'Varrock East' }, { x: 3013, y: 3356, name: 'Falador East' }, { x: 3270, y: 3167, name: 'Al Kharid' }];
 export const FOOD = ['Shrimps', 'Anchovies', 'Bread', 'Cooked chicken', 'Cooked meat', 'Sardine', 'Herring', 'Trout', 'Salmon', 'Pike', 'Tuna', 'Lobster', 'Cake', 'Meat pie', 'Swordfish', 'Kebab'];
 // Random event types the server may give bots: the ones with a proven solver (wave 1).
 // Sent to the server on every login, so it survives server restarts. Override: BOT_EVENTS=GENIE,ZOMBIE or BOT_EVENTS=none
@@ -896,9 +898,10 @@ export class Bot {
 
     // ---- bank: Lumbridge castle top floor (safe for low levels) ----
     async openBank() {
-        // the nearest bank: Lumbridge castle's top floor, or Varrock West (next to the anvils and the iron mine)
+        // the nearest bank: Lumbridge castle's top floor, or a ground-floor bank (Varrock West by the anvils and
+        // the iron mine, Varrock East by Aubury, Falador East, Al Kharid from inside its toll gate; Draynor is skipped: dark wizards)
         const s0 = await this.state(1);
-        const varrock = { x: 3185, y: 3440 };
+        const varrock = s0.z === 0 && s0.y < 6000 ? GROUND_BANKS.filter(b => b.name !== 'Al Kharid' || s0.x >= 3268).reduce((a, b) => dist(s0, a) <= dist(s0, b) ? a : b) : GROUND_BANKS[0];
         if (s0.z === 0 && s0.y < 6000 && dist(s0, varrock) < dist(s0, { x: 3208, y: 3220 })) {
             await this.travel(varrock.x, varrock.y, { tol: 3 });
             for (let i = 0; i < 4; i++) {
@@ -944,16 +947,18 @@ export class Bot {
         await this.state(2);
     }
 
-    // take exactly n of an item as bank notes (one bag slot however many): for trading and selling
-    async withdrawNoted(item, n) {
+    // take exactly n of an item (as 10s, 5s and 1s); noted: as bank notes, one bag slot however many
+    async withdrawN(item, n, { noted = false } = {}) {
         const banked = () => (this.s.bank ?? []).filter(i => i.name === item).reduce((t, i) => t + i.count, 0);
-        if (n >= banked()) return this.withdraw(item, 'all', { noted: true });
-        for (let left = n; left > 0 && banked() > 0; ) {
+        if (n >= banked()) return this.withdraw(item, 'all', { noted });
+        for (let left = n; left > 0 && banked() > 0 && (noted || this.s.invFree > 0); ) {
             const k = left >= 10 ? 10 : left >= 5 ? 5 : 1;
-            await this.withdraw(item, k, { noted: true });
+            await this.withdraw(item, k, { noted });
             left -= k;
         }
     }
+    // for trading and selling
+    withdrawNoted(item, n) { return this.withdrawN(item, n, { noted: true }); }
 
     async leaveBank() {
         await this.closeInterfaces();

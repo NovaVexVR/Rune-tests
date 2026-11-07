@@ -21,7 +21,8 @@ export const PLACES = {
     swampMine: { x: 3229, y: 3148 },
     furnace: { x: 3226, y: 3254 },
     varrockAnvils: { x: 3187, y: 3423, anvil: { x: 3188, y: 3424 } },
-    varrockIron: { x: 3178, y: 3369 }, // Varrock south-west mine: iron rocks (11954-11956), west of the dark wizards
+    varrockIron: { x: 3178, y: 3369 },
+    barbarianCoal: { x: 3081, y: 3423 }, // Barbarian Village mine: coal rocks 11930-11932 (and tin) // Varrock south-west mine: iron rocks (11954-11956), west of the dark wizards
     farmers: { x: 3228, y: 3293 }
 };
 
@@ -152,6 +153,17 @@ export const IRON_PIECES = [
     { name: 'Iron full helm', lvl: 22, bars: 2, button: 152 },
     { name: 'Iron med helm', lvl: 18, bars: 1, button: 48 },
     { name: 'Iron dagger', lvl: 15, bars: 1, button: 24 }
+];
+
+export const STEEL_PIECES = [
+    { name: 'Steel platebody', lvl: 48, bars: 5, button: 248 },
+    { name: 'Steel platelegs', lvl: 46, bars: 3, button: 240 },
+    { name: 'Steel kiteshield', lvl: 42, bars: 3, button: 208 },
+    { name: 'Steel chainbody', lvl: 41, bars: 3, button: 200 },
+    { name: 'Steel sq shield', lvl: 38, bars: 2, button: 160 },
+    { name: 'Steel full helm', lvl: 37, bars: 2, button: 152 },
+    { name: 'Steel med helm', lvl: 33, bars: 1, button: 48 },
+    { name: 'Steel dagger', lvl: 30, bars: 1, button: 24 }
 ];
 
 export const SHOPS = {
@@ -384,6 +396,27 @@ export const TASKS = [
             const n = name => bot.s.inv.filter(i => i.name === name).reduce((t, i) => t + i.count, 0);
             await bot.state(5);
             const bankOre = x => bot.s.bank?.find(i => i.name === x)?.count ?? 0;
+            // steel at Smithing 30: 1 iron ore + 2 coal per bar, up to 9 bars a trip (all 27 slots)
+            const steel = Math.min(9, bankOre('Iron ore'), Math.floor(bankOre('Coal') / 2));
+            if (bot.lvl('smithing') >= 30 && steel >= 2 && (await bot.openBank())) {
+                await bot.depositAll(i => !KEEP(i.name));
+                await bot.withdrawN('Iron ore', steel);
+                await bot.withdrawN('Coal', steel * 2);
+                await bot.leaveBank();
+                await bot.walkTo(PLACES.furnace.x, PLACES.furnace.y, { tol: 2 });
+                for (let i = 0; i < 30 && n('Iron ore') > 0 && n('Coal') >= 2 && now() < until; i++) {
+                    const st = await bot.state(6);
+                    if (st.iface === 311 || st.chatbox === 311) { await bot.act({ type: 'button', iface: 311, child: 32 }); await bot.wait(5); continue; } // steel, make 1
+                    const f = bot.nearestScenery(l => l.name === 'Furnace' && l.ops.includes('Smelt'));
+                    if (!f) break;
+                    await bot.act({ type: 'scenery', x: f.x, y: f.y, id: f.id, op: 'Smelt' });
+                    await bot.waitIdle({ timeout: 10, cond: x => x.iface === 311 || x.chatbox === 311 });
+                }
+                await bot.closeInterfaces();
+                bot.log(`smelted: ${n('Steel bar')} steel bars`);
+                await bot.bankItems(i => /^(Steel bar|Iron ore|Coal)$/.test(i.name));
+                await bot.state(5);
+            }
             // iron ore in the bank and Smithing 15: smelt iron bars first (iron fails about half the time, as in the game)
             if (bot.lvl('smithing') >= 15 && bankOre('Iron ore') >= 3 && (await bot.openBank())) {
                 await bot.depositAll(i => !KEEP(i.name));
@@ -449,13 +482,14 @@ export const TASKS = [
         // take bronze bars from the bank to the Varrock west anvils, smith daggers, bring them home to the bank
         id: 'smith',
         skills: ['smithing'],
-        canRun: bot => !bot.has('Hammer') ? 'need a hammer' : (['Bronze bar', 'Iron bar'].some(b => bot.has(b) || bot.s.bank?.some(i => i.name === b)) ? true : 'need bars'),
+        canRun: bot => !bot.has('Hammer') ? 'need a hammer' : (['Bronze bar', 'Iron bar', 'Steel bar'].some(b => bot.has(b) || bot.s.bank?.some(i => i.name === b)) ? true : 'need bars'),
         async run(bot, until) {
             const n = name => bot.s.inv.filter(i => i.name === name).reduce((t, i) => t + i.count, 0);
             // iron once it can (Smithing 15) and has iron bars, else bronze
             const hasBars = b => n(b) > 0 || bot.s.bank?.some(i => i.name === b);
-            const BAR = bot.lvl('smithing') >= 15 && hasBars('Iron bar') ? 'Iron bar' : 'Bronze bar';
-            const PIECES = BAR === 'Iron bar' ? IRON_PIECES : BRONZE_PIECES;
+            const sm = bot.lvl('smithing');
+            const BAR = sm >= 30 && hasBars('Steel bar') ? 'Steel bar' : sm >= 15 && hasBars('Iron bar') ? 'Iron bar' : 'Bronze bar';
+            const PIECES = { 'Steel bar': STEEL_PIECES, 'Iron bar': IRON_PIECES, 'Bronze bar': BRONZE_PIECES }[BAR];
             while (now() < until) {
                 await bot.state(10);
                 if (!n(BAR)) {
@@ -483,7 +517,7 @@ export const TASKS = [
                     await bot.waitIdle({ timeout: 10, cond: x => x.iface === 300 });
                 }
                 await bot.closeInterfaces();
-                bot.log(`smithed: ${bot.s.inv.filter(i => /^(Bronze|Iron) (?!bar)/.test(i.name)).map(i => i.name).join(', ')}; banking them`);
+                bot.log(`smithed: ${bot.s.inv.filter(i => /^(Bronze|Iron|Steel) (?!bar)/.test(i.name)).map(i => i.name).join(', ')}; banking them`);
                 if (await bot.openBank()) { await bot.depositAll(i => !KEEP(i.name)); await bot.leaveBank(); }
             }
         }
@@ -495,14 +529,18 @@ export const TASKS = [
         // at Mining 15 a bronze pickaxe hardly ever gets iron; and a Mugger (level 6) roams this mine
         canRun: bot => !['Bronze pickaxe', 'Iron pickaxe', 'Steel pickaxe'].some(a => bot.has(a)) ? 'need a pickaxe' : bot.lvl('mining') < 20 ? 'need Mining 20' : (bot.s.combat ?? 3) >= 10 || 'need combat 10 (muggers)',
         async run(bot, until) {
-            const IRON = [11954, 11955, 11956];
-            const M = PLACES.varrockIron;
+            // from Mining 30, coal (Barbarian Village) whenever the bank has less than 2 coal per iron ore: steel needs both
+            const banked = x => bot.s.bank?.find(i => i.name === x)?.count ?? 0;
+            const coal = bot.lvl('mining') >= 30 && banked('Coal') < 2 * Math.max(5, banked('Iron ore'));
+            const IRON = coal ? [11930, 11931, 11932] : [11954, 11955, 11956];
+            const M = coal ? PLACES.barbarianCoal : PLACES.varrockIron;
+            if (coal) bot.log(`mining coal at Barbarian Village (bank: ${banked('Coal')} coal, ${banked('Iron ore')} iron ore)`);
             if (!(await bot.travel(M.x, M.y, { tol: 4 }))) return;
             while (now() < until) {
                 const s = await bot.state(12);
                 if (await bot.handleInterrupts()) continue;
                 if (s.invFree <= 1) {
-                    if (!(await bot.bankItems(i => /ore$|^Uncut/.test(i.name)))) { await bot.wait(10); continue; }
+                    if (!(await bot.bankItems(i => /ore$|^Coal$|^Uncut/.test(i.name)))) { await bot.wait(10); continue; }
                     await bot.travel(M.x, M.y, { tol: 4 });
                     continue;
                 }
@@ -510,7 +548,7 @@ export const TASKS = [
                 if (!rock) { await bot.wait(4); continue; } // mined out: wait for the respawn
                 await gatherOnce(bot, rock, 'Mine', 'scenery', 30);
             }
-            await bot.bankItems(i => /ore$|^Uncut/.test(i.name)); // end of the shift: bank it, don't walk home loaded
+            await bot.bankItems(i => /ore$|^Coal$|^Uncut/.test(i.name)); // end of the shift: bank it, don't walk home loaded
         }
     },
     {
@@ -842,3 +880,85 @@ export const LEATHER = {
     }
 };
 TASKS.push(LEATHER);
+
+// ---- Runecrafting (after Rune Mysteries): Aubury teleports us to the essence mine (bank at Varrock East),
+// then air runes at the air altar south of Falador with the quest's air talisman. Air runes feed magic training.
+const AUBURY = { x: 3253, y: 3401 }, AIR_RUINS = { x: 2985, y: 3294 };
+const inEssenceMine = s => s.x > 2880 && s.x < 2960 && s.y > 4780 && s.y < 4860;
+const inAirAltar = s => s.x > 2820 && s.x < 2860 && s.y > 4810 && s.y < 4850;
+async function mineEssence(bot, until) {
+    await bot.travel(AUBURY.x, AUBURY.y, { tol: 3 });
+    for (let i = 0; i < 4 && !inEssenceMine(await bot.state(8)); i++) {
+        const a = bot.nearestNpc(n => n.name === 'Aubury');
+        const op = a?.ops.find(o => /teleport/i.test(o));
+        if (!a || !op) { await bot.walkTo(AUBURY.x, AUBURY.y, { tol: 1 }); continue; }
+        await bot.act({ type: 'npc', npc: a.npc, op });
+        await bot.waitIdle({ timeout: 15, cond: inEssenceMine });
+    }
+    if (!inEssenceMine(bot.s)) { bot.log('runecraft: Aubury would not teleport us'); return false; }
+    while ((await bot.state(14)).invFree > 0 && now() < until) {
+        if (await bot.handleInterrupts()) continue;
+        const rock = bot.nearestScenery(l => /rune essence/i.test(l.name) && l.ops.includes('Mine'));
+        if (!rock) { bot.log('runecraft: no essence rock in view'); break; }
+        const before = bot.s.invFree;
+        await bot.act({ type: 'scenery', x: rock.x, y: rock.y, id: rock.id, op: 'Mine' });
+        await bot.waitIdle({ timeout: 90, quiet: 6, cond: st => st.invFree === 0 });
+        if (bot.s.invFree === before) await bot.wait(3);
+    }
+    // out through the nearest portal
+    for (let i = 0; i < 4 && inEssenceMine(await bot.state(14)); i++) {
+        const p = bot.nearestScenery(l => /portal/i.test(l.name) && l.ops.length) ?? bot.nearestNpc(n => /portal/i.test(n.name));
+        if (!p) { bot.log('runecraft: no portal in view'); break; }
+        if (p.npc !== undefined) await bot.act({ type: 'npc', npc: p.npc, op: p.ops[0] });
+        else await bot.act({ type: 'scenery', x: p.x, y: p.y, id: p.id, op: p.ops[0] });
+        await bot.waitIdle({ timeout: 20, cond: st => !inEssenceMine(st) });
+    }
+    return !inEssenceMine(bot.s);
+}
+async function craftAir(bot) {
+    await bot.travel(AIR_RUINS.x, AIR_RUINS.y, { tol: 3 });
+    for (let i = 0; i < 3 && !inAirAltar(await bot.state(8)); i++) {
+        const ruins = bot.nearestScenery(l => /mysterious ruins/i.test(l.name));
+        if (!ruins) { await bot.walkTo(AIR_RUINS.x, AIR_RUINS.y, { tol: 1 }); continue; }
+        await bot.act({ type: 'useitem', item: 'Air talisman', x: ruins.x, y: ruins.y, id: ruins.id });
+        await bot.waitIdle({ timeout: 15, cond: inAirAltar });
+    }
+    if (!inAirAltar(bot.s)) { bot.log('runecraft: could not enter the air altar'); return 0; }
+    const before = bot.count('Air rune');
+    const altar = bot.nearestScenery(l => l.name === 'Altar' && l.ops.some(o => /craft/i.test(o)));
+    if (altar) { await bot.act({ type: 'scenery', x: altar.x, y: altar.y, id: altar.id, op: altar.ops.find(o => /craft/i.test(o)) }); await bot.waitIdle({ timeout: 20, quiet: 3 }); }
+    const made = (await bot.state(14), bot.count('Air rune')) - before;
+    for (let i = 0; i < 3 && inAirAltar(bot.s); i++) {
+        const p = bot.nearestScenery(l => /portal/i.test(l.name) && l.ops.length);
+        if (!p) break;
+        await bot.act({ type: 'scenery', x: p.x, y: p.y, id: p.id, op: p.ops[0] });
+        await bot.waitIdle({ timeout: 15, cond: st => !inAirAltar(st) });
+        await bot.state(8);
+    }
+    bot.log(`runecraft: crafted ${made} air runes`);
+    return made;
+}
+export const RUNECRAFT = {
+    id: 'runecraft',
+    skills: ['runecrafting'],
+    canRun: bot => {
+        if ((bot.s.quests?.['Rune Mysteries'] ?? 0) < 100) return 'needs Rune Mysteries';
+        if (!bot.has('Air talisman') && !bot.s.bank?.some(i => i.name === 'Air talisman')) return 'needs an air talisman';
+        if (!['Bronze pickaxe', 'Iron pickaxe', 'Steel pickaxe'].some(p => bot.has(p) || bot.s.bank?.some(i => i.name === p))) return 'needs a pickaxe';
+        return true;
+    },
+    async run(bot, until) {
+        if (!(await bot.openBank())) return;
+        await bot.depositAll(i => !KEEP(i.name) && i.name !== 'Air talisman' && !/essence/i.test(i.name));
+        for (const n of ['Air talisman', 'Bronze pickaxe', 'Iron pickaxe', 'Steel pickaxe']) if (!bot.has(n) && bot.s.bank?.some(i => i.name === n)) { await bot.withdraw(n, 1); if (/pickaxe/.test(n)) break; }
+        await bot.leaveBank();
+        while (now() < until) {
+            if (bot.s.invFree > 0 && !(await mineEssence(bot, until))) return;
+            if (!bot.s.inv.some(i => /essence/i.test(i.name))) return;
+            await craftAir(bot);
+            if (bot.s.inv.some(i => /essence/i.test(i.name))) return; // couldn't craft: stop rather than loop
+            await bot.bankItems(i => i.name === 'Air rune');
+        }
+    }
+};
+TASKS.push(RUNECRAFT);
