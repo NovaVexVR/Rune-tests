@@ -201,11 +201,15 @@ async function cauldronRunInner(bot) {
     if (bot.s.x < DR.gate.x + 1) { bot.log(`quest: could not get through to the cauldron (at ${bot.s.x},${bot.s.y}; ${bot.s.scenery.filter(l => /gate|door/i.test(l.name) && l.dist <= 4).map(l => `${l.name}@${l.x},${l.y} ${l.ops}`).join('; ')})`); return false; }
     await bot.walkTo(DR.cauldron.x - 1, DR.cauldron.y, { tol: 1, timeout: 30, direct: true });
     for (const meat of Object.keys(MEATS)) {
-        const c = (await bot.state(8), bot.nearestScenery(l => /cauldron/i.test(l.name)));
-        if (!c) { bot.log(`quest: no cauldron in view at ${bot.s.x},${bot.s.y} (${bot.s.scenery.slice(0, 8).map(l => `${l.name}@${l.x},${l.y}`).join('; ')})`); break; }
+        // the Cauldron of Thunder (2142) has no options, so older servers leave it out of the state: try where it stands
+        const c = (await bot.state(8), bot.nearestScenery(l => /cauldron/i.test(l.name))) ?? { name: 'Cauldron of Thunder', id: 2142, ...DR.cauldron };
         if (!count(bot, meat)) continue;
         const m0 = bot.msgs.length;
-        const r = await bot.act({ type: 'useitem', item: meat, x: c.x, y: c.y, id: c.id }).catch(e => `error ${e.message}`);
+        let r = await bot.act({ type: 'useitem', item: meat, x: c.x, y: c.y, id: c.id }).catch(e => `error ${e.message}`);
+        if (/error/.test(r)) for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0], [0, 1], [-1, -1], [1, 1]]) { // not quite where we thought
+            r = await bot.act({ type: 'useitem', item: meat, x: c.x + dx, y: c.y + dy, id: 2142 }).catch(e => `error ${e.message}`);
+            if (!/error/.test(r)) { DR.cauldron = { x: c.x + dx, y: c.y + dy }; break; }
+        }
         await bot.waitIdle({ timeout: 8, quiet: 2 });
         bot.log(`quest: ${meat} on the ${c.name} (${c.x},${c.y}): ${r} ${bot.msgs.slice(m0).join(' | ')}`);
     }
