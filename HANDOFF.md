@@ -104,3 +104,14 @@ Follow the numbered list in `ROADMAP.md` ("Planned, in priority order"): section
 Dashboard (snapshot, refreshed only on request): https://claude.ai/artifact/6HWG1Z966j6BatW3LoV6aS (refresh = run `export_dashboard.mjs`, upload the five JSON files as assets, update each `datasets/<id>` source url).
 
 **Plan progress (new):** a Claude-directed bot's place in its plan loop is kept in `bots/market/steps.json` (gitignored, cleared on a reset), not in `orders/<bot>.json`. Order files now change only when a plan, role, personality or `paused` really changes, so they stay in git as design data (`bots/steps.mjs`: `getStep`, `setStep`).
+
+**New tasks and economy pieces (this session):**
+- `fish_cook` fly fishes (trout/salmon, Lure, Lumbridge river 3239,3246) from Fishing 20 when it has a rod and feathers; `prepare` fetches banked rod and feathers, and a fisher with 30+ coins and no rod buys one at Gerrant's, Port Sarim (`SHOPS.gerrant`, once a day if it fails). Verified: rod bought, 16 trout.
+- `leather` (Crafting): bank cowhides -> Al Kharid through the toll gate (Pay-toll, 10gp each way) -> Ellis tans (iface 324, child 1 = soft leather, op 4 = all) -> Dommik sells needle and thread -> needle on leather (iface 154: body 28, gloves 29, boots 30, vambraces 31, cowl 34; op 2 = all) -> back and bank. Verified: 8 hides to 8 gloves.
+- `runecraft`: after Rune Mysteries with the air talisman and a pickaxe: Aubury's Teleport -> mine Rune Essence -> portal out -> air altar ruins 2985,3294 (use the talisman on them) -> Craft-rune -> bank the runes. Being tested on qbot1.
+- Steel: `mine_iron` mines coal at Barbarian Village (3081,3423, rocks 11930-11932) from Mining 30 while the bank has under 2 coal per iron ore; `smelt` makes steel first at Smithing 30 (iron ore + 2 coal, bar menu child 32); `smith` uses `STEEL_PIECES` at Smithing 30+. Being tested on sbot1.
+- `buyArmour` (in `prepare` for melee): Horvik's in Varrock, at most every 6 h, only with 200+ coins, spending at most 30%; banks the change. Verified: bronze platebody bought and worn.
+- Willows are now the Lumbridge riverside ones (3233,3238), with no combat requirement; `fletch` makes willow bows from Fletching 35 / Woodcutting 30 (not yet tested). Oaks moved to 3197,3255 (the old spot had none in view).
+- `openBank` picks the nearest of Lumbridge and the ground-floor banks (`GROUND_BANKS`: Varrock West and East, Falador East, and Al Kharid only from inside the gate). `bot.withdrawN(item, n, {noted})` takes an exact amount.
+- Test bots added: `lbot1` (leather), `sbot1` (steel), `abot1` (armour); remove them at the reset with the others.
+

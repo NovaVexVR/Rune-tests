@@ -25,11 +25,10 @@ What's planned for the bot world, in priority order, plus how the built systems 
 
 ### B. A real economy
 7. *(done)* **Team stash:** the treasurer keeps shared goods (food, armour, tools) as well as coins, and hands them out to members who need them.
-8. *(started: `spin` makes balls of wool; iron goods below)* **Reasons to trade:** crafting chains (wool to balls of wool, cowhide to leather to leather armour, ore to bars to armour) and selling surplus to shops, so market days have real supply and demand. The first live market day had none: everyone wanted a knife and nobody had one.
-9. *(iron done: `mine_iron`, iron smelting and smithing; steel and the Varrock armour shops still to do)* **Iron and steel:** iron mining and smelting (iron ore fails half the time), steel bars with coal, iron and steel armour; buying armour at the Varrock shops.
-10. **More training methods** from the guides: fly fishing, leather crafting, willow bows, agility. *(Started: oak shortbows/longbows at Fletching 20, Woodcutting 15.)*
-    - Trading uses bank notes for multiples (one bag slot per stack): trades, market-day goods, clear-outs. Done.
-11. **Use what quests unlock:** the Lumbridge range after Cook's Assistant (fewer burnt fish), Runecrafting after Rune Mysteries (essence via Aubury, air runes for magic training), prayer from buried bones.
+8. *(done: wool to balls of wool (`spin`), cowhide to leather to leather armour (`leather`, Al Kharid), ore to bars to armour, bank notes for trading)* **Reasons to trade:** crafting chains and selling surplus, so market days have real supply and demand.
+9. *(done in code: iron; steel (coal at Barbarian Village from Mining 30, steel bars from Smithing 30, steel armour); fighters buy armour at Horvik's with 30% of their savings. Steel still being tested in-game)* **Iron and steel.**
+10. *(done: oak bows (willow bows and Lumbridge willows written, not yet tested in-game), fly fishing (rod from Port Sarim, feathers from chickens), leather crafting; agility still to do)* **More training methods.**
+11. *(done in code: the castle range after Cook's Assistant, Runecrafting after Rune Mysteries (essence via Aubury, air runes at the air altar; being tested), prayer from buried bones)* **Use what quests unlock.**
 
 ### C. Progression
 12. **Escorts and apprenticeships:** stronger teammates escort or train weaker ones; needed for the next quests.
@@ -51,7 +50,7 @@ What's planned for the bot world, in priority order, plus how the built systems 
 24. **Test the launcher on Windows.**
 
 ### Milestone: reset to level 1 and start the real run
-Clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, remove the test bots (`testbot`, `qbot*`, `pbot*`, `mbot*`, `gebot*`, `dbot*`), and start the fleet with `launch.mjs`. Human players join the fresh world.
+Clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, remove the test bots (`testbot`, `qbot*`, `pbot*`, `mbot*`, `gebot*`, `dbot*`, `lbot*`, `sbot*`, `abot*`), and start the fleet with `launch.mjs`. Human players join the fresh world.
 
 25. **Human players** joining the server and trading or chatting with bots.
 
