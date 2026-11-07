@@ -111,6 +111,8 @@ if (args.has('--setup')) { log('setup done'); process.exit(0); }
 
 const serverLog = path.join(HERE, 'server.log');
 fs.writeFileSync(serverLog, '');
+// a backup before every launch, so a bad restart or a reset can be undone (bots/backup.mjs; kept 14 days)
+spawnSync(process.execPath, [path.join(HERE, 'bots', 'backup.mjs'), 'launch'], { stdio: 'inherit' });
 log('starting the server (bot API on 127.0.0.1:8899)');
 start('server', JAVA, ['-Dnashorn.args=--no-deprecation-warning', '-jar', JAR], { cwd: path.join(SRV, 'Server'), env }, serverLog);
 if (!(await waitFor(serverLog, /started in/, 300))) { stopAll(); die(`server didn't start; see ${serverLog}`); }
