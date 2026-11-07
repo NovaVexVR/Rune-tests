@@ -24,7 +24,6 @@
   ],
   "loop": true,
   "paused": false,
-  "step": 4,
   "personality": {
     "archetype": "gambler",
     "greed": 0.45,

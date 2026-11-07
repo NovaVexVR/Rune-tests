@@ -9,6 +9,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { Bot, LOG_DIR, sleep, summary, watchdog, rememberDanger } from './lib.mjs';
+import { getStep, setStep } from './steps.mjs';
 import { taskById, RESUPPLY, prepare, clearOut, surplusInBank } from './tasks.mjs';
 import { Market, TEAMS, TRADEABLE } from './market.mjs';
 import { personalityOf, SPOTS } from './social.mjs';
@@ -30,17 +31,12 @@ fs.mkdirSync(ORDERS, { recursive: true });
 function readOrders(name) {
     const f = path.join(ORDERS, `${name}.json`);
     if (!fs.existsSync(f)) {
-        fs.writeFileSync(f, JSON.stringify({ plan: [{ task: 'melee', minutes: 15, why: 'default start' }], loop: true, paused: false, step: 0 }, null, 2));
+        fs.writeFileSync(f, JSON.stringify({ plan: [{ task: 'melee', minutes: 15, why: 'default start' }], loop: true, paused: false }, null, 2));
     }
     return JSON.parse(fs.readFileSync(f, 'utf8'));
 }
 
-function writeStep(name, step) {
-    const f = path.join(ORDERS, `${name}.json`);
-    const o = JSON.parse(fs.readFileSync(f, 'utf8'));
-    o.step = step;
-    fs.writeFileSync(f, JSON.stringify(o, null, 2));
-}
+const writeStep = setStep; // progress lives in market/steps.json, not in the orders file
 
 async function runBot(name, delay) {
     await sleep(delay);
@@ -95,7 +91,7 @@ async function runBot(name, delay) {
             if (!s || !s.online) { await bot.login(); await bot.onboard(); }
             await bot.state();
             const plan = o.plan ?? [];
-            let step = o.step ?? 0;
+            let step = getStep(name) ?? o.step ?? 0; // o.step: from orders written before steps.json
             if (step >= plan.length) {
                 if (o.loop && plan.length) step = 0;
                 else { await sleep(10000); continue; }

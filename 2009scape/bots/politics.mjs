@@ -1,5 +1,6 @@
 // Team politics (roadmap Phase 2): scoreboard, taxes & mutiny, leaving & recruiting.
 // Team membership lives in market/teams.json and is the source of truth for factions.
+import { setStep } from './steps.mjs';
 import fs from 'fs';
 import path from 'path';
 
@@ -83,7 +84,7 @@ function rewritePlansForSwap(a, b) {
     const oa = JSON.parse(fs.readFileSync(fa, 'utf8')), ob = JSON.parse(fs.readFileSync(fb, 'utf8'));
     [oa.plan, ob.plan] = [ob.plan, oa.plan];
     [oa.role, ob.role] = [ob.role, oa.role];
-    oa.step = 0; ob.step = 0;
+    delete oa.step; delete ob.step; setStep(a, 0); setStep(b, 0);
     fs.writeFileSync(fa, JSON.stringify(oa, null, 2));
     fs.writeFileSync(fb, JSON.stringify(ob, null, 2));
 }

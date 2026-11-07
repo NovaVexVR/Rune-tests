@@ -102,3 +102,5 @@ Follow the numbered list in `ROADMAP.md` ("Planned, in priority order"): section
 - Prefer one larger batch of work with a short summary over many small check-ins.
 
 Dashboard (snapshot, refreshed only on request): https://claude.ai/artifact/6HWG1Z966j6BatW3LoV6aS (refresh = run `export_dashboard.mjs`, upload the five JSON files as assets, update each `datasets/<id>` source url).
+
+**Plan progress (new):** a Claude-directed bot's place in its plan loop is kept in `bots/market/steps.json` (gitignored, cleared on a reset), not in `orders/<bot>.json`. Order files now change only when a plan, role, personality or `paused` really changes, so they stay in git as design data (`bots/steps.mjs`: `getStep`, `setStep`).

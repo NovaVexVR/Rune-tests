@@ -24,7 +24,6 @@
   ],
   "loop": true,
   "paused": false,
-  "step": 4,
   "personality": {
     "archetype": "opportunist",
     "greed": 0.82,
