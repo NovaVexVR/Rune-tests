@@ -35,7 +35,8 @@
     "habits": {
       "spot": "farm",
       "food": "Cooked meat",
-      "collection": "logs"
+      "collection": "logs",
+      "collectionDone": "2026-11-07T04:51:47.079Z"
     }
   }
 }

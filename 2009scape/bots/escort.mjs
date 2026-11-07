@@ -101,7 +101,10 @@ export class Escorts {
                 const d = dist(s, w.s);
                 if (d > 30 || s.z !== w.s.z) { await bot.travel(w.s.x, w.s.y, { tol: 3, timeout: 300 }); continue; }
                 // attack whatever is attacking the ward (or us)
-                const foe = s.npcs.find(n => (n.target === job.ward || n.target === bot.name) && n.ops.includes('Attack'));
+                // what the ward sees counts too: an attacker may be outside our own view
+                const wardName = job.ward.toLowerCase(), me = bot.name.toLowerCase();
+                const isFoe = n => [wardName, me].includes(String(n.target ?? '').toLowerCase()) && (n.ops ?? []).includes('Attack');
+                const foe = s.npcs.find(isFoe) ?? (w.s.npcs ?? []).find(isFoe);
                 if (foe && !s.attacking) {
                     if (foe.target === job.ward) this.log(`[escort] ${bot.name} fights the ${foe.name} attacking ${job.ward}`);
                     await bot.act({ type: 'npc', npc: foe.npc, op: 'Attack' });
@@ -109,7 +112,7 @@ export class Escorts {
                     continue;
                 }
                 if (s.attacking || s.inCombat) { await bot.wait(2); continue; }
-                if (d > 4) { await bot.walkTo(w.s.x, w.s.y, { tol: 2, timeout: 30 }); continue; }
+                if (d > 3) { await bot.walkTo(w.s.x, w.s.y, { tol: 2, timeout: 12, direct: true }); continue; } // short hops: the ward keeps moving
                 await bot.wait(3);
             }
         } finally { bot.waiting = null; }

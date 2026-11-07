@@ -53,7 +53,10 @@ export async function fightDuel(a, b, log = console.log) {
                 const s = await me.state(10);
                 if (s.messages?.some(m => /you have defeated/i.test(m.text))) { winner = me.name; break; }
                 if (!inArena(s)) continue;
-                if (!s.attacking) await me.act({ type: 'player', name: other.name, op: 'Fight' }).catch(() => {});
+                if (!s.attacking) {
+                    const r = await me.act({ type: 'player', name: other.name, op: 'Fight' }).catch(e => `error ${e.message}`);
+                    if (process.env.DUEL_DEBUG && (me._dbg = (me._dbg ?? 0) + 1) <= 3) log(`[duel] ${me.name} fight -> ${JSON.stringify(r)} | ${s.x},${s.y} vs ${other.s?.x},${other.s?.y} | locked ${s.locked} attacking ${s.attacking} | msgs ${JSON.stringify(me.msgs.slice(-4))}`);
+                }
             }
             await sleep(2000);
         }

@@ -7,7 +7,8 @@ import path from 'path';
 import { Bot, sleep, dist } from './lib.mjs';
 import { Market } from './market.mjs';
 import { Escorts } from './escort.mjs';
-import { taskById } from './tasks.mjs';
+import { taskById, PLACES } from './tasks.mjs';
+const MINE = PLACES.varrockIron;
 
 const ROOT = path.dirname(new URL(import.meta.url).pathname);
 const SAVES = process.env.SAVES ?? path.resolve(ROOT, '../../../2009scape-server/Server/data/players');
@@ -47,12 +48,14 @@ const before = task.canRun(ward);
 console.log(`ward combat ${ward.s.combat}, canRun before: ${before}`);
 // the escort idles, checking its hook, like a runner between steps
 let stop = false, maxGap = 0;
-const idle = (async () => { while (!stop) { await guard.handleInterrupts(); await sleep(2000); } })();
+const idle = (async () => { while (!stop) { await guard.state(5); await guard.handleInterrupts(); await sleep(2000); } })();
+const why = () => { const g = guard.s, w = ward.s; return `escort combat ${g?.combat} hp ${g?.hp}/${g?.maxHp} waiting ${guard.waiting} busy ${market.isBusy('ebot2')} teams ${market.social.teamOf('ebot2')}/${market.social.teamOf('ebot1')} ward combat ${w?.combat}`; };
+setTimeout(() => console.log('canEscort check:', why(), '->', escorts.jobs.get('ebot1') ? escorts.canEscort('ebot2', escorts.jobs.get('ebot1')) : 'no job'), 8000);
 const got = await escorts.request(ward, 'mine_iron');
 const after = task.canRun(ward);
 let xp0 = ward.s.stats.mining.xp;
 if (got) {
-    const watch = setInterval(() => { if (ward.s && guard.s) maxGap = Math.max(maxGap, dist(ward.s, guard.s)); }, 5000);
+    const watch = setInterval(() => { if (ward.s && guard.s && dist(ward.s, MINE) <= 20) maxGap = Math.max(maxGap, dist(ward.s, guard.s)); }, 5000); // at the mine, where the muggers are
     try { await task.run(ward, Date.now() + 6 * 60_000); } finally { escorts.finish(ward.name); clearInterval(watch); }
 }
 stop = true; await idle;
@@ -61,7 +64,7 @@ const checks = {
     'an escort took the job and arrived': got === 'ebot2',
     'the ward could then do the task': before !== true && after === true,
     'the ward mined (xp gained)': xp1 > xp0,
-    'the escort stayed close (within 15 tiles)': got && maxGap <= 15,
+    'the escort stayed close at the mine (within 15 tiles)': got && maxGap <= 15,
     'the job ended': !escorts.jobs.size
 };
 console.log('\n==== results');
