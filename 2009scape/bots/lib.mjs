@@ -671,6 +671,17 @@ export class Bot {
     // open, come down to the ground floor and walk back to Lumbridge. The runners log a bot out and back in if it's
     // still stuck after HARD_STUCK_MINUTES.
     stuckFor() { return this.lastProgress && !this.waiting ? (Date.now() - this.lastProgress) / 60_000 : 0; }
+    // The free Lumbridge Home Teleport (standard spellbook, button 0): a ~10 second cast that nothing must interrupt.
+    // At most once every 30 minutes (the game's own cooldown); true if we ended up near Lumbridge.
+    async homeTeleport() {
+        if (Date.now() - (this._homeTele ?? 0) < 30 * 60_000) return false;
+        this._homeTele = Date.now();
+        this.log('home teleport to Lumbridge');
+        await this.act({ type: 'button', iface: 192, child: 0 }).catch(() => {});
+        for (let i = 0; i < 12; i++) { await sleep(2000); const s = await this.state(1).catch(() => null); if (s && s.y < 6000 && dist(s, { x: 3222, y: 3218 }) < 10) return true; }
+        return false;
+    }
+
     async unstickIfStuck() {
         if (this._unsticking || this.stuckFor() < STUCK_MINUTES) return false;
         this._unsticking = true;
@@ -680,7 +691,8 @@ export class Bot {
             this.stuckCount = (this.stuckCount ?? 0) + 1;
             this.onStuck?.(s);
             await this.closeInterfaces().catch(() => {});
-            await this.travel(3222, 3218, { tol: 4, timeout: 300 }).catch(() => {});
+            // the Lumbridge home teleport gets out of anything walking can't (dead-end cellars, fenced corners)
+            if (!(await this.homeTeleport().catch(() => false))) await this.travel(3222, 3218, { tol: 4, timeout: 300 }).catch(() => {});
             this.lastProgress = Date.now();
         } finally { this._unsticking = false; }
         return true;
@@ -809,6 +821,12 @@ export class Bot {
             // somehow underground (y > 6000) while heading for the surface: take the nearest way up
             if (s.y > 6000 && y < 6000) {
                 const up = this.nearestScenery(l => l.ops.some(o => /^climb-up$/i.test(o)), s) ?? this.nearestScenery(l => /ladder|stair/i.test(l.name), s);
+                // a dead end (a ladder that "doesn't lead anywhere") or three tries without getting out: teleport home
+                this._upTries = (this._upTries ?? 0) + 1;
+                if (!up || this._upTries > 3 || this.msgs.slice(-3).some(m => /doesn't seem to lead anywhere/i.test(m))) {
+                    this._upTries = 0;
+                    if (await this.homeTeleport()) return this.walkTo(x, y, { tol, timeout, direct });
+                }
                 if (up) {
                     this.log(`underground at ${s.x},${s.y}; climbing ${up.name}`);
                     await this.act({ type: 'scenery', x: up.x, y: up.y, id: up.id, op: up.ops.find(o => /climb-up/i.test(o)) ?? up.ops[0] });
