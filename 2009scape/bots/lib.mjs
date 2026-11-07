@@ -406,7 +406,8 @@ export class Bot {
             await this.wait(3);
             return true;
         }
-        if (s.dialog) return this.answerDialog();
+        // the "Solve the pillory puzzle" notice can't be dismissed: ignore it and work the cage
+        if (s.dialog && !/pillory puzzle/i.test((s.dialog.text ?? []).join(' '))) return this.answerDialog();
         if (Date.now() - (this._plTry ?? 0) < 6000) return false;
         this._plTry = Date.now();
         const cage = this.nearestScenery(l => /cage/i.test(l.name) && l.ops.some(o => /unlock/i.test(o)));
