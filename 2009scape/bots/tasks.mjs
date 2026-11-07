@@ -1285,3 +1285,52 @@ async function crossDitch(bot, north) {
 }
 const personalityCaution = name => { try { return JSON.parse(fs.readFileSync(new URL(`./orders/${name}.json`, import.meta.url), 'utf8')).personality?.caution ?? 1; } catch { return 1; } };
 TASKS.push(WILD_MINE);
+
+// ---- Agility (roadmap 10): the Gnome Stronghold course, an expedition: Lumbridge -> Falador -> Taverley -> over
+// White Wolf Mountain -> Catherby -> Seers' Village -> the Stronghold gate (opened by hand) -> the course; laps until
+// time is up, then the same way home. Combat 30+ (the mountain's wolves). The route planner can't do it in one go.
+const AGILITY_LEGS = [{ x: 2965, y: 3380 }, { x: 2895, y: 3445 }, { x: 2850, y: 3495 }, { x: 2810, y: 3440 }, { x: 2720, y: 3480 }, { x: 2461, y: 3380 }];
+const GNOME_COURSE = [['Log balance', /walk-across/i], ['Obstacle net', /climb-over/i], ['Tree branch', /^climb$/i], ['Balancing rope', /walk-on/i], ['Tree branch', /climb-down/i], ['Obstacle net', /climb-over/i], ['Obstacle pipe', /squeeze-through/i]];
+const inStronghold = s => s.x > 2380 && s.x < 2520 && s.y > 3384 && s.y < 3520;
+async function toStronghold(bot) {
+    if (inStronghold(await bot.state(1))) return true;
+    for (const leg of AGILITY_LEGS) if (!(await bot.travel(leg.x, leg.y, { tol: 4, timeout: 900 }))) { bot.log(`agility: stuck on the way at ${bot.s.x},${bot.s.y}`); return false; }
+    for (let i = 0; i < 4 && !inStronghold(await bot.state(8)); i++) {
+        const gate = bot.nearestScenery(l => l.name === 'Gate' && l.id === 190 && l.ops.includes('Open'));
+        if (gate) { await bot.act({ type: 'scenery', x: gate.x, y: gate.y, id: gate.id, op: 'Open' }); await bot.waitIdle({ timeout: 10 }); }
+        await bot.walkTo(2461, 3395, { tol: 2, timeout: 40, direct: true });
+    }
+    return inStronghold(bot.s);
+}
+export const AGILITY = {
+    id: 'agility',
+    skills: ['agility'],
+    canRun: bot => (bot.s.combat ?? 3) >= 30 || 'needs combat 30 for the trip past the White Wolf Mountain wolves',
+    async run(bot, until) {
+        await bot.ensureFood?.(4).catch(() => {});
+        if (!(await toStronghold(bot))) return;
+        bot.log('agility: at the Gnome Stronghold course');
+        const x0 = bot.s.stats.agility.xp;
+        let laps = 0;
+        while (now() < until) {
+            await bot.walkTo(2474, 3438, { tol: 2, timeout: 60, direct: true });
+            let done = 0;
+            for (const [name, op] of GNOME_COURSE) {
+                const s = await bot.state(12);
+                if (await bot.handleInterrupts()) { /* answered something */ }
+                const o = bot.nearestScenery(l => l.name === name && l.ops.some(x => op.test(x)));
+                if (!o) { bot.log(`agility: no ${name} in view at ${s.x},${s.y}`); break; }
+                const before = { x: s.x, y: s.y, z: s.z };
+                await bot.act({ type: 'scenery', x: o.x, y: o.y, id: o.id, op: o.ops.find(x => op.test(x)) });
+                await bot.waitIdle({ timeout: 25, quiet: 3, cond: st => (st.x !== before.x || st.y !== before.y || st.z !== before.z) && !st.moving && !st.locked });
+                done++;
+            }
+            if (done === GNOME_COURSE.length) laps++;
+            else await bot.wait(3);
+        }
+        bot.log(`agility: ${laps} laps, +${bot.s.stats.agility.xp - x0} xp; heading home`);
+        for (const leg of [...AGILITY_LEGS].reverse()) await bot.travel(leg.x, leg.y, { tol: 4, timeout: 900 });
+        await bot.travel(3222, 3218, { tol: 4, timeout: 900 });
+    }
+};
+TASKS.push(AGILITY);
