@@ -35,7 +35,8 @@
     "habits": {
       "spot": "courtyard",
       "food": "Bread",
-      "collection": "logs"
+      "collection": "logs",
+      "collectionDone": "2026-11-07T22:20:57.180Z"
     }
   }
 }
