@@ -427,7 +427,7 @@ export class Bot {
     }
 
     // Quiz Master: three item models on the quiz box (chatbox 191, children 6-8); the odd one out is the one whose
-    // category the other two don't share. Its button is child - 4. Four right answers win: take the 1000 coins.
+    // category the other two don't share. Its button is child - 3. Four right answers win: take the 1000 coins.
     async quizMaster() {
         const s = this.s;
         const models = s.ifaceModels?.['191'];
@@ -436,7 +436,7 @@ export class Bot {
             const shown = [6, 7, 8].map(c => ({ c, kind: KIND[Number(String(models[c] ?? '').split(':')[1])] ?? `?${c}` }));
             const odd = shown.find(x => shown.filter(y => y.kind === x.kind).length === 1) ?? shown[0];
             this.log(`random event: quiz master shows ${shown.map(x => x.kind).join(', ')}; the odd one is the ${odd.kind}`);
-            await this.act({ type: 'continue', child: odd.c - 4 }); // a dialogue box: answered with the dialogue packet (a plain button press closes it)
+            await this.act({ type: 'continue', child: odd.c - 3 }); // buttons 3-5 for models 6-8 (tested); a dialogue box: answered with the dialogue packet (a plain button press closes it)
             await this.wait(3);
             return true;
         }
