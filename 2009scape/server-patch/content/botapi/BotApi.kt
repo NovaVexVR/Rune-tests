@@ -642,7 +642,7 @@ object BotRegistry {
         val scen = ArrayList<JSONObject>()
         // every object on each tile (a lit fire sits on top of whatever was there); objects with no options are kept
         // when they're things you use items on (fires, ranges, anvils, hoppers...), since those are what tasks need
-        val useTargets = Regex("fire|range|anvil|hopper|furnace|altar|well|fountain|sink|spinning|loom|pottery|oven|churn|stove", RegexOption.IGNORE_CASE)
+        val useTargets = Regex("fire|range|anvil|hopper|furnace|altar|ruins|well|fountain|sink|spinning|loom|pottery|oven|churn|stove", RegexOption.IGNORE_CASE)
         for (dx in -radius..radius) for (dy in -radius..radius) {
             val tl = Location(loc.x + dx, loc.y + dy, loc.z)
             val here = RegionManager.getRegionChunk(tl).objects?.getOrNull(tl.chunkOffsetX)?.getOrNull(tl.chunkOffsetY) ?: continue

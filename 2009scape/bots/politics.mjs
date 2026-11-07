@@ -48,6 +48,7 @@ export const taxRate = (social, team) => {
 };
 
 import { note } from './diary.mjs';
+import { hearCases } from './justice.mjs';
 
 function event(log, text) {
     STATE.history.push({ t: new Date().toISOString(), text });
@@ -237,6 +238,8 @@ export function council(market) {
             event(log, `${ta} and ${tb} have buried the hatchet (team trust ${r.trust})`);
         }
     }
+    // ---- D17 justice: the most trusted bot in town hears unjudged defaults ----
+    hearCases(market, text => event(log, text), m => treasurerOfTeam(teamOf(m)));
     social.save();
     saveState();
     return scores;
