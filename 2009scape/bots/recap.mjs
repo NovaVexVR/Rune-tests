@@ -81,7 +81,7 @@ const scores = jsonl('scores.jsonl').at(-1);
 if (scores?.scores) out.push('## Team standings', '', ...Object.entries(scores.scores).sort((a, b) => b[1].perMember - a[1].perMember).map(([t, s], i) => `- ${i + 1}. ${t}: score ${s.perMember} per member, ${s.quests ?? 0} quest points, wealth ${s.wealth}gp (${s.members} members)`), '');
 
 const evs = json('events.json', { past: [] }).past.filter(e => e.end >= since);
-if (evs.length) out.push('## Town events', '', ...evs.map(e => `- **${e.kind === 'fishing' ? 'Fishing contest' : 'Smithing fair'}**: ${e.results.length ? e.results.map((r, i) => `${i + 1}. ${r.bot} (${r.xp} xp)`).join(', ') : 'nobody entered'}.`), '');
+if (evs.length) out.push('## Town events', '', ...evs.map(e => `- **${{ fishing: 'Fishing contest', smithing: 'Smithing fair', duels: 'Duel tournament' }[e.kind] ?? e.kind}**: ${e.results.length ? e.results.map((r, i) => `${i + 1}. ${r.bot} (${r.xp} ${e.kind === 'duels' ? 'wins' : 'xp'})`).join(', ') : 'nobody entered'}.`), '');
 out.push(...boardMarkdown(buildBoard()));
 if (out.length <= 4) out.push('A quiet day. Nothing worth printing.');
 const text = out.join('\n');

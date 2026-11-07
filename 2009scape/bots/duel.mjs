@@ -111,6 +111,12 @@ export class GrudgeDuels {
             }
         }
     }
+    // a duel set up by someone else (the tournament): both bots fetch it with join()
+    arrange(a, b, extra = {}) {
+        const d = { a, b, arrived: new Set(), state: 'gathering', created: Date.now(), ...extra };
+        this.pending.push(d);
+        return d;
+    }
     // runner side: if this bot has a duel, go and fight it (returns true if it did something)
     async join(bot) {
         const d = this.duelOf(bot.name);
@@ -144,8 +150,14 @@ export class GrudgeDuels {
         const s = this.market.social;
         d.state = 'done';
         this.pending = this.pending.filter(x => x !== d);
+        d.winner = winner;
         if (!winner) { this.log(`[duel] ${d.a} vs ${d.b}: no result`); return; }
         const loser = winner === d.a ? d.b : d.a;
+        if (d.tournament) { // a tournament bout: no grudges involved
+            note(winner, `Beat ${loser} in the duel tournament.`); note(loser, `Knocked out of the duel tournament by ${winner}.`);
+            this.log(`[duel] tournament: ${winner} beat ${loser}`);
+            return;
+        }
         s.clearRival(winner, loser); // honour satisfied
         s.bumpMood(winner, 0.2, `beating ${loser} in a duel`);
         s.bumpMood(loser, -0.2, `losing a duel to ${winner}`);

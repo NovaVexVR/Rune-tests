@@ -29,6 +29,7 @@ const market = new Market((...a) => console.log(new Date().toISOString(), ...a))
 const escorts = new Escorts(market, (...a) => console.log(new Date().toISOString(), ...a), note);
 const townEvents = new TownEvents(market, (...a) => console.log(new Date().toISOString(), ...a));
 const duels = new GrudgeDuels(market, (...a) => console.log(new Date().toISOString(), ...a));
+townEvents.duels = duels; // the duel tournament uses the arena machinery
 const marketDay = new MarketDay(market, (...a) => console.log(new Date().toISOString(), ...a));
 const parties = new Parties(market, (...a) => console.log(new Date().toISOString(), ...a));
 

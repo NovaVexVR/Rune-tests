@@ -15,8 +15,10 @@ const LEAD = Number(process.env.EVENT_LEAD_MINUTES ?? 60) * 60_000;
 const LENGTH = Number(process.env.EVENT_MINUTES ?? 60) * 60_000;
 export const KINDS = {
     fishing: { title: 'fishing contest', skill: 'fishing', task: 'fish_cook', career: 'fisher' },
-    smithing: { title: 'smithing fair', skill: 'smithing', task: 'smith', career: 'smith', alt: 'smelt' }
+    smithing: { title: 'smithing fair', skill: 'smithing', task: 'smith', career: 'smith', alt: 'smelt' },
+    duels: { title: 'duel tournament', bracket: true } // friendly duels at the arena, knockout rounds (needs this.duels: a GrudgeDuels)
 };
+const ROTATION = ['fishing', 'smithing', 'duels'];
 
 export class TownEvents {
     constructor(market, log = console.log) {
@@ -45,32 +47,66 @@ export class TownEvents {
             const k = KINDS[st.kind];
             const start = {};
             for (const [n] of this.market.bots) { const x = this.xp(n, k.skill); if (x !== null) start[n] = x; }
-            st.current = { kind: st.kind, start: now, end: now + LENGTH, xp0: start, entrants: [] };
+            st.current = { kind: st.kind, start: now, end: now + (k.bracket ? 2 * LENGTH : LENGTH), xp0: start, entrants: [] };
+            if (k.bracket) this.startBracket(st.current);
             this.say(`The ${k.title} has begun!`);
             this.log(`[event] ${k.title} begins`);
             this.save();
         }
         const c = st.current;
-        if (c && now >= c.end) {
+        if (c && KINDS[c.kind].bracket) this.advanceBracket(c);
+        if (c && (now >= c.end || c.champion)) {
             const k = KINDS[c.kind];
-            const gains = c.entrants.map(n => [n, (this.xp(n, k.skill) ?? c.xp0[n] ?? 0) - (c.xp0[n] ?? 0)]).filter(([, g]) => g > 0).sort((a, b) => b[1] - a[1]);
+            const gains = k.bracket ? (c.champion ? [[c.champion, c.wins?.[c.champion] ?? 1], ...Object.entries(c.wins ?? {}).filter(([n]) => n !== c.champion).sort((a, b) => b[1] - a[1])] : [])
+                : c.entrants.map(n => [n, (this.xp(n, k.skill) ?? c.xp0[n] ?? 0) - (c.xp0[n] ?? 0)]).filter(([, g]) => g > 0).sort((a, b) => b[1] - a[1]);
             const [win, second] = gains;
             if (win) {
-                this.say(`${win[0]} wins the ${k.title} with ${Math.round(win[1])} xp!${second ? ` ${second[0]} close behind.` : ''}`);
-                note(win[0], `Won the ${k.title} (${Math.round(win[1])} ${k.skill} xp in an hour)!`);
+                this.say(k.bracket ? `${win[0]} is the duel champion!` : `${win[0]} wins the ${k.title} with ${Math.round(win[1])} xp!${second ? ` ${second[0]} close behind.` : ''}`);
+                note(win[0], k.bracket ? `Won the duel tournament (${win[1]} fights won)!` : `Won the ${k.title} (${Math.round(win[1])} ${k.skill} xp in an hour)!`);
                 if (second) note(second[0], `Came second in the ${k.title}, behind ${win[0]}.`);
                 for (const [other] of this.market.bots) if (other !== win[0]) this.market.social.adjustTrust(other, win[0], 0.03);
                 this.market.social.save();
             } else this.say(`Nobody entered the ${k.title}. Maybe next time.`);
-            this.log(`[event] ${k.title} over: ${gains.slice(0, 3).map(([n, g]) => `${n} ${Math.round(g)}xp`).join(', ') || 'no entrants'}`);
+            this.log(`[event] ${k.title} over: ${gains.slice(0, 3).map(([n, g]) => `${n} ${Math.round(g)}${k.bracket ? ' wins' : 'xp'}`).join(', ') || 'no entrants'}`);
             st.past.push({ kind: c.kind, start: c.start, end: c.end, results: gains.slice(0, 5).map(([n, g]) => ({ bot: n, xp: Math.round(g) })) });
             st.past = st.past.slice(-20);
             delete st.current;
             st.announced = false;
-            st.kind = c.kind === 'fishing' ? 'smithing' : 'fishing';
+            st.kind = ROTATION[(ROTATION.indexOf(c.kind) + 1) % ROTATION.length];
             st.next = now + EVERY;
             this.save();
         }
+    }
+
+    // ---- duel tournament: pair up to 8 entrants, winners meet in the next round until one is left
+    startBracket(c) {
+        const m = this.market;
+        if (!this.duels) return;
+        const ok = n => { const b = m.bots.get(n)?.bot; const coins = (b?.s?.coins ?? 0) + ((b?.s?.bank ?? []).find(i => i.name === 'Coins')?.count ?? 0); return b?.s?.online && !m.isBusy(n) && !b.waiting && (b.s.combat ?? 3) >= 5 && coins >= 30 && !this.duels.duelOf(n); };
+        const keen = [...m.bots.keys()].filter(ok).filter(n => Math.random() < 0.3 + 0.5 * (1 - m.social.p(n).caution)).sort(() => Math.random() - 0.5).slice(0, 8);
+        c.entrants = keen.length % 2 ? keen.slice(0, -1) : keen;
+        c.wins = {}; c.round = 1; c.alive = [...c.entrants];
+        for (const n of c.entrants) note(n, 'Entered the duel tournament.');
+        this.pairRound(c);
+    }
+    pairRound(c) {
+        c.matches = [];
+        for (let i = 0; i + 1 < c.alive.length; i += 2) {
+            const d = this.duels.arrange(c.alive[i], c.alive[i + 1], { tournament: true });
+            c.matches.push(d);
+        }
+        this.log(`[event] duel tournament round ${c.round}: ${c.matches.map(d => `${d.a} vs ${d.b}`).join(', ') || 'no pairs'}`);
+        if (!c.matches.length) c.champion = c.alive[0] ?? null;
+    }
+    advanceBracket(c) {
+        if (!c.matches || c.champion !== undefined && c.champion !== null) return;
+        if (c.matches.some(d => !['done', 'dropped'].includes(d.state))) return;
+        c.alive = c.matches.map(d => d.winner ?? null).filter(Boolean);
+        for (const w of c.alive) c.wins[w] = (c.wins[w] ?? 0) + 1;
+        if (c.alive.length <= 1) { c.champion = c.alive[0] ?? null; if (!c.champion) c.end = Date.now(); return; }
+        c.round++;
+        this.pairRound(c);
+        this.save();
     }
 
     // while an event is on: the event's task for bots that would enter (its career, or a coin flip by sociability)
@@ -78,6 +114,7 @@ export class TownEvents {
         const c = this.current;
         if (!c || Date.now() >= c.end) return null;
         const k = KINDS[c.kind];
+        if (k.bracket) return null; // tournament fighters are fetched by the duels' join()
         const t = [k.task, k.alt].find(id => id && canRun(id) === true);
         if (!t) return null;
         if (!c.entrants.includes(bot.name)) {
