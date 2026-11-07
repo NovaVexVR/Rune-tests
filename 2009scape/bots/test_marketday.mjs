@@ -32,7 +32,9 @@ if (process.argv[2] === 'setup') {
         await b.login(); await b.onboard(); await b.logout(); await sleep(3000);
         const f = path.join(SAVES, `${name}.json`), d = JSON.parse(fs.readFileSync(f, 'utf8'));
         d.core_data.location = `${3218 + Object.keys(CAST).indexOf(name)},3218,0`;
-        const inv = (d.core_data.inventory ??= []).filter(i => !Object.keys(items).includes(i.id));
+        // knife buyers must really lack one (they keep the knives bought in earlier runs)
+        const drop = [...Object.keys(items), ...(CAST[name][0].includes('fletch') ? [String(KNIFE)] : [])];
+        const inv = (d.core_data.inventory ??= []).filter(i => !drop.includes(i.id));
         const free = () => [...Array(28).keys()].find(k => !inv.some(i => Number(i.slot) === k));
         for (const [id, n] of Object.entries(items)) {
             // only into free slots (a full bag would otherwise get slot 'undefined' and break the save)
@@ -53,7 +55,7 @@ const md = new MarketDay(market, log);
 md.state.next = Date.now(); // hold one now
 const t0 = Date.now();
 const bots = Object.entries(CAST).map(([name, [plan]]) => {
-    const bot = new Bot(name, { quiet: true });
+    const bot = new Bot(name); // bot logs go to the test log, to trace a failure
     market.register(bot, () => plan.map(task => ({ task })));
     bot.hook = async b => { if (market.dealFor(b.name)) { while (await market.step(b)) {} return true; } return false; };
     bot.onMsg = text => { if (/Oh dear, you are dead/i.test(text)) md.noteDeath(name); };

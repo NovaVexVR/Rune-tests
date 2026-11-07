@@ -125,7 +125,10 @@ export class MarketDay {
             this.shouts.delete(name);
         }
         bot.log(`[marketday] going home to ${home.label}`);
-        await bot.travel(home.x, home.y, { timeout: 600 });
+        if (!(await bot.travel(home.x, home.y, { timeout: 600 }))) {
+            bot.log(`[marketday] lost on the way home at ${bot.s.x},${bot.s.y}, trying again`);
+            await bot.travel(home.x, home.y, { timeout: 600 });
+        }
         this.onTrip.delete(name);
     }
 
