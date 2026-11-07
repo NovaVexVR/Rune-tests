@@ -82,7 +82,7 @@ Clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, r
 44. *(done: `bots/feasts.mjs`: a team member's win (contest, duel, quest, mayoralty) makes the best-stocked cook hand food to each teammate online by gift trade; mood and team trust up; once a day per team)* **Feasts:** after a team wins something its cook feeds everyone in the courtyard: mood and loyalty up.
 45. *(done: `bots/lottery.mjs`: weekly, a gambler sells 5gp tickets by coin trade for 6 hours and draws a winner; a greedy, disloyal one may keep the pot as an IOU the court will hear)* **The gambler's lottery:** a gambler bot sells tickets and draws a weekly winner; sometimes it runs off with the pot and the court gets involved.
 46. *(done: `bots/hunt.mjs`: every 3 days a riddle to a safe landmark; bots work it out hourly (teammates share), race there between tasks, the first wins 30gp from the mayor and the glory)* **Treasure hunts:** the director hides a prize (a bounty with a riddle clue to a place); bots follow the clues and teams race each other.
-47. **Revenge plots:** a bot that loses a grudge duel trains for a rematch, says so in its diary, and challenges again when it's ready.
+47. *(done: in `duel.mjs`: the loser of a grudge duel vows a rematch (`market/revenge.json`), trains melee in 35% of its steps, and challenges again once its combat passes the rival's; two failed rematches and it lets it go)* **Revenge plots:** a bot that loses a grudge duel trains for a rematch, says so in its diary, and challenges again when it's ready.
 
 ---
 

@@ -23,7 +23,7 @@ import { buildBoard } from './noticeboard.mjs';
 import { careerTask, checkGoal, apprenticeships } from './careers.mjs';
 import { TownEvents } from './events.mjs';
 import { sampleEconomy } from './economy.mjs';
-import { GrudgeDuels } from './duel.mjs';
+import { GrudgeDuels, revengeTask } from './duel.mjs';
 import { checkAlerts } from './director.mjs';
 import { backup } from './backup.mjs';
 import { awardNicknames } from './nicknames.mjs';
@@ -144,6 +144,8 @@ async function runBot(name, delay) {
                 item = { task: 'thieving', minutes: 20, why: 'team is poorest: making money' };
             }
             // career: some of the time, a task from the bot's chosen career instead (once it has one)
+            const rt = item.task !== 'treasury' && revengeTask(name); // training for a rematch (47)
+            if (rt && rt !== item.task && taskById(rt)?.canRun(bot) === true) item = { task: rt, minutes: item.minutes ?? 20, why: 'training for a rematch' };
             const ct = item.task !== 'treasury' && careerTask(bot, id => taskById(id)?.canRun(bot));
             if (ct && ct !== item.task) item = { task: ct, minutes: item.minutes ?? 20, why: 'career' };
             // a town event (fishing contest, smithing fair) is on: entrants do the event's skill until it ends

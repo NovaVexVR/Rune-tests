@@ -3,6 +3,7 @@
 // (interface 640: friendly, send), b challenges back to accept, both accept the rules (637 friendly / 631 staked) and confirm (639 / 626),
 // they're taken into an arena and fight ("Fight" option) until one is beaten.
 import { sleep, dist } from './lib.mjs';
+import fs from 'fs';
 import { note } from './diary.mjs';
 
 export const ARENA = { x: 3360, y: 3268 }; // the challenge area outside the arenas
@@ -78,6 +79,13 @@ export async function fightDuel(a, b, log = console.log) {
 // walks to the arena (paying the Al Kharid toll), waits for its rival, the challenger runs the fight, and both
 // go home. The winner's grudge is settled; the result goes in diaries, moods and the town's opinion.
 const HOME = { x: 3222, y: 3218 };
+// revenge plots (roadmap 47): the loser of a grudge duel trains for a rematch (bots/market/revenge.json)
+const REVENGE = new URL('./market/revenge.json', import.meta.url).pathname;
+const readRevenge = () => { try { return JSON.parse(fs.readFileSync(REVENGE, 'utf8')); } catch { return {}; } };
+const saveRevenge = v => fs.writeFileSync(REVENGE, JSON.stringify(v, null, 1));
+export const revengeOf = name => readRevenge()[name] ?? null;
+// the runner swaps in melee training this often while a bot is plotting revenge
+export const revengeTask = name => (revengeOf(name) && Math.random() < 0.35 ? 'melee' : null);
 export class GrudgeDuels {
     constructor(market, log = console.log) { this.market = market; this.log = log; this.pending = []; this.last = new Map(); }
     duelOf(name) { return this.pending.find(d => d.a === name || d.b === name); }
@@ -85,16 +93,19 @@ export class GrudgeDuels {
         const m = this.market, s = m.social, now = Date.now();
         if (this.pending.length >= 2) return;
         const free = n => { const b = m.bots.get(n)?.bot; return b?.s?.online && !m.isBusy(n) && !b.waiting && !b.dueling && !this.duelOf(n) && (b.s.coins ?? 0) + ((b.s.bank ?? []).find(i => i.name === 'Coins')?.count ?? 0) >= 30; };
+        const plots = readRevenge();
         for (const [a] of m.bots) {
-            if (!free(a) || s.p(a).caution > 0.6) continue;
-            for (const b of s.rivalsOf(a)) {
+            const plot = plots[a];
+            const ready = plot && (m.bots.get(a).bot.s?.combat ?? 0) > (m.bots.get(plot.rival)?.bot.s?.combat ?? 99);
+            if (!free(a) || (s.p(a).caution > 0.6 && !ready)) continue;
+            for (const b of ready ? [plot.rival] : s.rivalsOf(a)) {
                 const key = [a, b].sort().join('|');
                 if (!free(b) || now - (this.last.get(key) ?? 0) < 12 * 3600_000) continue;
                 const [ca, cb] = [m.bots.get(a).bot.s.combat ?? 3, m.bots.get(b).bot.s.combat ?? 3];
                 if (Math.abs(ca - cb) > 10) continue;
                 this.last.set(key, now);
-                const accepts = s.p(b).caution < 0.8 || s.mood(b) < -0.3;
-                m.bots.get(a).bot.act({ type: 'say', text: `${b}! Settle this at the Duel Arena.` }).catch(() => {});
+                const accepts = s.p(b).caution < 0.8 || s.mood(b) < -0.3 || ready; // nobody ducks a rematch
+                m.bots.get(a).bot.act({ type: 'say', text: ready ? `${b}! I've been training. Rematch, at the arena.` : `${b}! Settle this at the Duel Arena.` }).catch(() => {});
                 m.dm(a, b, 'Duel Arena. You and me. Friendly rules, but you will lose.');
                 if (!accepts) {
                     m.dm(b, a, "Not worth my time.");
@@ -159,6 +170,14 @@ export class GrudgeDuels {
             return;
         }
         s.clearRival(winner, loser); // honour satisfied
+        // revenge: the loser vows a rematch (unless that was the rematch and it lost again twice over)
+        const plots = readRevenge();
+        if (plots[winner]?.rival === loser) { delete plots[winner]; note(winner, `Got my revenge on ${loser}.`); this.log(`[duel] ${winner} has its revenge on ${loser}`); }
+        if (!d.tournament && !(plots[loser]?.rival === winner && plots[loser].tries >= 2)) {
+            plots[loser] = { rival: winner, since: new Date().toISOString(), combat: this.market.bots.get(loser)?.bot.s?.combat ?? 0, tries: (plots[loser]?.tries ?? 0) + 1 };
+            note(loser, `I'll train and beat ${winner} next time.`);
+        } else if (plots[loser]?.rival === winner) { delete plots[loser]; note(loser, `Lost to ${winner} again. Some fights aren't worth it.`); }
+        saveRevenge(plots);
         s.bumpMood(winner, 0.2, `beating ${loser} in a duel`);
         s.bumpMood(loser, -0.2, `losing a duel to ${winner}`);
         for (const [o] of this.market.bots) if (o !== winner && o !== loser) s.adjustTrust(o, winner, 0.01);
