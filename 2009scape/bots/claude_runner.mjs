@@ -34,6 +34,7 @@ import { crier, tabloid } from './crier.mjs';
 import { mayorTick } from './mayor.mjs';
 import { feasts } from './feasts.mjs';
 import { lottery } from './lottery.mjs';
+import { Hunts } from './hunt.mjs';
 import { readEconomy } from './economy.mjs';
 
 const ALL_BOTS = [];
@@ -42,6 +43,7 @@ const escorts = new Escorts(market, (...a) => console.log(new Date().toISOString
 const townEvents = new TownEvents(market, (...a) => console.log(new Date().toISOString(), ...a));
 const duels = new GrudgeDuels(market, (...a) => console.log(new Date().toISOString(), ...a));
 townEvents.duels = duels; // the duel tournament uses the arena machinery
+const hunts = new Hunts(market, (...a) => console.log(new Date().toISOString(), ...a));
 const marketDay = new MarketDay(market, (...a) => console.log(new Date().toISOString(), ...a));
 const parties = new Parties(market, (...a) => console.log(new Date().toISOString(), ...a));
 
@@ -133,6 +135,7 @@ async function runBot(name, delay) {
             }
             // quest party: wait for the rest of the party, then quest together
             if (await duels.join(bot)) continue; // a grudge duel at the arena
+            if (await hunts.join(bot)) continue; // a treasure hunt it has worked out
             if (await parties.join(bot)) continue;
             let item = plan[step];
             // politics: the poorest team spends some of its time making money
@@ -213,6 +216,7 @@ setInterval(() => { try { tabloid(); } catch (e) { console.log('tabloid:', e.mes
 setInterval(() => { try { mayorTick(market, (...a) => console.log(new Date().toISOString(), ...a)); } catch (e) { console.log('mayor:', e.message); } }, 60 * 60_000); // mayor of Lumbridge (43)
 setInterval(() => { try { feasts(market, (...a) => console.log(new Date().toISOString(), ...a)); } catch (e) { console.log('feasts:', e.message); } }, 60 * 60_000); // feasts (44)
 setInterval(() => { try { lottery(market, (...a) => console.log(new Date().toISOString(), ...a)); } catch (e) { console.log('lottery:', e.message); } }, 60 * 60_000); // the gambler's lottery (45)
+setInterval(() => { try { hunts.tick(); } catch (e) { console.log('hunt:', e.message); } }, 60 * 60_000); // treasure hunts (46)
 setInterval(() => backup('daily', (...a) => console.log(new Date().toISOString(), ...a)), 24 * 3600_000); // daily world backup (also one at every launch)
 setInterval(() => sampleEconomy().catch(e => console.log('economy sample:', e.message)), 30 * 60_000); // wealth over time (E23)
 setInterval(() => { try { townEvents.tick(); } catch (e) { console.log('town event error', e); } }, 60_000);
