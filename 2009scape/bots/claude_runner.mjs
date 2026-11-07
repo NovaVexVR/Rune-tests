@@ -26,6 +26,8 @@ import { sampleEconomy } from './economy.mjs';
 import { GrudgeDuels } from './duel.mjs';
 import { checkAlerts } from './director.mjs';
 import { backup } from './backup.mjs';
+import { awardNicknames } from './nicknames.mjs';
+import { readEconomy } from './economy.mjs';
 
 const ALL_BOTS = [];
 const market = new Market((...a) => console.log(new Date().toISOString(), ...a));
@@ -195,6 +197,7 @@ setInterval(() => { try { buildBoard(); } catch (e) { console.log('notice board:
 watchdog(ALL_BOTS, (...a) => console.log(new Date().toISOString(), ...a));
 setInterval(() => { try { if (!marketDay.upcoming()) duels.tick(); } catch (e) { console.log('duel error', e); } }, 30 * 60_000);
 setInterval(() => { try { const a = checkAlerts(); if (a.length) console.log(new Date().toISOString(), `[director] alert: ${a.join('; ')}`); } catch (e) { console.log('director alerts:', e.message); } }, 30 * 60_000); // trouble that calls for an early director pass
+setInterval(() => { try { awardNicknames(market, (...a) => console.log(new Date().toISOString(), ...a), readEconomy().at(-1)?.richest?.[0]?.bot); } catch (e) { console.log('nicknames:', e.message); } }, 60 * 60_000); // nicknames (37)
 setInterval(() => backup('daily', (...a) => console.log(new Date().toISOString(), ...a)), 24 * 3600_000); // daily world backup (also one at every launch)
 setInterval(() => sampleEconomy().catch(e => console.log('economy sample:', e.message)), 30 * 60_000); // wealth over time (E23)
 setInterval(() => { try { townEvents.tick(); } catch (e) { console.log('town event error', e); } }, 60_000);

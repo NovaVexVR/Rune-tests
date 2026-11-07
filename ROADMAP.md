@@ -72,7 +72,7 @@ Clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, r
 36. **Records and hall of fame:** firsts and milestones (first to Smithing 50, richest bot, most duels won) kept in `market/records.json`, shown in the recap and on the dashboard.
 
 ### I. Fun and quirks (planned)
-37. **Nicknames:** bots earn them from deeds ("Chickenslayer", "Old Ironfist", "the Unlucky"); others use them in chat and the recap uses them in headlines.
+37. *(done: `bots/nicknames.mjs`, hourly from diaries, skills and the richest bot; used in chat lines and a recap section; `market/nicknames.json`)* **Nicknames:** bots earn them from deeds ("Chickenslayer", "Old Ironfist", "the Unlucky"); others use them in chat and the recap uses them in headlines.
 38. **Superstitions and lucky charms:** a bot on a good streak decides an item is lucky, won't sell it and frets if it dies with it; little rituals (burying a bone at the chapel before mining).
 39. **Phobias:** a bot killed by something embarrassing (a chicken, an imp) avoids that creature for days and gets teased about it.
 40. **Gossip and rumours:** news passes bot to bot and drifts as it spreads ("owes 5gp" becomes "is a thief"); rumours move trust, and the target can clear its name.

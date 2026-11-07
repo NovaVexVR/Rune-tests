@@ -100,6 +100,7 @@ function makeHabits(name, p) {
 
 import { note } from './diary.mjs';
 import { relationOf } from './politics.mjs';
+import { callName } from './nicknames.mjs';
 
 const load = (f, d) => (fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : d);
 const save = (f, v) => fs.writeFileSync(f, JSON.stringify(v, null, 2));
@@ -341,6 +342,7 @@ export class Social {
     // A short in-character chat line (or null if this bot doesn't feel like talking).
     line(name, event, other) {
         const p = this.p(name);
+        if (other && /\d$/.test(other)) other = callName(other); // a bot: its nickname, half the time
         if (Math.random() > p.sociability) return null;
         const L = {
             sale: { merchant: `Pleasure doing business, ${other}.`, miser: `Don't spend it all at once.`, philanthropist: `Enjoy it, ${other}!`, default: `Deal.` },
