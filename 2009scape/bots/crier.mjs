@@ -24,6 +24,8 @@ function news(sinceMs) {
         else if (/^They've started calling me/.test(t)) h = `${e.bot} is now known as "${/"([^"]+)"/.exec(t)?.[1]}"`;
         else if (/^Decided to make a living as/.test(t)) h = `${e.bot} becomes ${/as (an? [\w ]+)\./.exec(t)?.[1]}`;
         else if (/^Cooked a feast for/.test(t)) h = `${e.bot} ${t.replace(/^Cooked/, 'cooked').replace(/\.$/, '')}`;
+        else if (/^Won \w+'s lottery/.test(t)) h = `${e.bot} ${t.replace(/^Won/, 'won').replace(/!$/, '')}`;
+        else if (/^Kept the lottery pot/.test(t)) h = `${e.bot} ran off with the lottery pot`;
         else if (/^Elected mayor/.test(t)) h = `${e.bot} elected mayor of Lumbridge`;
         else if (/^Pardoned /.test(t)) h = `Mayor ${e.bot} ${t.replace(/^Pardoned/, 'pardons').replace(/\.$/, '')}`;
         else if (/^Reached my goal/.test(t)) h = `${e.bot} reached a goal: ${/goal: ([^!]+)!/.exec(t)?.[1]}`;

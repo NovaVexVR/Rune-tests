@@ -33,6 +33,7 @@ import { tallTales } from './talltales.mjs';
 import { crier, tabloid } from './crier.mjs';
 import { mayorTick } from './mayor.mjs';
 import { feasts } from './feasts.mjs';
+import { lottery } from './lottery.mjs';
 import { readEconomy } from './economy.mjs';
 
 const ALL_BOTS = [];
@@ -211,6 +212,7 @@ setInterval(() => { try { crier(market, (...a) => console.log(new Date().toISOSt
 setInterval(() => { try { tabloid(); } catch (e) { console.log('tabloid:', e.message); } }, 24 * 3600_000); // the Lumbridge Whisper (42)
 setInterval(() => { try { mayorTick(market, (...a) => console.log(new Date().toISOString(), ...a)); } catch (e) { console.log('mayor:', e.message); } }, 60 * 60_000); // mayor of Lumbridge (43)
 setInterval(() => { try { feasts(market, (...a) => console.log(new Date().toISOString(), ...a)); } catch (e) { console.log('feasts:', e.message); } }, 60 * 60_000); // feasts (44)
+setInterval(() => { try { lottery(market, (...a) => console.log(new Date().toISOString(), ...a)); } catch (e) { console.log('lottery:', e.message); } }, 60 * 60_000); // the gambler's lottery (45)
 setInterval(() => backup('daily', (...a) => console.log(new Date().toISOString(), ...a)), 24 * 3600_000); // daily world backup (also one at every launch)
 setInterval(() => sampleEconomy().catch(e => console.log('economy sample:', e.message)), 30 * 60_000); // wealth over time (E23)
 setInterval(() => { try { townEvents.tick(); } catch (e) { console.log('town event error', e); } }, 60_000);
