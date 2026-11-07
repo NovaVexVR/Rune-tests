@@ -145,7 +145,7 @@ const DR = { kaqemeex: { x: 2925, y: 3486 }, sanfewLadder: { x: 2898, y: 3427 },
 const DR_ANSWERS = /in search of a quest|ok, i will try and help|sent to help purify the varrock stone circle/i;
 const MEATS = { 'Raw beef': ['Cow', { x: 3257, y: 3263 }], 'Raw rat meat': ['Giant rat', { x: 3180, y: 3190 }], 'Raw chicken': ['Chicken', { x: 3187, y: 3279 }], 'Raw bear meat': ['Black bear', { x: 2960, y: 3450 }] };
 async function killFor(bot, npcName, item, at, n = 1) {
-    await bot.travel(at.x, at.y, { tol: 5 });
+    if (!(await bot.travel(at.x, at.y, { tol: 5 }))) bot.log(`quest: couldn't reach the ${npcName}s at ${at.x},${at.y} (at ${bot.s.x},${bot.s.y})`);
     for (let i = 0; i < 20 && count(bot, item) < n; i++) {
         const s = await bot.state(12);
         if (await bot.handleInterrupts()) continue;
@@ -158,6 +158,7 @@ async function killFor(bot, npcName, item, at, n = 1) {
         await bot.waitIdle({ timeout: 40, quiet: 3, cond: st => !st.attacking && !st.inCombat });
         await bot.wait(2); // the drop lands a tick later
     }
+    if (count(bot, item) < n) bot.log(`quest: no ${item} from ${npcName} (at ${bot.s.x},${bot.s.y}; in view: ${bot.s.npcs.filter(x => x.name === npcName).map(x => `${x.x},${x.y}${x.inCombat ? ' busy' : ''}`).join(' ') || 'none'})`);
     return count(bot, item) >= n;
 }
 async function toSanfew(bot) {
