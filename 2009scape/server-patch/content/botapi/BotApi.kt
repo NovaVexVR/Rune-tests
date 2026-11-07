@@ -133,7 +133,14 @@ object BotRegistry {
      * Returns waypoints about 14 tiles apart and the doors on the way.
      */
     fun planRoute(fx: Int, fy: Int, tx: Int, ty: Int, z: Int, avoid: List<List<Int>>, solid: Set<Int> = emptySet(), step: Int = 14): JSONObject {
-        val margin = 60
+        // first in a box 60 tiles around both ends; if the way round leaves that box (Grand Exchange -> Edgeville goes
+        // south via Barbarian Village), search again in a wider one
+        val near = planRouteIn(fx, fy, tx, ty, z, avoid, solid, step, 60)
+        if (near["ok"] == true) return near
+        return runCatching { planRouteIn(fx, fy, tx, ty, z, avoid, solid, step, 160) }.getOrDefault(near)
+    }
+
+    private fun planRouteIn(fx: Int, fy: Int, tx: Int, ty: Int, z: Int, avoid: List<List<Int>>, solid: Set<Int>, step: Int, margin: Int): JSONObject {
         val x0 = minOf(fx, tx) - margin; val y0 = minOf(fy, ty) - margin
         val w = maxOf(fx, tx) + margin - x0 + 1; val h = maxOf(fy, ty) + margin - y0 + 1
         if (w * h > 700 * 700) throw BotError("route too long")

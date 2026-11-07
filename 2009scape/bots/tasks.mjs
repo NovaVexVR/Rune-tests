@@ -1119,22 +1119,27 @@ TASKS.push(MERCHANT);
 // Port Sarim (a seaman, 30gp) -> Musa Point -> the lobster spots (Cage) until the bag is full -> the customs officer
 // (30gp, a search for rum) -> Port Sarim -> bank the raw lobsters (cooked later by fish_cook's cookAll, or traded).
 const SARIM_DOCK = { x: 3028, y: 3219 }, MUSA_DOCK = { x: 2954, y: 3148 }, LOBSTERS = { x: 2924, y: 3179 };
+async function offBoat(bot) {
+    const plank = (await bot.state(8), bot.nearestScenery(l => /gangplank/i.test(l.name) && l.ops.some(o => /cross/i.test(o))));
+    if (plank && bot.s.z === 1) { await bot.act({ type: 'scenery', x: plank.x, y: plank.y, id: plank.id, op: plank.ops.find(o => /cross/i.test(o)) }); await bot.waitIdle({ timeout: 10, cond: st => st.z === 0 }); }
+}
 const BOAT_ANSWERS = /^yes, please\.?$|can i journey on this ship|search away|^ok\.?$/i;
 const onKaramja = s => s.x < 2990 && s.y < 3200 && s.x > 2750;
 async function sail(bot, toKaramja) {
     const at = toKaramja ? SARIM_DOCK : MUSA_DOCK, who = toKaramja ? /^Seaman (Lorris|Thresnor)$|^Captain Tobias$/ : /^Customs officer$/;
     await bot.travel(at.x, at.y, { tol: 3 });
-    for (let i = 0; i < 3 && onKaramja(await bot.state(8)) !== toKaramja; i++) {
+    const arrived = st => onKaramja(st) === toKaramja && st.z === 0; // and off the ship's deck (z 1)
+    for (let i = 0; i < 4 && !arrived(await bot.state(8)); i++) {
+        if (onKaramja(bot.s) === toKaramja) { await offBoat(bot); continue; } // docked: just the gangplank left
         const npc = bot.nearestNpc(n => who.test(n.name) && n.ops.some(o => /talk/i.test(o)));
         if (!npc) { await bot.walkTo(at.x, at.y, { tol: 1 }); continue; }
         await bot.talkTo(npc.name, { answer: BOAT_ANSWERS, maxSteps: 40 });
         await bot.waitIdle({ timeout: 30, quiet: 4, cond: s => onKaramja(s) === toKaramja });
         // the crossing is a short cutscene: wait it out, then step off the gangplank
         for (let k = 0; k < 10 && (await bot.state(6)).locked; k++) await bot.wait(3);
-        const plank = bot.nearestScenery(l => /gangplank/i.test(l.name) && l.ops.some(o => /cross/i.test(o)));
-        if (plank) { await bot.act({ type: 'scenery', x: plank.x, y: plank.y, id: plank.id, op: plank.ops.find(o => /cross/i.test(o)) }); await bot.waitIdle({ timeout: 10 }); }
+        await offBoat(bot);
     }
-    return onKaramja(bot.s) === toKaramja;
+    return arrived(bot.s);
 }
 export const LOBSTER = {
     id: 'lobsters',
