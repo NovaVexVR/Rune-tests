@@ -756,3 +756,89 @@ function combatXp(s) {
     return ['attack', 'strength', 'defence', 'hitpoints', 'ranged', 'magic'].reduce((t, k) => t + s.stats[k].xp, 0);
 }
 TASKS.push(FLETCH);
+
+// ---- Leather crafting (Al Kharid): cowhides (banked by cow fighters) -> Ellis tans them (1gp each) ->
+// needle and thread (Dommik) -> leather gloves/boots/cowls/vambraces/bodies by Crafting level -> bank at home.
+// The toll gate costs 10gp each way.
+const TOLL = { west: { x: 3267, y: 3227 }, east: { x: 3269, y: 3227 } };
+const ELLIS = { x: 3274, y: 3192 }, DOMMIK = { x: 3321, y: 3194 };
+// soft leather items (iface 154 child, Crafting level), best first
+const LEATHER_ITEMS = [['Leather body', 28, 14], ['Leather vambraces', 31, 11], ['Leather cowl', 34, 9], ['Leather boots', 30, 7], ['Leather gloves', 29, 1]];
+const LEATHER_GOODS = /^(Leather( gloves| boots| cowl| vambraces| body)?|Cowhide)$/;
+async function crossToll(bot, toEast) {
+    const from = toEast ? TOLL.west : TOLL.east;
+    await bot.travel(from.x, from.y, { tol: 1 });
+    for (let i = 0; i < 3; i++) {
+        const s = await bot.state(4);
+        if (toEast ? s.x >= 3268 : s.x <= 3267) return true;
+        if (s.coins < 10) { bot.log('leather: no coins for the toll'); return false; }
+        const gate = s.scenery.find(o => o.name === 'Gate' && o.x === 3268 && o.ops.some(op => /pay-toll/i.test(op)));
+        if (!gate) { await bot.walkTo(from.x, from.y, { tol: 0 }); continue; }
+        await bot.act({ type: 'scenery', x: gate.x, y: gate.y, id: gate.id, op: gate.ops.find(op => /pay-toll/i.test(op)) });
+        await bot.waitIdle({ timeout: 10, quiet: 2 });
+    }
+    const s = await bot.state(1);
+    return toEast ? s.x >= 3268 : s.x <= 3267;
+}
+export const LEATHER = {
+    id: 'leather',
+    skills: ['crafting'],
+    canRun: bot => {
+        const n = name => bot.count(name) + (bot.s.bank ?? []).filter(i => i.name === name).reduce((t, i) => t + i.count, 0);
+        if (n('Cowhide') + n('Leather') < 5) return 'need cowhides (5+)';
+        if (n('Coins') < 30) return 'need 30 coins for the toll and tanning';
+        return true;
+    },
+    async run(bot, until) {
+        if (!(await bot.openBank())) return;
+        await bot.depositAll(i => !KEEP(i.name) && !LEATHER_GOODS.test(i.name) && !/^(Needle|Thread)$/.test(i.name));
+        for (const n of ['Coins', 'Needle', 'Thread', 'Leather', 'Cowhide']) if (bot.s.bank?.some(i => i.name === n) && bot.s.invFree > 0) await bot.withdraw(n, 'all');
+        await bot.leaveBank();
+        await bot.state(2);
+        const hides = bot.count('Cowhide');
+        if (bot.s.coins < 20 + hides) { bot.log('leather: not enough coins for the trip'); return; }
+        bot.log(`leather: taking ${hides} cowhides to Al Kharid`);
+        if (!(await crossToll(bot, true))) return;
+        try {
+            // tan everything at Ellis
+            if (hides) {
+                await bot.walkTo(ELLIS.x, ELLIS.y, { tol: 3 });
+                for (let i = 0; i < 3 && (await bot.state(6)).inv.some(x => x.name === 'Cowhide'); i++) {
+                    const e = bot.nearestNpc(n => n.name === 'Ellis');
+                    if (!e) { await bot.walkTo(ELLIS.x, ELLIS.y, { tol: 1 }); continue; }
+                    await bot.act({ type: 'npc', npc: e.npc, op: 'Trade' });
+                    await bot.waitIdle({ timeout: 15, cond: st => st.iface === 324 });
+                    if (bot.s.iface !== 324) { bot.log(`leather: Ellis's tanning screen didn't open (ops ${e.ops})`); continue; }
+                    await bot.act({ type: 'button', iface: 324, child: 1, op: 4 }).catch(() => {}); // soft leather, all
+                    await bot.wait(3);
+                    await bot.closeInterfaces();
+                }
+                await bot.state(1);
+                bot.log(`leather: tanned, now ${bot.count('Leather')} leather`);
+            }
+            // needle and thread
+            if (!bot.has('Needle') || !bot.has('Thread')) {
+                if (await bot.openShop({ x: DOMMIK.x, y: DOMMIK.y, npcs: ['Dommik'] })) {
+                    if (!bot.has('Needle')) await bot.buy('Needle', 1);
+                    if (bot.count('Thread') < 5) await bot.buy('Thread', 5);
+                    await bot.closeInterfaces();
+                }
+            }
+            // craft: the best piece for our level, all the leather
+            const cr = bot.lvl('crafting');
+            const [piece, child] = LEATHER_ITEMS.find(([, , lv]) => cr >= lv);
+            for (let i = 0; i < 4 && bot.count('Leather') > 0 && bot.has('Needle') && bot.has('Thread') && now() < until + 10 * 60_000; i++) {
+                await bot.act({ type: 'useitem', item: 'Needle', onItem: 'Leather' });
+                await bot.wait(2);
+                await bot.act({ type: 'button', iface: 154, child, op: 2 }).catch(() => {}); // make all
+                await bot.waitIdle({ timeout: 90, quiet: 5 });
+                await bot.state(1);
+            }
+            bot.log(`leather: made ${bot.count(piece)} ${piece}`);
+        } finally {
+            await crossToll(bot, false);
+        }
+        await bot.bankItems(i => LEATHER_GOODS.test(i.name));
+    }
+};
+TASKS.push(LEATHER);
