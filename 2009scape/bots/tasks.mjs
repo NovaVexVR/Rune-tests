@@ -14,6 +14,8 @@ export const PLACES = {
     goblins: { x: 3246, y: 3241 },
     draynorFish: { x: 3087, y: 3229 },
     draynorWillows: { x: 3087, y: 3236 },
+    lumbridgeWillows: { x: 3233, y: 3238 }, // willows at 3232,3245 and 3234,3231 by the river: no dark wizards
+    lumbridgeRiver: { x: 3239, y: 3246 }, // fly fishing (Lure) spots: trout and salmon
     draynorTrees: { x: 3087, y: 3244 },
     swampFish: { x: 3243, y: 3151 },
     swampMine: { x: 3229, y: 3148 },
@@ -36,7 +38,7 @@ export const BRONZE_PIECES = [
 ];
 
 // what a bot keeps on it when it banks: its tools and some food
-const KEEP = name => /pickaxe$|(^| )axe$|^Hammer$|^Tinderbox$|^Small fishing net$|^Knife$|^Chisel$|^Shears$|^Coins$/.test(name) || FOOD.includes(name);
+const KEEP = name => /pickaxe$|(^| )axe$|^Hammer$|^Tinderbox$|^Small fishing net$|^Knife$|^Chisel$|^Shears$|^Fly fishing rod$|^Feather$|^Coins$/.test(name) || FOOD.includes(name);
 
 // ---- bank clear-outs ----
 // Bots bank everything. Goods normally leave the bank through trades and market days (marketday.mjs takes surplus
@@ -88,10 +90,31 @@ export async function prepare(bot, taskId) {
         await bot.leaveBank();
         bot.log(`tools: took ${missing.join(', ')} out of the bank`);
     }
+    if (taskId === 'fish_cook') await flyKit(bot).catch(e => bot.log(`fly fishing kit: ${e.message}`));
     await bot.gearUp({ weapon: !['ranged', 'magic'].includes(taskId) }).catch(() => {});
     if (['melee', 'ranged', 'magic', 'thieving'].includes(taskId)) {
         const food = await bot.ensureFood(4).catch(() => 0);
         if (food < 2) await catchFood(bot, 6).catch(e => bot.log(`food: ${e.message}`)); // nothing banked: catch and cook some
+    }
+}
+
+// Fly fishing from Fishing 20: carry the rod and the banked feathers (chicken fighters bank them);
+// a fisher with no rod and 30+ coins buys one at Gerrant's in Port Sarim (at most once a day if it fails).
+export const FEATHERS_MIN = 10;
+async function flyKit(bot) {
+    if (bot.lvl('fishing') < 20) return;
+    const banked = n => (bot.s.bank ?? []).filter(i => i.name === n).reduce((t, i) => t + i.count, 0);
+    const take = [];
+    if (!bot.has('Fly fishing rod') && banked('Fly fishing rod')) take.push(['Fly fishing rod', 1]);
+    if (banked('Feather')) take.push(['Feather', 'all']);
+    if (take.length && (await bot.openBank())) { for (const [n, k] of take) await bot.withdraw(n, k).catch(() => {}); await bot.leaveBank(); }
+    const coins = bot.s.coins + banked('Coins');
+    if (!bot.has('Fly fishing rod') && coins >= 30 && Date.now() > (bot._rodTry ?? 0)) {
+        bot._rodTry = Date.now() + 24 * 3600_000;
+        bot.log('fly fishing: buying a rod (and feathers) at Port Sarim');
+        await RESUPPLY.run(bot, Date.now() + 15 * 60_000, ['Fly fishing rod']);
+        // a few feathers to start with if none were banked (6gp each: keep most of the coins)
+        if (bot.has('Fly fishing rod') && bot.count('Feather') < FEATHERS_MIN && bot.s.coins >= 60 && (await bot.openShop(SHOPS.gerrant))) { await bot.buy('Feather', 10); await bot.closeInterfaces(); }
     }
 }
 
@@ -133,8 +156,10 @@ export const IRON_PIECES = [
 
 export const SHOPS = {
     bob: { x: 3229, y: 3203, npcs: ['Bob'], sells: { 'Bronze axe': 16, 'Bronze pickaxe': 1, 'Iron axe': 56, 'Steel axe': 200 } },
-    general: { x: 3216, y: 3241, npcs: ['Shopkeeper', 'Shop assistant'], sells: { Tinderbox: 1, Hammer: 1, Chisel: 1, Bucket: 2, 'Empty pot': 1 } }
-    // Small fishing net / runes are only sold in Port Sarim / Varrock: bots trade for those
+    general: { x: 3216, y: 3241, npcs: ['Shopkeeper', 'Shop assistant'], sells: { Tinderbox: 1, Hammer: 1, Chisel: 1, Bucket: 2, 'Empty pot': 1 } },
+    // Port Sarim fishing shop (shops.json "Gerrant's Fishy Business"): rods and feathers for fly fishing
+    gerrant: { x: 3013, y: 3224, npcs: ['Gerrant'], sells: { 'Fly fishing rod': 5, Feather: 6, 'Small fishing net': 5 } }
+    // runes are only sold in Varrock: bots trade for those
 };
 // Free respawning ground items near Lumbridge (wiki guides; coordinates from the server's ground spawns)
 export const FREE_SPAWNS = {
@@ -166,7 +191,7 @@ const FM_REQ = { Logs: 1, 'Oak logs': 15, 'Willow logs': 30 };
 
 function treeFor(bot) {
     const wc = bot.lvl('woodcutting');
-    if (wc >= 30 && bot.s.combat >= 20) return { place: PLACES.draynorWillows, names: ['Willow'] };
+    if (wc >= 30) return { place: PLACES.lumbridgeWillows, names: ['Willow'] };
     if (wc >= 20) return { place: PLACES.lumbridgeOaks, names: ['Oak'] };
     return { place: PLACES.lumbridgeTrees, names: ['Tree'] };
 }
@@ -287,10 +312,15 @@ export const TASKS = [
     {
         id: 'fish_cook',
         skills: ['fishing', 'cooking'],
-        canRun: bot => bot.has('Small fishing net') || 'need a small fishing net',
+        canRun: bot => bot.has('Small fishing net') || (bot.has('Fly fishing rod') && bot.count('Feather') > 0) || 'need a small fishing net',
         async run(bot, until) {
             // Draynor has aggressive dark wizards: only go there once combat can handle them
-            const spot = bot.s.combat >= 20 && Math.random() < 0.5 ? PLACES.draynorFish : PLACES.swampFish;
+            // fly fishing (trout from 20, salmon from 30) while there are feathers; otherwise the net
+            const fly = () => bot.lvl('fishing') >= 20 && bot.has('Fly fishing rod') && bot.count('Feather') > 0;
+            const flying = fly();
+            const spot = flying ? PLACES.lumbridgeRiver : bot.s.combat >= 20 && Math.random() < 0.5 ? PLACES.draynorFish : PLACES.swampFish;
+            const OP = flying ? 'Lure' : 'Net';
+            if (flying) bot.log(`fly fishing with ${bot.count('Feather')} feathers`);
             await bot.walkTo(spot.x, spot.y, { tol: 5 });
             while (now() < until) {
                 const s = await bot.state(14);
@@ -313,9 +343,10 @@ export const TASKS = [
                     await bot.walkTo(spot.x, spot.y, { tol: 5 });
                     continue;
                 }
-                const fs = bot.nearestNpc(n => n.name === 'Fishing spot' && n.ops.includes('Net'));
+                if (flying && !fly()) { bot.log('out of feathers: back to the net'); return; }
+                const fs = bot.nearestNpc(n => n.name === 'Fishing spot' && n.ops.includes(OP));
                 if (!fs) { await bot.walkTo(spot.x + rand(-4, 4), spot.y + rand(-4, 4), { tol: 2 }); continue; }
-                await gatherOnce(bot, fs, 'Net', 'npc', 60);
+                await gatherOnce(bot, fs, OP, 'npc', 60);
             }
         }
     },
@@ -585,8 +616,13 @@ export const FLETCH = {
     async run(bot, until) {
         if (!bot.has('Knife') && !(await pickupFree(bot, 'Knife'))) return;
         // oaks once it can (Fletching 20, Woodcutting 15): oak shortbows, oak longbows from 25
-        const oak = bot.lvl('fletching') >= 20 && bot.lvl('woodcutting') >= 15;
-        const LOG = oak ? 'Oak logs' : 'Logs', TREE = oak ? 'Oak' : 'Tree', AT = oak ? PLACES.lumbridgeOaks : PLACES.lumbridgeTrees;
+        // willows once it can (Fletching 35, Woodcutting 30): willow shortbows, willow longbows from 40
+        const fl0 = bot.lvl('fletching'), wc = bot.lvl('woodcutting');
+        const tier = fl0 >= 35 && wc >= 30 ? 'willow' : fl0 >= 20 && wc >= 15 ? 'oak' : 'normal';
+        const oak = tier === 'oak';
+        const LOG = { willow: 'Willow logs', oak: 'Oak logs', normal: 'Logs' }[tier];
+        const TREE = { willow: 'Willow', oak: 'Oak', normal: 'Tree' }[tier];
+        const AT = { willow: PLACES.lumbridgeWillows, oak: PLACES.lumbridgeOaks, normal: PLACES.lumbridgeTrees }[tier];
         await bot.walkTo(AT.x, AT.y, { tol: 6 });
         while (now() < until) {
             const s = await bot.state(14);
@@ -595,7 +631,7 @@ export const FLETCH = {
             if (s.invFree === 0 || (logs.length >= 10)) {
                 // fletching guide: arrow shafts to 10, then shortbows (u) / longbows (u); oak: shortbows, longbows from 25
                 const fl = bot.lvl('fletching');
-                const want = oak ? (fl >= 25 ? /oak longbow/i : /oak shortbow/i) : (fl >= 10 ? /longbow/i : fl >= 5 ? /shortbow/i : /shaft/i);
+                const want = tier === 'willow' ? (fl >= 40 ? /willow longbow/i : /willow shortbow/i) : oak ? (fl >= 25 ? /oak longbow/i : /oak shortbow/i) : (fl >= 10 ? /longbow/i : fl >= 5 ? /shortbow/i : /shaft/i);
                 await bot.act({ type: 'useitem', item: 'Knife', onItem: LOG });
                 await bot.wait(2);
                 await bot.state(3);
@@ -604,7 +640,7 @@ export const FLETCH = {
                 await bot.waitIdle({ timeout: 90, quiet: 4 });
                 await bot.state();
                 // unstrung bows and spare logs are goods: bank them (arrow shafts stack, so they stay in the bag)
-                if (bot.s.invFree <= 4) await bot.bankItems(i => /^(Logs|Oak logs|(Oak )?[Ss]hortbow \(u\)|(Oak )?[Ll]ongbow \(u\))$/.test(i.name));
+                if (bot.s.invFree <= 4) await bot.bankItems(i => /^(Logs|Oak logs|Willow logs|((Oak|Willow) )?[Ss]hortbow \(u\)|((Oak|Willow) )?[Ll]ongbow \(u\))$/.test(i.name));
                 continue;
             }
             const tree = bot.nearestScenery(l => l.name === TREE && l.ops.includes('Chop down'));
