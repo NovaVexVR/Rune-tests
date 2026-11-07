@@ -19,6 +19,7 @@ import { Parties } from './party.mjs';
 import { note, noteLevel } from './diary.mjs';
 import { Escorts } from './escort.mjs';
 import { buildBoard } from './noticeboard.mjs';
+import { careerTask, checkGoal } from './careers.mjs';
 
 const ALL_BOTS = [];
 const market = new Market((...a) => console.log(new Date().toISOString(), ...a));
@@ -120,6 +121,9 @@ async function runBot(name, delay) {
             if (team?.focus === 'money' && team.treasurer !== name && item.task !== 'thieving' && Math.random() < 0.5) {
                 item = { task: 'thieving', minutes: 20, why: 'team is poorest: making money' };
             }
+            // career: some of the time, a task from the bot's chosen career instead (once it has one)
+            const ct = item.task !== 'treasury' && careerTask(bot, id => taskById(id)?.canRun(bot));
+            if (ct && ct !== item.task) item = { task: ct, minutes: item.minutes ?? 20, why: 'career' };
             const task = taskById(item.task);
             if (!task) { bot.log(`unknown task ${item.task}, skipping`); writeStep(name, step + 1); continue; }
             let ok = task.canRun(bot);
@@ -139,6 +143,7 @@ async function runBot(name, delay) {
             await prepare(bot, item.task);
             try { await task.run(bot, marketDay.deadline(name, Date.now() + (item.minutes ?? 15) * 60_000)); }
             finally { if (bot.escort) escorts.finish(name); }
+            checkGoal(bot);
             writeStep(name, step + 1);
             // habit: now and then, drift to a favorite spot between tasks
             const habits = personalityOf(name).habits;

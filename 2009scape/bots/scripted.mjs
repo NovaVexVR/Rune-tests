@@ -6,6 +6,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { Bot, LOG_DIR, rand, sleep, summary, watchdog, rememberDanger } from './lib.mjs';
+import { careerOf, careerBonus, checkGoal } from './careers.mjs';
 import { TASKS, RESUPPLY, shopFor, prepare, clearOut, surplusInBank } from './tasks.mjs';
 import { TASK_NEEDS, TRADEABLE } from './market.mjs';
 
@@ -29,7 +30,7 @@ function chooseTask(bot, lastId) {
     // score = average level of the task's skills (lower is better) + noise for variety
     const scored = runnable.map(t => {
         const avg = t.skills.reduce((a, k) => a + bot.lvl(k), 0) / t.skills.length;
-        return { t, score: avg + Math.random() * 4 };
+        return { t, score: avg + Math.random() * 4 + careerBonus(bot, t.id) }; // careers favour their own tasks
     });
     scored.sort((a, b) => a.score - b.score);
     return scored[0]?.t ?? TASKS.find(t => t.id === 'melee');
@@ -49,13 +50,14 @@ async function runBot(name, startDelay) {
                 await bot.onboard();
             }
             await bot.state();
+            careerOf(bot); // settles on a career once it has found its feet
             const task = chooseTask(bot, lastId);
             const minutes = rand(50, 70); // roughly hourly task changes
             bot.log(`task -> ${task.id} for ${minutes}m | ${summary(bot.s)}`);
             const shopping = task.canRun(bot) === true ? null : buyableNeeds(bot, task);
             if (shopping) { bot.log(`buying ${shopping.join(', ')} for ${task.id}`); await RESUPPLY.run(bot, Date.now() + 10 * 60_000, shopping); }
             if (Date.now() - (bot._lastClearOut ?? 0) > 3600_000 && surplusInBank(bot).length) { bot._lastClearOut = Date.now(); await clearOut(bot); }
-            if (task.canRun(bot) === true) { await prepare(bot, task.id); await task.run(bot, Date.now() + minutes * 60_000); }
+            if (task.canRun(bot) === true) { await prepare(bot, task.id); await task.run(bot, Date.now() + minutes * 60_000); checkGoal(bot); }
             lastId = task.id;
             await bot.state(1);
             fs.appendFileSync(PROGRESS, JSON.stringify({ t: Date.now(), bot: name, kind: 'scripted', task: task.id, total: bot.s.totalLevel, combat: bot.s.combat, x: bot.s.x, y: bot.s.y, stats: Object.fromEntries(Object.entries(bot.s.stats).map(([k, v]) => [k, v.level])) }) + '\n');
