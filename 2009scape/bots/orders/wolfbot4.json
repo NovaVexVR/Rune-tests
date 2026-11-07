@@ -24,7 +24,7 @@
   ],
   "loop": true,
   "paused": false,
-  "step": 2,
+  "step": 4,
   "personality": {
     "archetype": "loyalist",
     "greed": 0.3,

@@ -24,7 +24,7 @@
   ],
   "loop": true,
   "paused": false,
-  "step": 4,
+  "step": 1,
   "personality": {
     "archetype": "philanthropist",
     "greed": 0.13,
@@ -36,7 +36,8 @@
     "habits": {
       "spot": "chapel",
       "food": "Anchovies",
-      "collection": "tools"
+      "collection": "tools",
+      "collectionDone": "2026-11-07T01:04:32.257Z"
     }
   }
 }

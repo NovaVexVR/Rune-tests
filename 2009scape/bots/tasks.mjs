@@ -7,7 +7,7 @@ import { getShears, shear, spin } from './quests.mjs';
 export const PLACES = {
     lumbridge: { x: 3222, y: 3219 },
     lumbridgeTrees: { x: 3196, y: 3232 },
-    lumbridgeOaks: { x: 3205, y: 3243 },
+    lumbridgeOaks: { x: 3197, y: 3255 }, // between the oaks at 3188,3247 and 3206,3263,
     lumbridgeKitchen: { x: 3209, y: 3214 },
     chickens: { x: 3187, y: 3279 },
     cows: { x: 3257, y: 3263 },
