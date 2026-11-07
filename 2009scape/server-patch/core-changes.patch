@@ -78,7 +78,7 @@ index e2656b0..5b3e12a 100644
  		OutgoingPacket p = OUTGOING_PACKETS.get(clazz);
  		if (p == null) {
 diff --git a/Server/worldprops/default.conf b/Server/worldprops/default.conf
-index 2fe516c..7c0746a 100644
+index 2fe516c..1c2fb69 100644
 --- a/Server/worldprops/default.conf
 +++ b/Server/worldprops/default.conf
 @@ -71,7 +71,7 @@ activity = "2009Scape Classic."
@@ -90,3 +90,12 @@ index 2fe516c..7c0746a 100644
  #message of the week model ID, 0 for random
  motw_identifier = "0"
  #text shown for message of the week - @name will be replaced with the name property set above.
+@@ -87,7 +87,7 @@ increased_door_time = false
+ enable_botting = false
+ max_adv_bots = 100
+ enable_doubling_money_scammers = true
+-wild_pvp_enabled = false
++wild_pvp_enabled = true
+ jad_practice_enabled = false
+ enable_global_chat = false
+ #minimum HA value for announcements of bots selling on ge
