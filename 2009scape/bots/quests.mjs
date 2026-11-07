@@ -66,6 +66,65 @@ async function toJuliet(bot) {
     return true;
 }
 
+// Imp Catcher: Wizard Mizgog on the Wizards' Tower's second floor wants a red, yellow, black and white bead.
+// Imps (level 2-7) roam around Lumbridge and Draynor; each kill drops a given bead 1 time in 16.
+const BEADS = ['Red bead', 'Yellow bead', 'Black bead', 'White bead'];
+const IMP_GROUNDS = [{ x: 3212, y: 3226 }, { x: 3240, y: 3250 }, { x: 3190, y: 3260 }, { x: 3067, y: 3254 }, { x: 3110, y: 3280 }];
+const IC_ANSWERS = /give me a quest please|i'll try/i;
+async function upTower(bot, z) {
+    await bot.travel(3109, 3163, { tol: 2 });
+    await bot.act({ type: 'scenery', x: 3107, y: 3162, id: 11993, op: 'Open' }).catch(() => {}); // the auto-walk door
+    await bot.wait(6);
+    for (let i = 0; i < 6 && (await bot.state(12)).z < z; i++) {
+        const st = bot.nearestScenery(l => /stair|ladder/i.test(l.name) && l.ops.some(o => /climb-up|climb/i.test(o)) && l.y < 9000);
+        if (!st) { bot.log('quest: no way up the tower'); return false; }
+        const op = st.ops.find(o => /^climb-up$/i.test(o)) ?? st.ops.find(o => /climb/i.test(o));
+        const z0 = bot.s.z;
+        await bot.act({ type: 'scenery', x: st.x, y: st.y, id: st.id, op });
+        await bot.waitIdle({ timeout: 12, cond: x => x.z > z0 });
+        await bot.handleInterrupts({ answer: /climb up/i });
+    }
+    return bot.s.z >= z;
+}
+async function downTower(bot) {
+    for (let i = 0; i < 6 && (await bot.state(12)).z > 0; i++) {
+        const st = bot.nearestScenery(l => /stair|ladder/i.test(l.name) && l.ops.some(o => /climb-down|climb/i.test(o)));
+        if (!st) break;
+        const op = st.ops.find(o => /^climb-down$/i.test(o)) ?? st.ops.find(o => /climb/i.test(o));
+        const z0 = bot.s.z;
+        await bot.act({ type: 'scenery', x: st.x, y: st.y, id: st.id, op });
+        await bot.waitIdle({ timeout: 12, cond: x => x.z < z0 });
+        await bot.handleInterrupts({ answer: /climb down/i });
+    }
+}
+async function talkMizgog(bot) {
+    if (!(await upTower(bot, 2))) return false;
+    await bot.walkTo(3103, 3163, { tol: 2, timeout: 40, direct: true });
+    await bot.talkTo('Wizard Mizgog', { answer: IC_ANSWERS, maxSteps: 60 });
+    await bot.state(5);
+    await downTower(bot);
+    return true;
+}
+async function huntBeads(bot, minutes = 25) {
+    const end = Date.now() + minutes * 60_000;
+    let at = IMP_GROUNDS[Math.floor(Math.random() * IMP_GROUNDS.length)];
+    await bot.travel(at.x, at.y, { tol: 4 });
+    while (Date.now() < end && BEADS.some(b => !count(bot, b))) {
+        const s = await bot.state(14);
+        if (await bot.handleInterrupts()) continue;
+        const bead = s.ground.find(g => BEADS.includes(g.name) && !count(bot, g.name) && g.dist <= 8);
+        if (bead && s.invFree > 0) { await bot.act({ type: 'ground', x: bead.x, y: bead.y, id: bead.id }); await bot.waitIdle({ timeout: 10 }); continue; }
+        if (s.attacking || s.inCombat) { await bot.wait(2); continue; }
+        if (s.hp < s.maxHp * 0.4) { const f = s.inv.find(i => i.ops.includes('Eat')); if (f) { await bot.act({ type: 'item', slot: f.slot, op: 'Eat' }); await bot.wait(2); continue; } }
+        const imp = bot.nearestNpc(n => n.name === 'Imp' && n.ops.includes('Attack') && !n.inCombat);
+        if (!imp) { at = IMP_GROUNDS[Math.floor(Math.random() * IMP_GROUNDS.length)]; await bot.travel(at.x, at.y, { tol: 4 }); continue; }
+        await bot.act({ type: 'npc', npc: imp.npc, op: 'Attack' });
+        await bot.waitIdle({ timeout: 25, quiet: 3, cond: st => !st.attacking && !st.inCombat });
+    }
+    bot.log(`quest: beads ${BEADS.filter(b => count(bot, b)).join(', ') || 'none'}`);
+    return BEADS.every(b => count(bot, b));
+}
+
 // Ways to get one quest item (each returns true once the bot holds it). `n`: how many to get.
 export const GATHER = {
     async 'Cadava berries'(bot, n = 1) {
@@ -283,6 +342,20 @@ export const QUESTS = {
                 await bot.talkTo('Fred the Farmer', { answer: FRED_ANSWERS, maxSteps: 40 });
                 await bot.state(5);
             }
+            return stageOf(bot, this.name) >= 100;
+        }
+    },
+    imp_catcher: {
+        name: 'Imp Catcher',
+        items: [], // the beads are hunted in finish (several sessions if need be: what's found is kept)
+        async start(bot) {
+            if (stageOf(bot, this.name) > 0) return true;
+            await talkMizgog(bot);
+            return stageOf(bot, this.name) > 0;
+        },
+        async finish(bot) {
+            if (!(await huntBeads(bot))) return false;
+            await talkMizgog(bot);
             return stageOf(bot, this.name) >= 100;
         }
     },

@@ -39,7 +39,7 @@ export const BRONZE_PIECES = [
 ];
 
 // what a bot keeps on it when it banks: its tools and some food
-const KEEP = name => /pickaxe$|(^| )axe$|^Hammer$|^Tinderbox$|^Small fishing net$|^Knife$|^Chisel$|^Shears$|^Fly fishing rod$|^Feather$|^Needle$|^Thread$|^Air talisman$|^Coins$/.test(name) || FOOD.includes(name);
+const KEEP = name => /pickaxe$|(^| )axe$|^Hammer$|^Tinderbox$|^Small fishing net$|^Knife$|^Chisel$|^Shears$|^Fly fishing rod$|^Feather$|^Needle$|^Thread$|^Air talisman$|^(Red|Yellow|Black|White) bead$|^Cadava (berries|potion)$|^Coins$/.test(name) || FOOD.includes(name);
 
 // ---- bank clear-outs ----
 // Bots bank everything. Goods normally leave the bank through trades and market days (marketday.mjs takes surplus
