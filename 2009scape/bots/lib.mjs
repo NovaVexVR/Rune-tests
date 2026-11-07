@@ -1,4 +1,5 @@
 // Bot client library for the 2009Scape bot API (127.0.0.1:8899).
+import { recordDeath } from './phobias.mjs';
 import fs from 'fs';
 import path from 'path';
 
@@ -146,6 +147,9 @@ export class Bot {
             const key = `${s.x},${s.y},${s.z},${Object.values(s.stats).reduce((t, k) => t + k.xp, 0)},${s.hp}`;
             if (key !== this._progressKey) { this._progressKey = key; this.lastProgress = Date.now(); }
         }
+        // who's been hitting us (for phobias: what killed us)
+        const hitter = (s.npcs ?? []).find(n => String(n.target ?? '').toLowerCase() === this.name.toLowerCase());
+        if (hitter) this._lastAttacker = { name: hitter.name, level: hitter.level, t: Date.now() };
         this.s = s;
         return s;
     }
@@ -467,6 +471,7 @@ export class Bot {
             // by the time the message arrives the bot is already back at the respawn point: the last state before it
             // (this.s, not yet replaced) is where it fell
             const at = this.s?.online ? this.s : s;
+            recordDeath(this.name, this._lastAttacker, (...m) => this.log(...m));
             if (at.y >= 6000) return;
             const again = this._deathAt && Date.now() - this._deathAt.t < 10 * 60_000; // died again soon: don't go back a second time
             this._deathAt = { x: at.x, y: at.y, z: at.z, t: Date.now() };

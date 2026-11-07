@@ -1,5 +1,6 @@
 // Skill-training tasks shared by scripted bots and Claude-directed bots (2009Scape).
 // Each task: { id, skills, canRun(bot) -> true | reason, run(bot, untilMs) }
+import { fearOf } from './phobias.mjs';
 import { dist, rand, sleep, FOOD, gearInfo } from './lib.mjs';
 import { faction, TASK_NEEDS } from './market.mjs';
 import { getShears, shear, spin } from './quests.mjs';
@@ -723,6 +724,8 @@ export const FLETCH = {
 };
 
 async function fightLoop(bot, until, area, names, { pickup = [], stopIf = null } = {}) {
+    const feared = fearOf(bot.name); // a phobia (killed by one recently): leave those alone
+    if (feared && names.includes(feared)) { names = names.filter(n => n !== feared); bot.log(`not fighting ${feared}s (still shaken)`); if (!names.length) return; }
     await bot.walkTo(area.x, area.y, { tol: 6 });
     while (now() < until) {
         const s = await bot.state(12);

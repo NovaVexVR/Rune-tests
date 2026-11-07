@@ -74,7 +74,7 @@ Clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, r
 ### I. Fun and quirks (planned)
 37. *(done: `bots/nicknames.mjs`, hourly from diaries, skills and the richest bot; used in chat lines and a recap section; `market/nicknames.json`)* **Nicknames:** bots earn them from deeds ("Chickenslayer", "Old Ironfist", "the Unlucky"); others use them in chat and the recap uses them in headlines.
 38. **Superstitions and lucky charms:** a bot on a good streak decides an item is lucky, won't sell it and frets if it dies with it; little rituals (burying a bone at the chapel before mining).
-39. **Phobias:** a bot killed by something embarrassing (a chicken, an imp) avoids that creature for days and gets teased about it.
+39. *(done: `bots/phobias.mjs`: the last attacker is remembered from the state; a death to a level-5-or-lower creature gives a 3-day phobia (no fights with it, a diary line), and sociable bots nearby tease it hourly)* **Phobias:** a bot killed by something embarrassing (a chicken, an imp) avoids that creature for days and gets teased about it.
 40. **Gossip and rumours:** news passes bot to bot and drifts as it spreads ("owes 5gp" becomes "is a thief"); rumours move trust, and the target can clear its name.
 41. **Tall tales:** fishers and fighters boast in chat, the boasts grow with each telling, and bots who know better call them out.
 42. **Town crier and the tabloid:** a sociable bot shouts the news in Lumbridge square; a second recap written as a biased gossip rag by a journalist bot with favourites and enemies.
