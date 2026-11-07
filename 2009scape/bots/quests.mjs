@@ -70,7 +70,8 @@ async function toJuliet(bot) {
 // Imp Catcher: Wizard Mizgog on the Wizards' Tower's second floor wants a red, yellow, black and white bead.
 // Imps (level 2-7) roam around Lumbridge and Draynor; each kill drops a given bead 1 time in 16.
 const BEADS = ['Red bead', 'Yellow bead', 'Black bead', 'White bead'];
-const IMP_GROUNDS = [{ x: 3212, y: 3226 }, { x: 3240, y: 3250 }, { x: 3190, y: 3260 }, { x: 3067, y: 3254 }, { x: 3110, y: 3280 }];
+// east and north of Lumbridge only: the Draynor imps share their ground with the dark wizards
+const IMP_GROUNDS = [{ x: 3212, y: 3226 }, { x: 3240, y: 3250 }, { x: 3190, y: 3260 }, { x: 3230, y: 3290 }, { x: 3250, y: 3205 }];
 const IC_ANSWERS = /give me a quest please|i'll try/i;
 async function upTower(bot, z) {
     await bot.travel(3109, 3163, { tol: 2 });
@@ -355,6 +356,7 @@ export const QUESTS = {
             return stageOf(bot, this.name) > 0;
         },
         async finish(bot) {
+            if ((bot.s.combat ?? 3) < 10) { bot.log('quest: Imp Catcher waits until combat 10 (imps hit back)'); return false; }
             if (!(await huntBeads(bot))) return false;
             await talkMizgog(bot);
             return stageOf(bot, this.name) >= 100;
