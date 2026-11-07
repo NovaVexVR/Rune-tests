@@ -14,7 +14,7 @@ const teamsState = fs.existsSync(path.join(HERE, 'market/teams.json')) ? JSON.pa
 const liveTeam = n => { for (const [t, d] of Object.entries(teamsState?.teams ?? {})) if (d.members.includes(n)) return TEAM_NAMES[t] ?? t; return null; };
 const groupOf = n => liveTeam(n) ?? groupOfName(n);
 const groupOfName = n =>
-    n.startsWith('script') ? 'Scripted' : /^(claude|guild|wolf|hawk|bear|legion)/.test(n) ? 'Individualist' : n.startsWith('guild') ? 'Guild team' : n.startsWith('wolf') ? 'Wolf team' : n.startsWith('hawk') ? 'Hawk team' : n.startsWith('bear') ? 'Bear team' : n.startsWith('legion') ? 'Legion' : 'Other';
+    n.startsWith('script') ? 'Scripted' : n.startsWith('newbie') ? 'Newcomer' : /^(claude|guild|wolf|hawk|bear|legion)/.test(n) ? 'Individualist' : n.startsWith('guild') ? 'Guild team' : n.startsWith('wolf') ? 'Wolf team' : n.startsWith('hawk') ? 'Hawk team' : n.startsWith('bear') ? 'Bear team' : n.startsWith('legion') ? 'Legion' : 'Other';
 const readJson = (f, d) => (fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : d);
 const lastTask = name => {
     const f = path.join(HERE, 'logs', `${name}.log`);
@@ -27,7 +27,7 @@ const lastTask = name => {
 const list = await (await fetch(`${API}/bots`)).json();
 const bots = [];
 for (const b of list) {
-    if (!/^(scriptbot|claudebot|guildbot|wolfbot|hawkbot|bearbot|legion)\d+$/.test(b.name)) continue;
+    if (!/^(scriptbot|claudebot|guildbot|wolfbot|hawkbot|bearbot|legion|newbie)\d+$/.test(b.name)) continue;
     const s = await (await fetch(`${API}/bot/${b.name}/state?r=0`)).json();
     if (!s.online) { bots.push({ bot: b.name, group: groupOf(b.name), online: false }); continue; }
     const o = readJson(path.join(HERE, 'orders', `${b.name}.json`), {});

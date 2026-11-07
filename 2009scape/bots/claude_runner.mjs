@@ -179,4 +179,44 @@ setInterval(() => { try { buildBoard(); } catch (e) { console.log('notice board:
 watchdog(ALL_BOTS, (...a) => console.log(new Date().toISOString(), ...a));
 setInterval(() => { try { marketDay.tick(); } catch (e) { console.log('market day error', e); } }, 60_000);
 setInterval(() => { try { if (!marketDay.upcoming()) parties.tick(); } catch (e) { console.log('party error', e); } }, 5 * 60_000);
-await Promise.all(names.map((n, i) => runBot(n, i * 3000)));
+// ---- D18 newcomers: a fresh level-1 bot joins every NEWCOMER_HOURS (up to MAX_NEWCOMERS). A team with room
+// sends its most generous member to welcome it with a starter gift; the trust that builds lets the council
+// recruit it. Kept in market/newcomers.json (cleared on a reset); their orders files are written on arrival.
+const NEWCOMER_FILE = path.join(path.dirname(new URL(import.meta.url).pathname), 'market', 'newcomers.json');
+const NEWCOMER_HOURS = Number(process.env.NEWCOMER_HOURS ?? 6), MAX_NEWCOMERS = Number(process.env.MAX_NEWCOMERS ?? 10);
+const newcomers = (() => { try { return JSON.parse(fs.readFileSync(NEWCOMER_FILE, 'utf8')); } catch { return { joined: [], last: Date.now() }; } })();
+const saveNewcomers = () => fs.writeFileSync(NEWCOMER_FILE, JSON.stringify(newcomers, null, 1));
+const STARTER_PLAN = [{ task: 'woodcut_fire', minutes: 20, why: 'newcomer: learning the basics' }, { task: 'fish_cook', minutes: 20, why: 'newcomer: food' }, { task: 'mine', minutes: 15, why: 'newcomer' }, { task: 'melee', minutes: 20, why: 'newcomer: getting tougher' }];
+async function welcome(name) {
+    await sleep(5 * 60_000); // let it find its feet first
+    const teams = Object.entries(POLITICS.teams).filter(([, d]) => d.members.length < Math.max(d.maxSize, 5) * 1.5);
+    const [team, d] = teams[Math.floor(Math.random() * teams.length)] ?? [];
+    if (!team) return;
+    const mentor = d.members.filter(m => market.bots.get(m)?.bot.s?.online).sort((a, b) => market.social.p(b).generosity - market.social.p(a).generosity)[0];
+    if (!mentor) return;
+    market.dm(mentor, name, `Welcome to Lumbridge, ${name}. ${team} looks after its own. Here's something to start with.`);
+    const spare = market.surplusOf(mentor).find(i => TRADEABLE.has(i.name));
+    market.open(spare ? { buyer: name, seller: mentor, item: spare.name, amount: 1, price: 0, kind: 'gift' } : { buyer: name, seller: mentor, item: 'Coins', amount: 20, price: 0, kind: 'gift' });
+    market.social.adjustTrust(name, mentor, 0.3);
+    market.social.adjustTrust(mentor, name, 0.2);
+    for (const m of d.members) if (m !== mentor) market.social.adjustTrust(m, name, 0.15);
+    market.social.save();
+    note(name, `${mentor} of ${team} welcomed me to town with a gift.`);
+    note(mentor, `Welcomed the newcomer ${name} on behalf of ${team}.`);
+    console.log(new Date().toISOString(), `[newcomer] ${mentor} (${team}) welcomes ${name}`);
+}
+function addNewcomer() {
+    if (newcomers.joined.length >= MAX_NEWCOMERS) return;
+    const name = `newbie${newcomers.joined.length + 1}`;
+    const f = path.join(ORDERS, `${name}.json`);
+    if (!fs.existsSync(f)) fs.writeFileSync(f, JSON.stringify({ plan: STARTER_PLAN, loop: true, paused: false }, null, 2));
+    newcomers.joined.push({ name, t: new Date().toISOString() });
+    newcomers.last = Date.now();
+    saveNewcomers();
+    console.log(new Date().toISOString(), `[newcomer] ${name} arrives in Lumbridge`);
+    note(name, 'Arrived in Lumbridge with nothing but the starter kit.');
+    runBot(name, 0).catch(e => console.log(`newcomer ${name}:`, e));
+    welcome(name).catch(() => {});
+}
+setInterval(() => { if (Date.now() - newcomers.last > NEWCOMER_HOURS * 3600_000) addNewcomer(); }, 10 * 60_000);
+await Promise.all([...names, ...newcomers.joined.map(n => n.name)].map((n, i) => runBot(n, i * 3000)));

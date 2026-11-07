@@ -2,9 +2,9 @@
 import fs from 'fs';
 process.chdir(new URL('.', import.meta.url).pathname);
 const API = 'http://127.0.0.1:8899';
-const bots = (await (await fetch(`${API}/bots`)).json()).filter(b => /^(scriptbot|claudebot|guildbot|wolfbot|hawkbot|bearbot|legion)/.test(b.name)).sort((a, b) => a.name.localeCompare(b.name));
+const bots = (await (await fetch(`${API}/bots`)).json()).filter(b => /^(scriptbot|claudebot|guildbot|wolfbot|hawkbot|bearbot|legion|newbie)/.test(b.name)).sort((a, b) => a.name.localeCompare(b.name));
 const lastTask = {};
-for (const f of fs.readdirSync('logs').filter(f => /^(scriptbot|claudebot|guildbot|wolfbot|hawkbot|bearbot|legion)\d+\.log$/.test(f))) {
+for (const f of fs.readdirSync('logs').filter(f => /^(scriptbot|claudebot|guildbot|wolfbot|hawkbot|bearbot|legion|newbie)\d+\.log$/.test(f))) {
     const lines = fs.readFileSync(`logs/${f}`, 'utf8').trim().split('\n');
     const t = [...lines].reverse().find(l => /task ->|\[plan step/.test(l));
     lastTask[f.replace('.log', '')] = t ? (t.match(/task -> (\w+)/)?.[1] ?? t.match(/\] (\w+) for/)?.[1]) : '-';

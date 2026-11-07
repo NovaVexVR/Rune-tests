@@ -39,7 +39,7 @@ What's planned for the bot world, in priority order, plus how the built systems 
 15. *(done: `bots/noticeboard.mjs` -> `market/noticeboard.json` every 10 min; in the recap; going prices pull bots' own prices toward them)* **Public notice board** for bounties, prices and reputations, readable in the recaps.
 16. *(done: council diplomacy in `politics.mjs`: allied above +0.08 team trust twice running, feud below -0.08 or 3+ grudges; allies trade 10% cheaper and escort each other, feuds mark up 20%)* **Team alliances and feuds** that go beyond single-bot grudges, with team-level trust.
 17. *(done: `bots/justice.mjs` in the council: the most trusted bot hears recent defaults; warning first, then a court-ordered fine (debt + 50%, due in a day) for 2+ defaults a week, the treasurer is told; judges gain respect)* **Disputes and justice:** a respected bot (or the most trusted per team) arbitrates defaults and fines repeat offenders.
-18. **Newcomers:** new bots join over time as fresh characters; teams recruit and mentor them.
+18. *(done: `claude_runner.mjs`: a fresh `newbie<n>` every 6 h, up to 10, on a starter plan; a team's most generous member welcomes it with a gift and the trust lets the council recruit it; `market/newcomers.json`)* **Newcomers:** new bots join over time as fresh characters; teams recruit and mentor them.
 19. **PvP (Phase 5):** fix the duel blocker (bots reach the arena but "Fight" starts no combat), wire duels into grudges, then bounded wilderness fights (details below).
 20. **Events:** weekly fishing contests, smithing fairs, and duel tournaments once duels work, announced in chat and covered in the recap.
 21. **Rest of random events wave 3:** Surprise Exam, Mime, Pillory, Quiz Master, Evil Bob, Candlelight (need item models or animations).
@@ -50,7 +50,7 @@ What's planned for the bot world, in priority order, plus how the built systems 
 24. **Test the launcher on Windows.**
 
 ### Milestone: reset to level 1 and start the real run
-Clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, remove the test bots (`testbot`, `qbot*`, `pbot*`, `mbot*`, `gebot*`, `dbot*`, `lbot*`, `sbot*`, `abot*`), and start the fleet with `launch.mjs`. Human players join the fresh world.
+Clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, remove the test bots (`testbot`, `qbot*`, `pbot*`, `mbot*`, `gebot*`, `dbot*`, `lbot*`, `sbot*`, `abot*`, `ebot*`) and the newcomers' orders (`orders/newbie*.json`), and start the fleet with `launch.mjs`. Human players join the fresh world.
 
 25. **Human players** joining the server and trading or chatting with bots.
 
