@@ -741,11 +741,11 @@ async function fightLoop(bot, until, area, names, { pickup = [], stopIf = null }
             continue;
         }
         if (s.attacking || s.inCombat) { await bot.wait(2); continue; }
-        const loot = s.ground.find(o => o.dist <= 5 && ['Bones', 'Feather', ...pickup].includes(o.name) && s.invFree > 1);
+        const loot = s.ground.find(o => o.dist <= 5 && (['Bones', 'Feather', ...pickup].includes(o.name) || /^Grimy /.test(o.name)) && s.invFree > 1); // herbs: for herblore (31)
         if (loot) { await bot.act({ type: 'ground', x: loot.x, y: loot.y, id: loot.id }); await bot.waitIdle({ timeout: 8 }); continue; }
         const bones = s.inv.find(i => i.name === 'Bones');
         if (bones) { await bot.act({ type: 'item', slot: bones.slot, op: 'Bury' }); await bot.wait(2); continue; }
-        if (s.invFree <= 2) { await bot.bankItems(i => /^(Raw chicken|Raw beef|Cowhide|Goblin mail|Chef's hat|Feather)$/.test(i.name) || (/^(Bronze|Iron)/.test(i.name) && !i.ops.some(o => /wield|wear/i.test(o))), { back: area }); continue; }
+        if (s.invFree <= 2) { await bot.bankItems(i => /^(Raw chicken|Raw beef|Cowhide|Goblin mail|Chef's hat|Feather)$|^Grimy /.test(i.name) || (/^(Bronze|Iron)/.test(i.name) && !i.ops.some(o => /wield|wear/i.test(o))), { back: area }); continue; }
         const t = bot.nearestNpc(n => names.includes(n.name) && !n.inCombat && n.ops.includes('Attack'));
         if (!t) { await bot.walkTo(area.x + rand(-5, 5), area.y + rand(-5, 5), { tol: 2 }); continue; }
         const xpBefore = combatXp(bot.s);
@@ -1002,3 +1002,69 @@ export const RUNECRAFT = {
     }
 };
 TASKS.push(RUNECRAFT);
+
+// ---- Herblore (roadmap 31), after Druidic Ritual: grimy herbs (fighters pick them up from drops and bank them) ->
+// clean them -> vials from Jatix in Taverley (5gp) filled at the village fountain -> unfinished potions; guams with
+// an eye of newt (3gp, also Jatix) become attack potions. Potions are banked as goods.
+const JATIX = { x: 2897, y: 3429, npcs: ['Jatix'] }, TAV_FOUNTAIN = { x: 2892, y: 3437 };
+// level to clean (by the grimy herb's name) and to make the unfinished potion (by the clean herb's name)
+const HERB_LEVEL = { 'Grimy guam': 3, 'Grimy marrentill': 5, 'Grimy tarromin': 11, 'Grimy harralander': 20, 'Grimy ranarr': 25 };
+const UNF_LEVEL = { 'Clean guam': 3, 'Clean marrentill': 5, 'Clean tarromin': 12, 'Clean harralander': 22, 'Clean ranarr': 30 };
+export const HERBLORE = {
+    id: 'herblore',
+    skills: ['herblore'],
+    canRun: bot => {
+        if ((bot.s.quests?.['Druidic Ritual'] ?? 0) < 100) return 'needs Druidic Ritual';
+        const herbs = [...bot.s.inv, ...(bot.s.bank ?? [])].filter(i => bot.lvl('herblore') >= (HERB_LEVEL[i.name] ?? UNF_LEVEL[i.name] ?? 99)).reduce((t, i) => t + i.count, 0);
+        if (herbs < 3) return 'needs 3+ herbs it can use';
+        return bot.s.coins + ((bot.s.bank ?? []).find(i => i.name === 'Coins')?.count ?? 0) >= 30 || 'needs 30 coins for vials';
+    },
+    async run(bot, until) {
+        if (!(await bot.openBank())) return;
+        await bot.depositAll(i => !KEEP(i.name));
+        for (const it of (bot.s.bank ?? []).filter(i => /^(Grimy|Clean) /.test(i.name))) if (bot.s.invFree > 13) await bot.withdrawN(it.name, Math.min(it.count, 9));
+        if (bot.s.coins < 60) await bot.withdrawN('Coins', 60 - bot.s.coins);
+        await bot.leaveBank();
+        // clean what we can
+        for (let i = 0; i < 20; i++) {
+            const g = (await bot.state(2)).inv.find(x => /^Grimy /.test(x.name) && x.ops.includes('Clean'));
+            if (!g) break;
+            await bot.act({ type: 'item', slot: g.slot, op: 'Clean' });
+            await bot.wait(2);
+            if ((await bot.state(1)).inv.some(x => x.slot === g.slot && x.name === g.name)) break; // too low a level for it
+        }
+        const herbs = bot.s.inv.filter(x => UNF_LEVEL[x.name] && bot.lvl('herblore') >= UNF_LEVEL[x.name]);
+        if (!herbs.length) { bot.log('herblore: no herbs I can use yet'); await bot.bankItems(i => /^(Grimy|Clean) /.test(i.name)); return; }
+        const guams = herbs.filter(h => h.name === 'Clean guam').length;
+        if (await bot.openShop(JATIX)) {
+            await bot.buy('Vial', herbs.length);
+            if (guams) await bot.buy('Eye of newt', guams);
+            await bot.closeInterfaces();
+        }
+        // fill the vials at the fountain
+        await bot.walkTo(TAV_FOUNTAIN.x, TAV_FOUNTAIN.y, { tol: 2 });
+        for (let i = 0; i < 4 && bot.count('Vial'); i++) {
+            const f = (await bot.state(8), bot.nearestScenery(l => /fountain/i.test(l.name)));
+            if (!f) break;
+            await bot.act({ type: 'useitem', item: 'Vial', x: f.x, y: f.y, id: f.id });
+            await bot.waitIdle({ timeout: 20, quiet: 3 });
+        }
+        // herb + vial of water -> unfinished potion; guam (unf) + eye of newt -> attack potion
+        for (let i = 0; i < 30 && now() < until + 10 * 60_000; i++) {
+            const s = await bot.state(2);
+            const herb = s.inv.find(x => UNF_LEVEL[x.name] && bot.lvl('herblore') >= UNF_LEVEL[x.name]);
+            const unfGuam = s.inv.find(x => /^Guam potion ?\(unf\)$/.test(x.name));
+            if (herb && bot.has('Vial of water')) { await bot.act({ type: 'useitem', item: herb.name, onItem: 'Vial of water' }); }
+            else if (unfGuam && bot.has('Eye of newt')) { await bot.act({ type: 'useitem', item: 'Eye of newt', onItem: unfGuam.name }); }
+            else break;
+            await bot.wait(3);
+            const menu = (await bot.state(2)).dialog?.skillMenu;
+            if (menu) await bot.act({ type: 'skillmenu', index: 0 });
+            await bot.waitIdle({ timeout: 30, quiet: 3 });
+        }
+        const made = bot.s.inv.filter(x => /potion/i.test(x.name)).map(x => x.name);
+        bot.log(`herblore: made ${made.length} (${[...new Set(made)].join(', ')})`);
+        await bot.bankItems(i => /potion|^(Grimy|Clean) |^Vial|^Eye of newt$/.test(i.name));
+    }
+};
+TASKS.push(HERBLORE);

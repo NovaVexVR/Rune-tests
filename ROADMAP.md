@@ -64,7 +64,7 @@ Clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, r
 30. **Bots trade with humans:** accept human trade requests at the bot's own perceived prices; humans can post bounties on the notice board and bots fill them.
 
 ### H. Deeper gameplay and story (planned)
-31. **Herblore:** unlocked by Druidic Ritual: clean herbs from drops, attack potions (guam + eye of newt), a herbalist career; potions become goods to trade.
+31. *(done and verified: `herblore` task after Druidic Ritual: grimy herbs picked up by fighters, cleaned, vials and eyes of newt from Jatix (Taverley), filled at the village fountain, unfinished potions and attack potions (6 made, +150 xp); a herbalist career)* **Herblore:** unlocked by Druidic Ritual: clean herbs from drops, attack potions (guam + eye of newt), a herbalist career; potions become goods to trade.
 32. **Group combat outings:** teams go together to the Varrock sewers or the moss giants, with roles (front fighter, food carrier, looter), building on escorts.
 33. **Wilderness risk and reward:** wilderness mines and resources that bold bots visit for better pay, with a real risk of being attacked (wilderness PvP is on).
 34. **Karamja trips:** the boat from Port Sarim for lobsters and better food at higher fishing levels.

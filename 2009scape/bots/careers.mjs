@@ -22,7 +22,8 @@ export const CAREERS = {
     fletcher: { skill: 'fletching', tasks: ['fletch', 'woodcut_fire'], title: 'a fletcher' },
     fighter: { skill: 'attack', tasks: ['melee', 'ranged'], title: 'a fighter', gear: true },
     thief: { skill: 'thieving', tasks: ['thieving'], title: 'a thief' },
-    mystic: { skill: 'runecrafting', tasks: ['runecraft', 'magic'], title: 'a runecrafter' }
+    mystic: { skill: 'runecrafting', tasks: ['runecraft', 'magic'], title: 'a runecrafter' },
+    herbalist: { skill: 'herblore', tasks: ['herblore', 'melee'], title: 'a herbalist' }
 };
 // personality leanings (added to the skill level when choosing)
 const LEAN = {
@@ -38,7 +39,7 @@ const ARMOUR = ['head', 'body', 'legs', 'shield'];
 
 // how suited a bot is to a career: its skill, counting the skills that feed it (a miner is half a smith already,
 // a woodcutter half a fletcher, a strong fighter a fighter)
-const FEEDS = { smith: ['mining', 0.8], fletcher: ['woodcutting', 0.6], fighter: ['strength', 1], crafter: ['firemaking', 0], fisher: ['cooking', 0.6], thief: ['thieving', 1], mystic: ['magic', 0.6] };
+const FEEDS = { herbalist: ['herblore', 1], smith: ['mining', 0.8], fletcher: ['woodcutting', 0.6], fighter: ['strength', 1], crafter: ['firemaking', 0], fisher: ['cooking', 0.6], thief: ['thieving', 1], mystic: ['magic', 0.6] };
 function aptitude(bot, k) {
     const [feed, w] = FEEDS[k] ?? [null, 0];
     return Math.max(bot.lvl(CAREERS[k].skill), feed ? bot.lvl(feed) * w : 0);
