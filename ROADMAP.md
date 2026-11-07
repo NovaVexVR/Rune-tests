@@ -26,12 +26,12 @@ What's planned for the bot world, in priority order, plus how the built systems 
 ### B. A real economy
 7. *(done)* **Team stash:** the treasurer keeps shared goods (food, armour, tools) as well as coins, and hands them out to members who need them.
 8. *(done: wool to balls of wool (`spin`), cowhide to leather to leather armour (`leather`, Al Kharid), ore to bars to armour, bank notes for trading)* **Reasons to trade:** crafting chains and selling surplus, so market days have real supply and demand.
-9. *(done in code: iron; steel (coal at Barbarian Village from Mining 40, steel bars from Smithing 30, steel armour); fighters buy armour at Horvik's with 30% of their savings. Steel still being tested in-game)* **Iron and steel.**
+9. *(done and verified: iron; steel (coal at Barbarian Village from Mining 40, steel bars from Smithing 30, steel armour); fighters buy armour at Horvik's with 30% of their savings)* **Iron and steel.**
 10. *(done: oak bows (willow bows and Lumbridge willows written, not yet tested in-game), fly fishing (rod from Port Sarim, feathers from chickens), leather crafting; agility still to do)* **More training methods.**
-11. *(done in code: the castle range after Cook's Assistant, Runecrafting after Rune Mysteries (essence via Aubury, air runes at the air altar; being tested), prayer from buried bones)* **Use what quests unlock.**
+11. *(done: the castle range after Cook's Assistant, Runecrafting after Rune Mysteries (essence via Aubury, air runes at the air altar; verified: 63 runes in 3 trips), prayer from buried bones)* **Use what quests unlock.**
 
 ### C. Progression
-12. *(written: escorts (`bots/escort.mjs`, `test_escort.mjs`, used for the iron mine's muggers; in-game test pending a server rebuild) and apprenticeships (`careers.mjs`: hourly, a career bot with 20+ takes on a weaker teammate once a day and gives it the trade's starter goods))* **Escorts and apprenticeships:** stronger teammates escort or train weaker ones; needed for the next quests.
+12. *(written: escorts (`bots/escort.mjs`, `test_escort.mjs`, used for the iron mine's muggers; verified in-game) and apprenticeships (`careers.mjs`: hourly, a career bot with 20+ takes on a weaker teammate once a day and gives it the trade's starter goods))* **Escorts and apprenticeships:** stronger teammates escort or train weaker ones; needed for the next quests.
 13. *(Romeo & Juliet and Druidic Ritual done and verified in-game (Herblore unlocked); Imp Catcher verified in-game (all four beads after 18 imp fights, Amulet of accuracy); The Knight's Sword still to do)* **More quests:** The Knight's Sword and Druidic Ritual (both need escorts past ice warriors / Taverley dungeon), Romeo & Juliet, Imp Catcher.
 14. *(done: `bots/careers.mjs`: a career from total level 60 (best skill + personality), plans bend toward it (up to 40% of steps), skill-to-next-10 or full-armour-set goals with diary lines; `market/careers.json`)* **Careers and life goals:** each bot picks a career (smith, fisher, crafter, fighter) and a long-term goal from its personality (full steel armour, a skill to 50, a quest list), and its plan bends toward it. Diaries and recaps follow the goal.
 
@@ -50,7 +50,7 @@ What's planned for the bot world, in priority order, plus how the built systems 
 24. **Test the launcher on Windows.**
 
 ### Milestone: reset to level 1 and start the real run
-Clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, remove the test bots (`testbot`, `qbot*`, `pbot*`, `mbot*`, `gebot*`, `dbot*`, `lbot*`, `sbot*`, `abot*`, `ebot*`) and the newcomers' orders (`orders/newbie*.json`), and start the fleet with `launch.mjs`. Human players join the fresh world.
+Clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, remove the test bots (`testbot`, `qbot*`, `pbot*`, `mbot*`, `gebot*`, `dbot*`, `lbot*`, `sbot*`, `abot*`, `ebot*`, `rjbot*`, `icbot*`, `drbot*`) and the newcomers' orders (`orders/newbie*.json`), and start the fleet with `launch.mjs`. Human players join the fresh world.
 
 25. **Human players** joining the server and trading or chatting with bots.
 
