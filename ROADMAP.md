@@ -2,7 +2,7 @@
 
 What's planned for the bot world, in priority order, plus how the built systems work.
 
-**Note:** bots will be reset to fresh level-1 characters for the real run (milestone below); until then, test scenarios are set up by hand to prove each mechanic.
+**Note:** bots will be reset to fresh level-1 characters for the real run (milestone just before human players join, after everything else on this list is built); until then, test scenarios are set up by hand to prove each mechanic.
 
 ## Done
 - **Core:** bot API (real client packets, no admin), 60 bots (10 scripted, 10 individualists, four 5-bot teams, a 20-bot legion), shops, banking, cross-platform launcher (`launch.mjs`; tested on Linux, not yet on Windows).
@@ -15,7 +15,7 @@ What's planned for the bot world, in priority order, plus how the built systems 
 
 ## Planned, in priority order
 
-### A. Keep the bots alive and running (before the real run)
+### A. Keep the bots alive and running
 1. *(done)* **Stuck-bot watchdog:** flag bots that haven't moved or gained xp in a while, and unstick them (walk home, relog, rescue).
 2. *(done: shop sales only when a bank is nearly full; surplus goes to market days)* **Bank management:** banks fill now that bots keep everything. Periodic clear-outs: sell junk to shops, post surplus on the GE, give teammates what they need, keep a reserve of food and tools.
 3. *(done: a quick catch-and-cook run before fights/thieving; cooking itself fixed)* **Food for bots with an empty bank:** buy it, fish it, or ask a teammate, instead of going out without any.
@@ -30,9 +30,6 @@ What's planned for the bot world, in priority order, plus how the built systems 
 10. **More training methods** from the guides: fly fishing, leather crafting, willow bows, agility. *(Started: oak shortbows/longbows at Fletching 20, Woodcutting 15.)*
     - Trading uses bank notes for multiples (one bag slot per stack): trades, market-day goods, clear-outs. Done.
 11. **Use what quests unlock:** the Lumbridge range after Cook's Assistant (fewer burnt fish), Runecrafting after Rune Mysteries (essence via Aubury, air runes for magic training), prayer from buried bones.
-
-### Milestone: reset to level 1 and start the real run
-Clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, remove the test bots (`testbot`, `qbot*`, `pbot*`, `mbot*`, `gebot*`, `dbot*`), and start the fleet with `launch.mjs`. Everything below is built while the real run goes on.
 
 ### C. Progression
 12. **Escorts and apprenticeships:** stronger teammates escort or train weaker ones; needed for the next quests.
@@ -52,6 +49,10 @@ Clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, r
 22. **Daily director pass:** Claude reads the recap and rewrites some bots' plans (`orders/`).
 23. **Economy charts:** coins in circulation, prices over time, who's rich and who's poor, on the dashboard.
 24. **Test the launcher on Windows.**
+
+### Milestone: reset to level 1 and start the real run
+Clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, remove the test bots (`testbot`, `qbot*`, `pbot*`, `mbot*`, `gebot*`, `dbot*`), and start the fleet with `launch.mjs`. Human players join the fresh world.
+
 25. **Human players** joining the server and trading or chatting with bots.
 
 ---

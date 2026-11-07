@@ -94,7 +94,7 @@ Last session's container had everything under `/home/user`; a new one starts emp
 - Personalities live in `orders/<bot>.json`; bots without an orders file (test bots) get a seeded one. A tools collector won't sell a Knife or Hammer, which can make a staged trade test look broken.
 
 ## Next steps (in order)
-Follow the numbered list in `ROADMAP.md` ("Planned, in priority order"): section A first (watchdog, bank clear-outs, food, danger memory, death recovery, regular tests), then B (team stash, reasons to trade, iron/steel, training, quest unlocks), then the reset-to-level-1 milestone. Open threads: the duel "Fight" blocker (item 19) and confirming in the fleet that thieving bots rest and fishers bank their catch.
+Follow the numbered list in `ROADMAP.md` ("Planned, in priority order"): section A first (watchdog, bank clear-outs, food, danger memory, death recovery, regular tests), then B (team stash, reasons to trade, iron/steel, training, quest unlocks), then C, D and E (items 12–24); the reset-to-level-1 milestone comes just before human players (item 25). Open threads: the duel "Fight" blocker (item 19) and confirming in the fleet that thieving bots rest and fishers bank their catch.
 
 ## Usage rules (from the user)
 - **Keep usage low.** Don't spend tokens on anything not asked for: no unrequested status checks, polling loops, screenshots or dashboard refreshes.
