@@ -55,10 +55,10 @@ index 4f9ba87..2a52687 100644
              entity.timers.removeTimer(this)
          if (entity is Player && entity.rights == Rights.ADMINISTRATOR)
 diff --git a/Server/src/main/core/net/packet/PacketRepository.java b/Server/src/main/core/net/packet/PacketRepository.java
-index e2656b0..5b3e12a 100644
+index e2656b0..cc738fc 100644
 --- a/Server/src/main/core/net/packet/PacketRepository.java
 +++ b/Server/src/main/core/net/packet/PacketRepository.java
-@@ -89,6 +89,18 @@ public final class PacketRepository {
+@@ -89,6 +89,22 @@ public final class PacketRepository {
  	@SuppressWarnings({ "rawtypes", "unchecked" })
  	public static void send(Class<? extends OutgoingPacket> clazz, Context context) {
                  if(context.getPlayer() instanceof AIPlayer) return;
@@ -72,6 +72,10 @@ index e2656b0..5b3e12a 100644
 +                    else if (context instanceof core.net.packet.context.StringContext) {
 +                        core.net.packet.context.StringContext sc = (core.net.packet.context.StringContext) context;
 +                        content.botapi.BotRegistry.onString(context.getPlayer(), sc.getInterfaceId(), sc.getLineId(), sc.getString());
++                    }
++                    else if (context instanceof core.net.packet.context.DisplayModelContext) {
++                        core.net.packet.context.DisplayModelContext dm = (core.net.packet.context.DisplayModelContext) context;
++                        content.botapi.BotRegistry.onModel(context.getPlayer(), dm.getInterfaceId(), dm.getChildId(), dm.getNodeId(), dm.getType().name());
 +                    }
 +                }
  		if(context.getPlayer().getSession() == null) return;

@@ -51,6 +51,7 @@ class BotData(val name: String, val session: BotSession) {
     var seq = 0
     // interface id -> (child -> text), captured from outgoing string packets
     val strings = HashMap<Int, HashMap<Int, String>>()
+    val models = HashMap<Int, HashMap<Int, String>>()
     @Synchronized fun addMessage(m: String) {
         messages.add(Pair(++seq, m))
         if (messages.size > 200) messages.removeAt(0)
@@ -72,6 +73,11 @@ object BotRegistry {
 
     @JvmStatic fun onPm(p: Player, from: String, text: String) {
         bots[p.username.lowercase()]?.let { if (it.player === p) synchronized(it) { it.pms.add(Triple(++it.seq, from.lowercase(), text)); if (it.pms.size > 100) it.pms.removeAt(0) } }
+    }
+
+    // models and items drawn on an interface (Quiz Master's odd-one-out, ...): iface -> child -> "MODEL:8828" / "ITEM:1277"
+    @JvmStatic fun onModel(p: Player, iface: Int, child: Int, id: Int, type: String) {
+        bots[p.username.lowercase()]?.let { if (it.player === p) synchronized(it) { it.models.getOrPut(iface) { HashMap() }[child] = "$type:$id" } }
     }
 
     @JvmStatic fun onString(p: Player, iface: Int, child: Int, text: String) {
@@ -611,6 +617,12 @@ object BotRegistry {
         // text on the open main interface (child -> text), e.g. the Certer's three answers
         p.interfaceManager.opened?.id?.let { oid -> val t = synchronized(bot) { bot.strings[oid]?.toMap() }; if (!t.isNullOrEmpty()) o["ifaceText"] = JSONObject().apply { t.forEach { (k, v) -> this[k.toString()] = strip(v) } } }
         o["chatbox"] = chat
+        // models drawn on the open interface or chatbox (e.g. the Quiz Master's three items)
+        run {
+            val ids = listOfNotNull(p.interfaceManager.opened?.id, chat as? Int)
+            val m = synchronized(bot) { ids.flatMap { id -> bot.models[id]?.map { (c, v) -> Triple(id, c, v) } ?: emptyList() } }
+            if (m.isNotEmpty()) o["ifaceModels"] = JSONObject().apply { m.groupBy { it.first }.forEach { (id, l) -> this[id.toString()] = JSONObject().apply { l.forEach { this[it.second.toString()] = it.third } } } }
+        }
         if (chat != null && chat != 137) {
             val d = JSONObject()
             val strs = synchronized(bot) { bot.strings[chat]?.toMap() ?: emptyMap() }

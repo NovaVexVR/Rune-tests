@@ -51,7 +51,7 @@ export function watchdog(bots, log = console.log) {
 }
 export const RANDOM_EVENTS = process.env.BOT_EVENTS != null
     ? process.env.BOT_EVENTS.split(',').map(e => e.trim().toUpperCase()).filter(e => e && e !== 'NONE')
-    : ['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE', 'STRANGE_PLANT', 'SANDWICH_LADY', 'CERTER', 'DRILL_DEMON', 'FREAKY_FORESTER', 'MAZE',
+    : ['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE', 'STRANGE_PLANT', 'SANDWICH_LADY', 'CERTER', 'DRILL_DEMON', 'FREAKY_FORESTER', 'MAZE', 'QUIZ_MASTER',
        'EVIL_CHICKEN', 'RIVER_TROLL', 'ROCK_GOLEM', 'SHADE', 'SWARM', 'TREE_SPIRIT', 'ZOMBIE'];
 // ---- gear: which slot an item goes in, and how good it is (metal tier x 10 + the piece's rank within its slot) ----
 const TIERS = ['bronze', 'iron', 'steel', 'black', 'mithril', 'adamant', 'rune', 'dragon'];
@@ -285,6 +285,29 @@ export class Bot {
         if (inBox(3155, 4812, 3171, 4828)) return this.drillDemon();
         if (inBox(2587, 4758, 2616, 4788)) return this.freakyForester();
         if (inBox(2880, 4544, 2943, 4607)) return this.maze();
+        if (inBox(1920, 4736, 1983, 4799)) return this.quizMaster();
+        return false;
+    }
+
+    // Quiz Master: three item models on the quiz box (chatbox 191, children 6-8); the odd one out is the one whose
+    // category the other two don't share. Its button is child - 4. Four right answers win: take the 1000 coins.
+    async quizMaster() {
+        const s = this.s;
+        const models = s.ifaceModels?.['191'];
+        if (s.chatbox === 191 && models) {
+            const KIND = { 8828: 'weapon', 8836: 'weapon', 8829: 'fish', 8830: 'fish', 8831: 'jewellery', 8834: 'jewellery', 8832: 'armour', 8833: 'armour', 8835: 'tool', 8837: 'tool' };
+            const shown = [6, 7, 8].map(c => ({ c, kind: KIND[Number(String(models[c] ?? '').split(':')[1])] ?? `?${c}` }));
+            const odd = shown.find(x => shown.filter(y => y.kind === x.kind).length === 1) ?? shown[0];
+            this.log(`random event: quiz master shows ${shown.map(x => x.kind).join(', ')}; the odd one is the ${odd.kind}`);
+            await this.act({ type: 'button', iface: 191, child: odd.c - 4 });
+            await this.wait(3);
+            return true;
+        }
+        if (s.dialog) { await this.handleInterrupts({ answer: /1000 coins/i }); return true; }
+        if (Date.now() - (this._qmTalk ?? 0) < 8000) return false;
+        this._qmTalk = Date.now();
+        const qm = this.nearestNpc(n => /quiz master/i.test(n.name));
+        if (qm) { await this.act({ type: 'npc', npc: qm.npc, op: qm.ops.find(o => /talk/i.test(o)) ?? 'Talk-to' }); await this.wait(3); return true; }
         return false;
     }
 
@@ -572,7 +595,7 @@ export class Bot {
         }
         // cooking's "how many?" menu (chatbox 307): cook all (button 2; the dialogue system adds 1 to the child)
         if (s.chatbox === 307) { await this.act({ type: 'continue', child: 3 }); await this.wait(2); return true; }
-        if (s.dialog && ![372, 311].includes(s.chatbox)) { // 311: the furnace bar menu, left to the smelting task
+        if (s.dialog && ![372, 311, 191].includes(s.chatbox)) { // 191: the Quiz Master's box, left to quizMaster() // 311: the furnace bar menu, left to the smelting task
             if (s.dialog.options.length) {
                 const want = answer ? s.dialog.options.find(o => answer.test(o)) : null;
                 const o = want ?? s.dialog.options.find(o => /^(yes|okay|ok|sure|i'll|continue)/i.test(o)) ?? s.dialog.options[0];
