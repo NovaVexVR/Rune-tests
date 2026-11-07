@@ -51,8 +51,9 @@ export function watchdog(bots, log = console.log) {
 }
 export const RANDOM_EVENTS = process.env.BOT_EVENTS != null
     ? process.env.BOT_EVENTS.split(',').map(e => e.trim().toUpperCase()).filter(e => e && e !== 'NONE')
-    : ['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE', 'STRANGE_PLANT', 'SANDWICH_LADY', 'CERTER', 'DRILL_DEMON', 'FREAKY_FORESTER', 'MAZE', 'QUIZ_MASTER',
+    : ['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE', 'STRANGE_PLANT', 'SANDWICH_LADY', 'CERTER', 'DRILL_DEMON', 'FREAKY_FORESTER', 'MAZE', 'QUIZ_MASTER', 'PILLORY', 'SURPRISE_EXAM',
        'EVIL_CHICKEN', 'RIVER_TROLL', 'ROCK_GOLEM', 'SHADE', 'SWARM', 'TREE_SPIRIT', 'ZOMBIE'];
+const PILLORY_CAGES = [[3226, 3407], [3228, 3407], [3230, 3407], [2681, 3489], [2683, 3489], [2685, 3489], [2604, 3105], [2606, 3105], [2608, 3105]].map(([x, y]) => ({ x, y }));
 // ---- gear: which slot an item goes in, and how good it is (metal tier x 10 + the piece's rank within its slot) ----
 const TIERS = ['bronze', 'iron', 'steel', 'black', 'mithril', 'adamant', 'rune', 'dragon'];
 const GEAR_SLOTS = [
@@ -286,6 +287,61 @@ export class Bot {
         if (inBox(2587, 4758, 2616, 4788)) return this.freakyForester();
         if (inBox(2880, 4544, 2943, 4607)) return this.maze();
         if (inBox(1920, 4736, 1983, 4799)) return this.quizMaster();
+        if (PILLORY_CAGES.some(c => c.x === s.x && c.y === s.y)) return this.pillory();
+        if (inBox(1860, 5000, 1915, 5050)) return this.surpriseExam();
+        return false;
+    }
+
+    // Surprise Exam (Mr. Mordaut): interface 103 shows three items of one set (children 6-8) and four options
+    // (10-13), one from the same set; that's the answer (button = its child). Three right, then he names the exit door.
+    async surpriseExam() {
+        const s = this.s;
+        const SETS = [[5325, 5329, 5343, 5341], [329, 385, 333, 315], [1277, 1171, 1139, 1371], [309, 11323, 303, 311]];
+        const DOORS = { 'red cross': 2188, 'blue star': 2189, 'purple circle': 2192, 'green square': 2193 };
+        const m = s.ifaceModels?.['103'];
+        if (s.iface === 103 && m?.[6]) {
+            const id = c => Number(String(m[c] ?? '').split(':')[1]);
+            const set = SETS.find(st => st.includes(id(6)));
+            const pick = [10, 11, 12, 13].find(c => set?.includes(id(c))) ?? 10;
+            this.log(`random event: surprise exam, the pattern is ${set ? ['garden tools', 'fish', 'armour and weapons', 'fishing gear'][SETS.indexOf(set)] : '?'}; answering slot ${pick - 9}`);
+            await this.act({ type: 'button', iface: 103, child: pick });
+            await this.wait(3);
+            return true;
+        }
+        const said = (s.dialog?.text ?? []).join(' ');
+        const door = /exit through the ([a-z ]+) door/i.exec(said)?.[1]?.toLowerCase();
+        if (door && DOORS[door]) this._seDoor = DOORS[door];
+        if (s.dialog) { await this.handleInterrupts(); return true; }
+        if (this._seDoor) {
+            const d = this.nearestScenery(l => l.id === this._seDoor && l.ops.includes('Open'));
+            if (d) { this.log(`random event: surprise exam done, leaving by the ${Object.keys(DOORS).find(k => DOORS[k] === this._seDoor)} door`); await this.act({ type: 'scenery', x: d.x, y: d.y, id: d.id, op: 'Open' }); await this.wait(4); if (this.s.y < 5000) this._seDoor = null; return true; }
+        }
+        if (Date.now() - (this._seTalk ?? 0) < 8000) return false;
+        this._seTalk = Date.now();
+        const mord = this.nearestNpc(n => /mordaut/i.test(n.name));
+        if (mord) { await this.act({ type: 'npc', npc: mord.npc, op: mord.ops.find(o => /talk/i.test(o)) ?? 'Talk-to' }); await this.wait(3); return true; }
+        return false;
+    }
+
+    // Pillory: locked in a cage (Varrock, Seers', Yanille). Unlock opens interface 189: the lock's model (child 4) is
+    // 9753 + n, the three keys (children 5-7) are 9749 + k; the key with k == n opens it (button = child + 3). 3 right.
+    async pillory() {
+        const s = this.s;
+        const m = s.ifaceModels?.['189'];
+        if (s.iface === 189 && m?.[4]) {
+            const id = c => Number(String(m[c] ?? '').split(':')[1]);
+            const lock = id(4) - 9753;
+            const key = [5, 6, 7].find(c => id(c) - 9749 === lock) ?? 5;
+            this.log(`random event: pillory lock ${lock}, trying the key in slot ${key - 4}`);
+            await this.act({ type: 'button', iface: 189, child: key + 3 });
+            await this.wait(3);
+            return true;
+        }
+        if (s.dialog) { await this.handleInterrupts(); return true; }
+        if (Date.now() - (this._plTry ?? 0) < 6000) return false;
+        this._plTry = Date.now();
+        const cage = this.nearestScenery(l => /cage/i.test(l.name) && l.ops.some(o => /unlock/i.test(o)));
+        if (cage) { await this.act({ type: 'scenery', x: cage.x, y: cage.y, id: cage.id, op: cage.ops.find(o => /unlock/i.test(o)) }); await this.wait(3); return true; }
         return false;
     }
 
