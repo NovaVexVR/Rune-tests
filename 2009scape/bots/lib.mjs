@@ -303,8 +303,7 @@ export class Bot {
             const said = (s.dialog.text ?? []).join(' ');
             if (/falls asleep|fast asleep|snor/i.test(said)) this._bobDone = true;
             if (/don't know if this is a good place/i.test(said)) this._bobAsk = true;
-            await this.handleInterrupts();
-            return true;
+            return this.answerDialog();
         }
         const has = id => s.inv.find(i => i.id === id);
         if (this._bobDone) {
@@ -381,7 +380,7 @@ export class Bot {
         const said = (s.dialog?.text ?? []).join(' ');
         const door = /exit through the ([a-z ]+) door/i.exec(said)?.[1]?.toLowerCase();
         if (door && DOORS[door]) this._seDoor = DOORS[door];
-        if (s.dialog) { await this.handleInterrupts(); return true; }
+        if (s.dialog) return this.answerDialog();
         if (this._seDoor) {
             const d = this.nearestScenery(l => l.id === this._seDoor && l.ops.includes('Open'));
             if (d) { this.log(`random event: surprise exam done, leaving by the ${Object.keys(DOORS).find(k => DOORS[k] === this._seDoor)} door`); await this.act({ type: 'scenery', x: d.x, y: d.y, id: d.id, op: 'Open' }); await this.wait(4); if (this.s.y < 5000) this._seDoor = null; return true; }
@@ -407,12 +406,24 @@ export class Bot {
             await this.wait(3);
             return true;
         }
-        if (s.dialog) { await this.handleInterrupts(); return true; }
+        if (s.dialog) return this.answerDialog();
         if (Date.now() - (this._plTry ?? 0) < 6000) return false;
         this._plTry = Date.now();
         const cage = this.nearestScenery(l => /cage/i.test(l.name) && l.ops.some(o => /unlock/i.test(o)));
         if (cage) { await this.act({ type: 'scenery', x: cage.x, y: cage.y, id: cage.id, op: cage.ops.find(o => /unlock/i.test(o)) }); await this.wait(3); return true; }
         return false;
+    }
+
+    // answer a dialogue box directly (the kidnap solvers can't hand dialogues to handleInterrupts: it calls them back)
+    async answerDialog(answer = null) {
+        const d = this.s.dialog;
+        if (!d) return false;
+        if (d.options?.length) {
+            const o = (answer && d.options.find(x => answer.test(x))) ?? d.options.find(x => /^(yes|okay|ok|sure|i'll|continue)/i.test(x)) ?? d.options[0];
+            await this.act({ type: 'choose', option: o }).catch(() => {});
+        } else await this.act({ type: 'continue' }).catch(() => {});
+        await this.wait(1);
+        return true;
     }
 
     // Quiz Master: three item models on the quiz box (chatbox 191, children 6-8); the odd one out is the one whose
@@ -429,7 +440,7 @@ export class Bot {
             await this.wait(3);
             return true;
         }
-        if (s.dialog) { await this.handleInterrupts({ answer: /1000 coins/i }); return true; }
+        if (s.dialog) return this.answerDialog(/1000 coins/i);
         if (Date.now() - (this._qmTalk ?? 0) < 8000) return false;
         this._qmTalk = Date.now();
         const qm = this.nearestNpc(n => /quiz master/i.test(n.name));
