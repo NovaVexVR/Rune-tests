@@ -77,9 +77,9 @@ async function upTower(bot, z) {
     await bot.act({ type: 'scenery', x: 3107, y: 3162, id: 11993, op: 'Open' }).catch(() => {}); // the auto-walk door
     await bot.wait(6);
     for (let i = 0; i < 6 && (await bot.state(12)).z < z; i++) {
-        const st = bot.nearestScenery(l => /stair|ladder/i.test(l.name) && l.ops.some(o => /climb-up|climb/i.test(o)) && l.y < 9000);
-        if (!st) { bot.log('quest: no way up the tower'); return false; }
-        const op = st.ops.find(o => /^climb-up$/i.test(o)) ?? st.ops.find(o => /climb/i.test(o));
+        const st = bot.nearestScenery(l => /stair|ladder/i.test(l.name) && l.ops.some(o => /^climb(-up)?$/i.test(o)) && l.y < 9000);
+        if (!st) { bot.log(`quest: no way up the tower (in view: ${bot.s.scenery.filter(l => /stair|ladder/i.test(l.name)).map(l => `${l.name}@${l.x},${l.y} ${l.ops}`).join('; ')})`); return false; }
+        const op = st.ops.find(o => /^climb-up$/i.test(o)) ?? st.ops.find(o => /^climb$/i.test(o));
         const z0 = bot.s.z;
         await bot.act({ type: 'scenery', x: st.x, y: st.y, id: st.id, op });
         await bot.waitIdle({ timeout: 12, cond: x => x.z > z0 });
@@ -89,9 +89,9 @@ async function upTower(bot, z) {
 }
 async function downTower(bot) {
     for (let i = 0; i < 6 && (await bot.state(12)).z > 0; i++) {
-        const st = bot.nearestScenery(l => /stair|ladder/i.test(l.name) && l.ops.some(o => /climb-down|climb/i.test(o)));
+        const st = bot.nearestScenery(l => /stair|ladder/i.test(l.name) && l.ops.some(o => /^climb(-down)?$/i.test(o)));
         if (!st) break;
-        const op = st.ops.find(o => /^climb-down$/i.test(o)) ?? st.ops.find(o => /climb/i.test(o));
+        const op = st.ops.find(o => /^climb-down$/i.test(o)) ?? st.ops.find(o => /^climb$/i.test(o));
         const z0 = bot.s.z;
         await bot.act({ type: 'scenery', x: st.x, y: st.y, id: st.id, op });
         await bot.waitIdle({ timeout: 12, cond: x => x.z < z0 });
