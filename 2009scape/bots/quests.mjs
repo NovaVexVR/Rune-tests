@@ -369,7 +369,7 @@ export const QUESTS = {
             return stageOf(bot, this.name) > 0;
         },
         async finish(bot) {
-            for (let i = 0; i < 12 && stageOf(bot, this.name) < 100; i++) {
+            for (let i = 0; i < 20 && stageOf(bot, this.name) < 100; i++) {
                 const st = stageOf(bot, this.name);
                 if (st === 10 || st === 60) await toJuliet(bot); // her message; then the cadava potion
                 else if (st === 20 || st === 70) await talkWait(bot, 'Romeo', RJ.romeo);

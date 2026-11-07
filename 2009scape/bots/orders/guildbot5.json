@@ -1,24 +1,24 @@
 {
-  "role": "Guild treasurer: earns coins, collects spare coins from members, buys missing tools for members, banks the pool",
+  "role": "Guild vanguard: combat first, gathers food/supplies in between",
   "plan": [
     {
-      "task": "treasury",
-      "minutes": 40,
-      "why": "equip the guild + manage pool"
-    },
-    {
       "task": "melee",
-      "minutes": 20,
-      "why": "hp/combat"
-    },
-    {
-      "task": "treasury",
-      "minutes": 40,
-      "why": "treasury"
+      "minutes": 45,
+      "why": "guild fighter"
     },
     {
       "task": "fish_cook",
+      "minutes": 20,
+      "why": "food"
+    },
+    {
+      "task": "ranged",
       "minutes": 15,
+      "why": "ranged"
+    },
+    {
+      "task": "woodcut_fire",
+      "minutes": 20,
       "why": "variety"
     }
   ],
