@@ -35,6 +35,7 @@ import { mayorTick } from './mayor.mjs';
 import { feasts } from './feasts.mjs';
 import { lottery } from './lottery.mjs';
 import { Hunts } from './hunt.mjs';
+import { superstitions } from './superstition.mjs';
 import { readEconomy } from './economy.mjs';
 
 const ALL_BOTS = [];
@@ -219,6 +220,7 @@ setInterval(() => { try { mayorTick(market, (...a) => console.log(new Date().toI
 setInterval(() => { try { feasts(market, (...a) => console.log(new Date().toISOString(), ...a)); } catch (e) { console.log('feasts:', e.message); } }, 60 * 60_000); // feasts (44)
 setInterval(() => { try { lottery(market, (...a) => console.log(new Date().toISOString(), ...a)); } catch (e) { console.log('lottery:', e.message); } }, 60 * 60_000); // the gambler's lottery (45)
 setInterval(() => { try { hunts.tick(); } catch (e) { console.log('hunt:', e.message); } }, 60 * 60_000); // treasure hunts (46)
+setInterval(() => { try { superstitions(market, (...a) => console.log(new Date().toISOString(), ...a)); } catch (e) { console.log('superstitions:', e.message); } }, 60 * 60_000); // superstitions and lucky charms (38)
 setInterval(() => backup('daily', (...a) => console.log(new Date().toISOString(), ...a)), 24 * 3600_000); // daily world backup (also one at every launch)
 setInterval(() => sampleEconomy().catch(e => console.log('economy sample:', e.message)), 30 * 60_000); // wealth over time (E23)
 setInterval(() => { try { townEvents.tick(); } catch (e) { console.log('town event error', e); } }, 60_000);

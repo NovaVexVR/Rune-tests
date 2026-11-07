@@ -20,6 +20,7 @@ import path from 'path';
 
 import { dist, sleep, FOOD } from './lib.mjs';
 import { boardPrice } from './noticeboard.mjs';
+import { luckyOf } from './superstition.mjs';
 import { Social, COLLECTIONS, personalityOf } from './social.mjs';
 import { note, record } from './diary.mjs';
 import { teamOf, treasurerOfTeam, onContribution, onHelped } from './politics.mjs';
@@ -192,6 +193,7 @@ export class Market {
         else f *= 0.7; // spare to me
         const h = personalityOf(name).habits ?? {};
         if (h.food === item) f *= 3; // its favorite food: hardly for sale
+        if (luckyOf(name) === item) f *= 5; // its lucky charm: not for sale, not really
         const col = h.collection ? COLLECTIONS[h.collection] : null;
         if (col?.includes(item)) f *= owned > 0 ? 2 : 4; // collectors overpay for missing pieces and cling to the rest
         let demand = 0, supply = 0;

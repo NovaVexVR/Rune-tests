@@ -1,6 +1,7 @@
 // Skill-training tasks shared by scripted bots and Claude-directed bots (2009Scape).
 // Each task: { id, skills, canRun(bot) -> true | reason, run(bot, untilMs) }
 import { fearOf } from './phobias.mjs';
+import { doRitual, luckyOf } from './superstition.mjs';
 import { dist, rand, sleep, FOOD, gearInfo } from './lib.mjs';
 import { faction, TASK_NEEDS } from './market.mjs';
 import { getShears, shear, spin } from './quests.mjs';
@@ -52,7 +53,7 @@ const NEVER_SELL = /^Coins$|rune$|arrow|^Feather$|bones$|^Bucket|^Empty pot$|^Po
 export const bankNearlyFull = bot => (bot.s.bank?.length ?? 0) >= BANK_SLOTS * FULL_AT;
 export function surplusInBank(bot) {
     if (!bankNearlyFull(bot)) return [];
-    const spare = (bot.s.bank ?? []).filter(i => !KEEP(i.name) && !NEVER_SELL.test(i.name) && !FOOD.includes(i.name) && !gearInfo(i.name));
+    const spare = (bot.s.bank ?? []).filter(i => !KEEP(i.name) && !NEVER_SELL.test(i.name) && !FOOD.includes(i.name) && !gearInfo(i.name) && i.name !== luckyOf(bot.name)); // never the lucky charm
     const free = Math.ceil((bot.s.bank?.length ?? 0) - BANK_SLOTS * ROOMY_AT); // slots to free
     return spare.sort((a, b) => a.count - b.count || a.count * (a.value ?? 1) - b.count * (b.value ?? 1)).slice(0, free).map(i => ({ name: i.name, count: i.count }));
 }
@@ -84,6 +85,8 @@ export async function clearOut(bot) {
 // Before any task: wear the best gear carried (no melee weapon swap for ranged/magic), and fighters
 // and thieves carry some food from the bank.
 export async function prepare(bot, taskId) {
+    bot._lastTask = taskId;
+    await doRitual(bot, taskId).catch(() => {}); // a superstition (38)
     // the task's tools: if one is banked but not carried, fetch it
     const missing = (TASK_NEEDS[taskId] ?? []).filter(g => !g.some(n => bot.s.inv.some(i => i.name === n) || bot.s.worn.some(i => i.name === n)))
         .map(g => g.find(n => bot.s.bank?.some(i => i.name === n))).filter(Boolean);
