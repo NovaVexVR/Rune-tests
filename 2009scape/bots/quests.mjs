@@ -1,7 +1,7 @@
 // Phase 4.2: quests as scripts of steps (walk, talk with dialog choices, gather, hand in).
 // Each quest lists the items it needs, and how to get each one, so a party can split the gathering
 // (see party.mjs). Quest progress comes from the bot API's `quests` state (stage 100 = done).
-import { sleep, dist } from './lib.mjs';
+import { sleep, dist, DANGER } from './lib.mjs';
 import { SHOPS } from './tasks.mjs';
 
 // A bucket or pot to fill: buy one at the Lumbridge general store if the bot has none.
@@ -107,8 +107,9 @@ async function talkMizgog(bot) {
     await downTower(bot);
     return true;
 }
-async function huntBeads(bot, minutes = 25) {
+async function huntBeads(bot, minutes = Number(process.env.IMP_MINUTES ?? 25)) {
     const end = Date.now() + minutes * 60_000;
+    let fights = 0;
     let at = IMP_GROUNDS[Math.floor(Math.random() * IMP_GROUNDS.length)];
     await bot.travel(at.x, at.y, { tol: 4 });
     while (Date.now() < end && BEADS.some(b => !count(bot, b))) {
@@ -119,11 +120,21 @@ async function huntBeads(bot, minutes = 25) {
         if (s.attacking || s.inCombat) { await bot.wait(2); continue; }
         if (s.hp < s.maxHp * 0.4) { const f = s.inv.find(i => i.ops.includes('Eat')); if (f) { await bot.act({ type: 'item', slot: f.slot, op: 'Eat' }); await bot.wait(2); continue; } }
         const imp = bot.nearestNpc(n => n.name === 'Imp' && n.ops.includes('Attack') && !n.inCombat);
-        if (!imp) { at = IMP_GROUNDS[Math.floor(Math.random() * IMP_GROUNDS.length)]; await bot.travel(at.x, at.y, { tol: 4 }); continue; }
+        if (!imp) {
+            // imps wander and are few: look for the nearest one around (outside the danger zones) and go there
+            const found = await fetch(`http://127.0.0.1:8899/find?name=Imp&x=${s.x}&y=${s.y}&z=0&r=80`).then(r => r.json()).catch(() => null);
+            const safe = (found?.npcs ?? []).filter(n => n.name === 'Imp' && !DANGER.some(d => dist(n, d) <= d.r + 4) && n.x > 3120).sort((a, b) => dist(s, a) - dist(s, b))[0];
+            at = safe ?? IMP_GROUNDS[Math.floor(Math.random() * IMP_GROUNDS.length)];
+            await bot.travel(at.x, at.y, { tol: 3 });
+            continue;
+        }
         await bot.act({ type: 'npc', npc: imp.npc, op: 'Attack' });
+        fights++;
+        await bot.wait(3); // let the fight start before waiting for it to end
         await bot.waitIdle({ timeout: 25, quiet: 3, cond: st => !st.attacking && !st.inCombat });
+        await bot.wait(2); // the drop lands a tick later
     }
-    bot.log(`quest: beads ${BEADS.filter(b => count(bot, b)).join(', ') || 'none'}`);
+    bot.log(`quest: beads ${BEADS.filter(b => count(bot, b)).join(', ') || 'none'} after ${fights} imp fights`);
     return BEADS.every(b => count(bot, b));
 }
 
@@ -175,12 +186,12 @@ async function cauldronRun(bot) {
         if (await bot.handleInterrupts()) continue;
         const suit = bot.s.npcs.find(n => /suit of armour/i.test(n.name) && n.ops.includes('Attack') && n.dist <= 8);
         if (suit) { await bot.act({ type: 'npc', npc: suit.npc, op: 'Attack' }); await bot.waitIdle({ timeout: 60, quiet: 3, cond: st => !st.attacking && !st.inCombat }); continue; }
-        const gate = bot.nearestScenery(l => /gate/i.test(l.name) && l.ops.includes('Open') && Math.abs(l.x - DR.gate.x) <= 1);
+        const gate = bot.nearestScenery(l => /gate|door/i.test(l.name) && l.ops.includes('Open') && Math.abs(l.x - DR.gate.x) <= 1 && Math.abs(l.y - DR.gate.y) <= 1); // a pair of doors (31841/31844) here
         if (!gate) { await bot.walkTo(DR.gate.x - 1, DR.gate.y, { tol: 1, timeout: 30, direct: true }); continue; }
         await bot.act({ type: 'scenery', x: gate.x, y: gate.y, id: gate.id, op: 'Open' });
         await bot.waitIdle({ timeout: 8, quiet: 2 });
     }
-    if (bot.s.x < DR.gate.x + 1) { bot.log('quest: could not get through the gate to the cauldron'); return false; }
+    if (bot.s.x < DR.gate.x + 1) { bot.log(`quest: could not get through to the cauldron (at ${bot.s.x},${bot.s.y}; ${bot.s.scenery.filter(l => /gate|door/i.test(l.name) && l.dist <= 4).map(l => `${l.name}@${l.x},${l.y} ${l.ops}`).join('; ')})`); return false; }
     await bot.walkTo(DR.cauldron.x - 1, DR.cauldron.y, { tol: 1, timeout: 30, direct: true });
     for (const meat of Object.keys(MEATS)) {
         const c = (await bot.state(8), bot.nearestScenery(l => /cauldron/i.test(l.name)));
@@ -192,7 +203,7 @@ async function cauldronRun(bot) {
     bot.log(`quest: ${enchanted} enchanted meats`);
     // back out the way we came (the gate opens from this side without a fight)
     for (let i = 0; i < 4 && (await bot.state(10)).x > DR.gate.x; i++) {
-        const gate = bot.nearestScenery(l => /gate/i.test(l.name) && l.ops.includes('Open'));
+        const gate = bot.nearestScenery(l => /gate|door/i.test(l.name) && l.ops.includes('Open') && Math.abs(l.x - DR.gate.x) <= 1 && Math.abs(l.y - DR.gate.y) <= 1);
         if (gate) { await bot.act({ type: 'scenery', x: gate.x, y: gate.y, id: gate.id, op: 'Open' }); await bot.waitIdle({ timeout: 8, quiet: 2 }); }
     }
     await bot.walkTo(DR.dungeonLadder.x, DR.dungeonLadder.y + 6400, { tol: 2, timeout: 240, direct: true });
