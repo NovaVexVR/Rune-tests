@@ -6,6 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 import { readDiaries } from './diary.mjs';
+import { buildBoard, boardMarkdown } from './noticeboard.mjs';
 
 const ROOT = path.dirname(new URL(import.meta.url).pathname);
 const MKT = path.join(ROOT, 'market');
@@ -79,6 +80,7 @@ if (levels.length) {
 const scores = jsonl('scores.jsonl').at(-1);
 if (scores?.scores) out.push('## Team standings', '', ...Object.entries(scores.scores).sort((a, b) => b[1].perMember - a[1].perMember).map(([t, s], i) => `- ${i + 1}. ${t}: score ${s.perMember} per member, ${s.quests ?? 0} quest points, wealth ${s.wealth}gp (${s.members} members)`), '');
 
+out.push(...boardMarkdown(buildBoard()));
 if (out.length <= 4) out.push('A quiet day. Nothing worth printing.');
 const text = out.join('\n');
 console.log(text);

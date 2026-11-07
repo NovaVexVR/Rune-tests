@@ -31,12 +31,12 @@ What's planned for the bot world, in priority order, plus how the built systems 
 11. *(done in code: the castle range after Cook's Assistant, Runecrafting after Rune Mysteries (essence via Aubury, air runes at the air altar; being tested), prayer from buried bones)* **Use what quests unlock.**
 
 ### C. Progression
-12. **Escorts and apprenticeships:** stronger teammates escort or train weaker ones; needed for the next quests.
+12. *(escorts written: `bots/escort.mjs`, `test_escort.mjs`; used for the iron mine's muggers; in-game test pending a server rebuild; apprenticeships still to do)* **Escorts and apprenticeships:** stronger teammates escort or train weaker ones; needed for the next quests.
 13. **More quests:** The Knight's Sword and Druidic Ritual (both need escorts past ice warriors / Taverley dungeon), Romeo & Juliet, Imp Catcher.
 14. **Careers and life goals:** each bot picks a career (smith, fisher, crafter, fighter) and a long-term goal from its personality (full steel armour, a skill to 50, a quest list), and its plan bends toward it. Diaries and recaps follow the goal.
 
 ### D. Society
-15. **Public notice board** for bounties, prices and reputations, readable in the recaps.
+15. *(done: `bots/noticeboard.mjs` -> `market/noticeboard.json` every 10 min; in the recap; going prices pull bots' own prices toward them)* **Public notice board** for bounties, prices and reputations, readable in the recaps.
 16. **Team alliances and feuds** that go beyond single-bot grudges, with team-level trust.
 17. **Disputes and justice:** a respected bot (or the most trusted per team) arbitrates defaults and fines repeat offenders.
 18. **Newcomers:** new bots join over time as fresh characters; teams recruit and mentor them.

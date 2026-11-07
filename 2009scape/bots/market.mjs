@@ -19,6 +19,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { dist, sleep, FOOD } from './lib.mjs';
+import { boardPrice } from './noticeboard.mjs';
 import { Social, COLLECTIONS, personalityOf } from './social.mjs';
 import { note, record } from './diary.mjs';
 import { teamOf, treasurerOfTeam, onContribution, onHelped } from './politics.mjs';
@@ -204,6 +205,8 @@ export class Market {
         let v = base * f;
         const seen = this.memory[item]?.slice(-5);
         if (seen?.length) v = 0.7 * v + 0.3 * (seen.reduce((a, b) => a + b, 0) / seen.length);
+        const posted = boardPrice(item); // the notice board's going price: everyone reads it, so prices converge
+        if (posted) v = 0.8 * v + 0.2 * posted;
         return Math.max(1, Math.round(v * 10) / 10);
     }
 

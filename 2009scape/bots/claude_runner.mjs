@@ -18,6 +18,7 @@ import { MarketDay } from './marketday.mjs';
 import { Parties } from './party.mjs';
 import { note, noteLevel } from './diary.mjs';
 import { Escorts } from './escort.mjs';
+import { buildBoard } from './noticeboard.mjs';
 
 const ALL_BOTS = [];
 const market = new Market((...a) => console.log(new Date().toISOString(), ...a));
@@ -169,6 +170,7 @@ console.log(`starting Claude-directed bots: ${names.join(', ')}`);
 const POLITICS_MINUTES = Number(process.env.POLITICS_MINUTES ?? 60);
 setInterval(() => { try { council(market); } catch (e) { console.log('council error', e); } }, POLITICS_MINUTES * 60_000);
 setInterval(() => market.social.driftMoods(), 10 * 60_000);
+setInterval(() => { try { buildBoard(); } catch (e) { console.log('notice board:', e.message); } }, 10 * 60_000); // the public notice board
 watchdog(ALL_BOTS, (...a) => console.log(new Date().toISOString(), ...a));
 setInterval(() => { try { marketDay.tick(); } catch (e) { console.log('market day error', e); } }, 60_000);
 setInterval(() => { try { if (!marketDay.upcoming()) parties.tick(); } catch (e) { console.log('party error', e); } }, 5 * 60_000);
