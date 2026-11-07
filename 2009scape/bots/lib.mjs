@@ -410,6 +410,7 @@ export class Bot {
     async gearUp({ weapon = true } = {}) {
         this._cantWear ??= new Map(); // item -> total level when it was too high-level; tried again once the bot levels up
         let s = await this.state(1);
+        if (!s?.worn || !s.inv) return 0; // offline or a failed state read
         for (const [name, lvl] of this._cantWear) if (s.totalLevel > lvl) this._cantWear.delete(name);
         let changed = 0;
         for (let pass = 0; pass < 7; pass++) {
