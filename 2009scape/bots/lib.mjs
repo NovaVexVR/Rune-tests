@@ -51,7 +51,7 @@ export function watchdog(bots, log = console.log) {
 }
 export const RANDOM_EVENTS = process.env.BOT_EVENTS != null
     ? process.env.BOT_EVENTS.split(',').map(e => e.trim().toUpperCase()).filter(e => e && e !== 'NONE')
-    : ['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE', 'STRANGE_PLANT', 'SANDWICH_LADY', 'CERTER', 'DRILL_DEMON', 'FREAKY_FORESTER', 'MAZE', 'QUIZ_MASTER', 'PILLORY', 'SURPRISE_EXAM',
+    : ['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE', 'STRANGE_PLANT', 'SANDWICH_LADY', 'CERTER', 'DRILL_DEMON', 'FREAKY_FORESTER', 'MAZE', 'QUIZ_MASTER', 'PILLORY', 'SURPRISE_EXAM', 'MIME',
        'EVIL_CHICKEN', 'RIVER_TROLL', 'ROCK_GOLEM', 'SHADE', 'SWARM', 'TREE_SPIRIT', 'ZOMBIE'];
 const PILLORY_CAGES = [[3226, 3407], [3228, 3407], [3230, 3407], [2681, 3489], [2683, 3489], [2685, 3489], [2604, 3105], [2606, 3105], [2608, 3105]].map(([x, y]) => ({ x, y }));
 // ---- gear: which slot an item goes in, and how good it is (metal tier x 10 + the piece's rank within its slot) ----
@@ -289,7 +289,30 @@ export class Bot {
         if (inBox(1920, 4736, 1983, 4799)) return this.quizMaster();
         if (PILLORY_CAGES.some(c => c.x === s.x && c.y === s.y)) return this.pillory();
         if (inBox(1860, 5000, 1915, 5050)) return this.surpriseExam();
+        if (inBox(1984, 4736, 2047, 4799)) return this.mime();
         return false;
+    }
+
+    // Mime: the Mime acts out an emote, bows, then the emote board (interface 188) opens: copy it (button per emote).
+    // Animations aren't kept, so watch him closely between his turns.
+    async mime() {
+        const BUTTON = { 857: 2, 860: 3, 861: 4, 866: 5, 1130: 6, 1129: 7, 1131: 8, 1128: 9 }; // think cry laugh dance rope lean box wall
+        for (let i = 0; i < 40; i++) {
+            const s = await this.state(12);
+            const mime = s.npcs.find(n => /^mime$/i.test(n.name));
+            if (mime?.anim && BUTTON[mime.anim]) this._mimeAnim = mime.anim;
+            if (s.iface === 188 && this._mimeAnim) {
+                this.log(`random event: copying the mime (button ${BUTTON[this._mimeAnim]})`);
+                await this.act({ type: 'button', iface: 188, child: BUTTON[this._mimeAnim] });
+                this._mimeAnim = null;
+                await this.wait(2);
+                return true;
+            }
+            if (s.dialog) { await this.act({ type: 'continue' }).catch(() => {}); }
+            if (!(s.x >= 1984 && s.x <= 2047 && s.y >= 4736 && s.y <= 4799)) return true; // done: we're out
+            await sleep(600);
+        }
+        return true;
     }
 
     // Surprise Exam (Mr. Mordaut): interface 103 shows three items of one set (children 6-8) and four options

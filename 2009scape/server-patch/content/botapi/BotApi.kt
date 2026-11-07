@@ -661,6 +661,7 @@ object BotRegistry {
             j["level"] = shown.definition.combatLevel
             j["inCombat"] = n.inCombat()
             (n.properties.combatPulse.getVictim() as? Player)?.let { j["target"] = it.username } // who it is attacking (escorts guard their ward)
+            n.animator.animation?.id?.takeIf { it > 0 }?.let { j["anim"] = it } // what it's acting out (the Mime's emotes)
             j["ops"] = JSONArray().apply { shown.interaction.options.filterNotNull().forEach { add(it.name) } }
             npcs.add(j)
         }
