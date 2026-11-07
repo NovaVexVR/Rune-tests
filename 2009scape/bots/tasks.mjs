@@ -210,6 +210,8 @@ export const STEEL_PIECES = [
 export const SHOPS = {
     bob: { x: 3229, y: 3203, npcs: ['Bob'], sells: { 'Bronze axe': 16, 'Bronze pickaxe': 1, 'Iron axe': 56, 'Steel axe': 200 } },
     general: { x: 3216, y: 3241, npcs: ['Shopkeeper', 'Shop assistant'], sells: { Tinderbox: 1, Hammer: 1, Chisel: 1, Bucket: 2, 'Empty pot': 1 } },
+    // Varrock archery shop (Lowe's): arrows and bows for rangers
+    lowe: { x: 3232, y: 3424, npcs: ['Lowe'], sells: { 'Bronze arrow': 7, Shortbow: 50 } },
     // Port Sarim fishing shop (shops.json "Gerrant's Fishy Business"): rods and feathers for fly fishing
     gerrant: { x: 3013, y: 3224, npcs: ['Gerrant'], sells: { 'Fly fishing rod': 5, Feather: 6, 'Small fishing net': 5, 'Lobster pot': 20 } }
     // runes are only sold in Varrock: bots trade for those
@@ -780,7 +782,10 @@ export const RESUPPLY = {
                 if (banked + bot.s.coins < shop.sells[item]) continue;
                 if (await bot.openBank()) { await bot.withdraw('Coins', 'all'); await bot.leaveBank(); }
             }
-            if (await bot.openShop(shop)) { await bot.buy(item, 1); await bot.closeInterfaces(); }
+            // consumables come in bulk (arrows, runes), as many as a third of its coins buys, up to a stack's worth
+            const bulk = { 'Bronze arrow': 60, 'Air rune': 40, 'Mind rune': 40 }[item];
+            const n = bulk ? Math.max(1, Math.min(bulk, Math.floor((bot.s.coins / 3) / shop.sells[item]))) : 1;
+            if (await bot.openShop(shop)) { await bot.buy(item, n); await bot.closeInterfaces(); }
         }
     }
 };
@@ -1188,7 +1193,7 @@ export const WILD_MINE = {
     skills: ['mining'],
     canRun: bot => {
         if (!['Bronze pickaxe', 'Iron pickaxe', 'Steel pickaxe', 'Mithril pickaxe'].some(p => bot.has(p))) return 'need a pickaxe';
-        if (bot.lvl('mining') < 40 || (bot.s.combat ?? 3) < 20) return 'needs Mining 40 and combat 20';
+        if (bot.lvl('mining') < 40 || (bot.s.combat ?? 3) < 30) return 'needs Mining 40 and combat 30 (skeletons up to level 25 roam the shallow mine)';
         return (bot.market?.social?.p?.(bot.name)?.caution ?? personalityCaution(bot.name)) < 0.5 || 'too cautious for the wilderness';
     },
     async run(bot, until) {

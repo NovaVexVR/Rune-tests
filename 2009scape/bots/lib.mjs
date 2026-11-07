@@ -205,7 +205,7 @@ export class Bot {
         const s = await this.state(10);
         const ref = target ?? s;
         const g = s.scenery
-            .filter(l => l.ops.includes('Open') && /gate|door/i.test(l.name) && l.dist <= 10)
+            .filter(l => l.ops.includes('Open') && /gate|door/i.test(l.name) && !/trap ?door/i.test(l.name) && l.dist <= 10) // never trapdoors: they lead into cellars and caves
             .sort((a, b) => dist(a, ref) + a.dist - (dist(b, ref) + b.dist))[0];
         if (!g) return false;
         this.log(`opening ${g.name} at ${g.x},${g.y}`);

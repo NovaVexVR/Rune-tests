@@ -168,7 +168,16 @@ async function runBot(name, delay) {
                 if (market.dealFor(name)) { await bot.handleInterrupts(); continue; }
                 const needs = market.needsOf(name);
                 if (needs.length) await RESUPPLY.run(bot, Date.now() + 10 * 60_000, needs);
-                if (task.canRun(bot) !== true) writeStep(name, step + 1);
+                if (task.canRun(bot) !== true) {
+                    // still can't: don't waste the step, do something useful it can do instead (keeps it levelling)
+                    const alt = ['melee', 'fish_cook', 'woodcut_fire', 'mine', 'thieving', 'spin'].map(id => taskById(id)).filter(t => t && t.id !== item.task && t.canRun(bot) === true).sort(() => Math.random() - 0.5)[0];
+                    if (alt) {
+                        bot.log(`[plan step ${step}] instead of ${item.task}: ${alt.id} for ${item.minutes ?? 15}m`);
+                        await prepare(bot, alt.id);
+                        await alt.run(bot, marketDay.deadline(name, Date.now() + (item.minutes ?? 15) * 60_000)).catch(e => bot.log(`${alt.id}: ${e.message}`));
+                    }
+                    writeStep(name, step + 1);
+                }
                 continue;
             }
             bot.log(`[plan step ${step}] ${item.task} for ${item.minutes}m — ${item.why ?? ''} | ${summary(bot.s)}`);
