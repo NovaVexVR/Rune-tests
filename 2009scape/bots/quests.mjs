@@ -191,7 +191,9 @@ async function cauldronRunInner(bot) {
         if (await bot.handleInterrupts()) continue;
         const suit = bot.s.npcs.find(n => /suit of armour/i.test(n.name) && n.ops.includes('Attack') && n.dist <= 8);
         if (suit) { await bot.act({ type: 'npc', npc: suit.npc, op: 'Attack' }); await bot.waitIdle({ timeout: 60, quiet: 3, cond: st => !st.attacking && !st.inCombat }); continue; }
-        const gate = bot.nearestScenery(l => /gate|door/i.test(l.name) && l.ops.includes('Open') && Math.abs(l.x - DR.gate.x) <= 1 && Math.abs(l.y - DR.gate.y) <= 1); // a pair of doors (31841/31844) here
+        const near = l => /gate|door/i.test(l.name) && Math.abs(l.x - DR.gate.x) <= 1 && Math.abs(l.y - DR.gate.y) <= 1; // a pair of doors (31841/31844) here
+        if (bot.s.scenery.some(l => near(l) && l.ops.includes('Close'))) { await bot.walkTo(DR.gate.x + 2, DR.gate.y, { tol: 0, timeout: 20, direct: true }); continue; } // open: walk through
+        const gate = bot.nearestScenery(l => near(l) && l.ops.includes('Open'));
         if (!gate) { await bot.walkTo(DR.gate.x - 1, DR.gate.y, { tol: 1, timeout: 30, direct: true }); continue; }
         await bot.act({ type: 'scenery', x: gate.x, y: gate.y, id: gate.id, op: 'Open' });
         await bot.waitIdle({ timeout: 8, quiet: 2 });
