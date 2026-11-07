@@ -30,6 +30,7 @@ import { awardNicknames } from './nicknames.mjs';
 import { tease } from './phobias.mjs';
 import { gossipTick } from './gossip.mjs';
 import { tallTales } from './talltales.mjs';
+import { crier, tabloid } from './crier.mjs';
 import { readEconomy } from './economy.mjs';
 
 const ALL_BOTS = [];
@@ -204,6 +205,8 @@ setInterval(() => { try { awardNicknames(market, (...a) => console.log(new Date(
 setInterval(() => { try { tease(market, (...a) => console.log(new Date().toISOString(), ...a)); } catch (e) { console.log('phobias:', e.message); } }, 60 * 60_000); // phobias (39)
 setInterval(() => { try { gossipTick(market, (...a) => console.log(new Date().toISOString(), ...a), readEconomy().at(-1)?.richest?.[0]?.bot); } catch (e) { console.log('gossip:', e.message); } }, 15 * 60_000); // gossip (40)
 setInterval(() => { try { tallTales(market, (...a) => console.log(new Date().toISOString(), ...a)); } catch (e) { console.log('tales:', e.message); } }, 60 * 60_000); // tall tales (41)
+setInterval(() => { try { crier(market, (...a) => console.log(new Date().toISOString(), ...a)); } catch (e) { console.log('crier:', e.message); } }, 60 * 60_000); // town crier (42)
+setInterval(() => { try { tabloid(); } catch (e) { console.log('tabloid:', e.message); } }, 24 * 3600_000); // the Lumbridge Whisper (42)
 setInterval(() => backup('daily', (...a) => console.log(new Date().toISOString(), ...a)), 24 * 3600_000); // daily world backup (also one at every launch)
 setInterval(() => sampleEconomy().catch(e => console.log('economy sample:', e.message)), 30 * 60_000); // wealth over time (E23)
 setInterval(() => { try { townEvents.tick(); } catch (e) { console.log('town event error', e); } }, 60_000);
