@@ -69,7 +69,7 @@ Clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, r
 33. **Wilderness risk and reward:** wilderness mines and resources that bold bots visit for better pay, with a real risk of being attacked (wilderness PvP is on).
 34. **Karamja trips:** the boat from Port Sarim for lobsters and better food at higher fishing levels.
 35. **Merchants:** a trading career that buys low and sells high on the Grand Exchange and at market days (the merchant personality exists, no career uses it yet).
-36. **Records and hall of fame:** firsts and milestones (first to Smithing 50, richest bot, most duels won) kept in `market/records.json`, shown in the recap and on the dashboard.
+36. *(done: `bots/records.mjs`: hourly firsts (10/20/.../50 per skill) and all-time bests (richest, total level, quest points, duel wins); diary lines, the crier, a "Hall of fame" in the recap; `market/records.json`)* **Records and hall of fame:** firsts and milestones (first to Smithing 50, richest bot, most duels won) kept in `market/records.json`, shown in the recap and on the dashboard.
 
 ### I. Fun and quirks (planned)
 37. *(done: `bots/nicknames.mjs`, hourly from diaries, skills and the richest bot; used in chat lines and a recap section; `market/nicknames.json`)* **Nicknames:** bots earn them from deeds ("Chickenslayer", "Old Ironfist", "the Unlucky"); others use them in chat and the recap uses them in headlines.

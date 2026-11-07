@@ -27,6 +27,7 @@ function news(sinceMs) {
         else if (/^Won \w+'s lottery/.test(t)) h = `${e.bot} ${t.replace(/^Won/, 'won').replace(/!$/, '')}`;
         else if (/^Kept the lottery pot/.test(t)) h = `${e.bot} ran off with the lottery pot`;
         else if (/^Won the treasure hunt/.test(t)) h = `${e.bot} won the treasure hunt`;
+        else if (/^Set a record: /.test(t)) h = `${e.bot} is ${t.replace(/^Set a record: /, '').replace(/!$/, '')}`;
         else if (/^Elected mayor/.test(t)) h = `${e.bot} elected mayor of Lumbridge`;
         else if (/^Pardoned /.test(t)) h = `Mayor ${e.bot} ${t.replace(/^Pardoned/, 'pardons').replace(/\.$/, '')}`;
         else if (/^Reached my goal/.test(t)) h = `${e.bot} reached a goal: ${/goal: ([^!]+)!/.exec(t)?.[1]}`;

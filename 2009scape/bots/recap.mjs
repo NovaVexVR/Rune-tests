@@ -8,6 +8,7 @@ import path from 'path';
 import { readDiaries } from './diary.mjs';
 import { buildBoard, boardMarkdown } from './noticeboard.mjs';
 import { rumourMarkdown } from './gossip.mjs';
+import { recordsMarkdown } from './records.mjs';
 
 const ROOT = path.dirname(new URL(import.meta.url).pathname);
 const MKT = path.join(ROOT, 'market');
@@ -86,6 +87,7 @@ if (evs.length) out.push('## Town events', '', ...evs.map(e => `- **${{ fishing:
 const nicks = by(/^They've started calling me/);
 if (nicks.length) out.push('## Nicknames', '', ...nicks.map(e => `- **${e.bot}** is now "${/calling me "([^"]+)"/.exec(e.text)?.[1]}" (${/\(([^)]+)\)/.exec(e.text)?.[1] ?? ''}).`), '');
 out.push(...rumourMarkdown(since));
+out.push(...recordsMarkdown());
 out.push(...boardMarkdown(buildBoard()));
 if (out.length <= 4) out.push('A quiet day. Nothing worth printing.');
 const text = out.join('\n');
