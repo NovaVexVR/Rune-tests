@@ -51,7 +51,7 @@ export function watchdog(bots, log = console.log) {
 }
 export const RANDOM_EVENTS = process.env.BOT_EVENTS != null
     ? process.env.BOT_EVENTS.split(',').map(e => e.trim().toUpperCase()).filter(e => e && e !== 'NONE')
-    : ['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE', 'STRANGE_PLANT', 'SANDWICH_LADY', 'CERTER', 'DRILL_DEMON', 'FREAKY_FORESTER', 'MAZE', 'QUIZ_MASTER', 'PILLORY', 'SURPRISE_EXAM', 'MIME',
+    : ['GENIE', 'DRUNKEN_DWARF', 'RICK_TURPENTINE', 'STRANGE_PLANT', 'SANDWICH_LADY', 'CERTER', 'DRILL_DEMON', 'FREAKY_FORESTER', 'MAZE', 'QUIZ_MASTER', 'PILLORY', 'SURPRISE_EXAM', 'MIME', 'EVIL_BOB',
        'EVIL_CHICKEN', 'RIVER_TROLL', 'ROCK_GOLEM', 'SHADE', 'SWARM', 'TREE_SPIRIT', 'ZOMBIE'];
 const PILLORY_CAGES = [[3226, 3407], [3228, 3407], [3230, 3407], [2681, 3489], [2683, 3489], [2685, 3489], [2604, 3105], [2606, 3105], [2608, 3105]].map(([x, y]) => ({ x, y }));
 // ---- gear: which slot an item goes in, and how good it is (metal tier x 10 + the piece's rank within its slot) ----
@@ -290,7 +290,54 @@ export class Bot {
         if (PILLORY_CAGES.some(c => c.x === s.x && c.y === s.y)) return this.pillory();
         if (inBox(1860, 5000, 1915, 5050)) return this.surpriseExam();
         if (inBox(1984, 4736, 2047, 4799)) return this.mime();
+        if (inBox(3390, 4750, 3450, 4800)) return this.evilBob();
         return false;
+    }
+
+    // Evil Bob's island: fish at the right one of four spots (that catch is item 6202; anywhere else gives 6206, which
+    // we drop and try the next spot), uncook it in the pot, give it to Evil Bob; once he's asleep, leave by the portal.
+    async evilBob() {
+        const s = this.s;
+        const ZONES = [{ x: 3424, y: 4790 }, { x: 3438, y: 4777 }, { x: 3422, y: 4764 }, { x: 3406, y: 4776 }];
+        if (s.dialog) {
+            const said = (s.dialog.text ?? []).join(' ');
+            if (/falls asleep|fast asleep|snor/i.test(said)) this._bobDone = true;
+            if (/don't know if this is a good place/i.test(said)) this._bobAsk = true;
+            await this.handleInterrupts();
+            return true;
+        }
+        const has = id => s.inv.find(i => i.id === id);
+        if (this._bobDone) {
+            const portal = this.nearestScenery(l => /portal/i.test(l.name) && l.ops.some(o => /enter/i.test(o)));
+            if (portal) { this.log('random event: Evil Bob is asleep, leaving by the portal'); await this.act({ type: 'scenery', x: portal.x, y: portal.y, id: portal.id, op: portal.ops.find(o => /enter/i.test(o)) }); await this.wait(5); if (this.s.y < 4700) this._bobDone = false; return true; }
+        }
+        if (this._bobAsk) { // the servant points us to a new spot
+            this._bobAsk = false; this._bobZone = 0;
+            const sv = this.nearestNpc(n => /servant/i.test(n.name));
+            if (sv) { await this.act({ type: 'npc', npc: sv.npc, op: 'Talk-to' }); await this.wait(3); return true; }
+        }
+        const raw = has(6200);
+        if (raw) {
+            const bob = this.nearestNpc(n => /evil bob/i.test(n.name));
+            if (bob) { this.log('random event: serving Evil Bob his fish'); await this.act({ type: 'useitem', item: raw.name, slot: raw.slot, npc: bob.npc }); await this.wait(4); this._bobDone = true; return true; }
+        }
+        const good = has(6202);
+        if (good) {
+            const pot = this.nearestScenery(l => /uncooking pot/i.test(l.name)) ?? { x: 3421, y: 4777, id: 8985 };
+            await this.act({ type: 'useitem', slot: good.slot, x: pot.x, y: pot.y, id: pot.id ?? 8985 }); await this.wait(4); return true;
+        }
+        const bad = has(6206);
+        if (bad) { this._bobZone = ((this._bobZone ?? 0) + 1) % 4; this.log('random event: wrong fishing spot, trying another'); await this.act({ type: 'item', slot: bad.slot, op: 'Drop' }); await this.wait(2); return true; }
+        if (!s.inv.some(i => i.name === 'Small fishing net')) {
+            const net = s.ground.find(g => g.name === 'Small fishing net');
+            if (net) { await this.act({ type: 'ground', x: net.x, y: net.y, id: net.id }); await this.waitIdle({ timeout: 10 }); return true; }
+        }
+        const z = ZONES[this._bobZone ?? 0];
+        if (Math.max(Math.abs(s.x - z.x), Math.abs(s.y - z.y)) > 3) { await this.walkTo(z.x, z.y, { tol: 1, timeout: 30, direct: true }); return true; }
+        const spot = this.nearestScenery(l => /fishing spot/i.test(l.name) && l.ops.includes('Net'));
+        if (spot) { await this.act({ type: 'scenery', x: spot.x, y: spot.y, id: spot.id, op: 'Net' }); await this.wait(8); return true; }
+        this._bobZone = ((this._bobZone ?? 0) + 1) % 4;
+        return true;
     }
 
     // Mime: the Mime acts out an emote, bows, then the emote board (interface 188) opens: copy it (button per emote).
