@@ -71,6 +71,19 @@ Clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, r
 35. **Merchants:** a trading career that buys low and sells high on the Grand Exchange and at market days (the merchant personality exists, no career uses it yet).
 36. **Records and hall of fame:** firsts and milestones (first to Smithing 50, richest bot, most duels won) kept in `market/records.json`, shown in the recap and on the dashboard.
 
+### I. Fun and quirks (planned)
+37. **Nicknames:** bots earn them from deeds ("Chickenslayer", "Old Ironfist", "the Unlucky"); others use them in chat and the recap uses them in headlines.
+38. **Superstitions and lucky charms:** a bot on a good streak decides an item is lucky, won't sell it and frets if it dies with it; little rituals (burying a bone at the chapel before mining).
+39. **Phobias:** a bot killed by something embarrassing (a chicken, an imp) avoids that creature for days and gets teased about it.
+40. **Gossip and rumours:** news passes bot to bot and drifts as it spreads ("owes 5gp" becomes "is a thief"); rumours move trust, and the target can clear its name.
+41. **Tall tales:** fishers and fighters boast in chat, the boasts grow with each telling, and bots who know better call them out.
+42. **Town crier and the tabloid:** a sociable bot shouts the news in Lumbridge square; a second recap written as a biased gossip rag by a journalist bot with favourites and enemies.
+43. **Mayor elections:** a weekly vote by trust for mayor of Lumbridge; the mayor picks the next festival, can pardon a debt, and gets blamed when things go wrong.
+44. **Feasts:** after a team wins something its cook feeds everyone in the courtyard: mood and loyalty up.
+45. **The gambler's lottery:** a gambler bot sells tickets and draws a weekly winner; sometimes it runs off with the pot and the court gets involved.
+46. **Treasure hunts:** the director hides a prize (a bounty with a riddle clue to a place); bots follow the clues and teams race each other.
+47. **Revenge plots:** a bot that loses a grudge duel trains for a rematch, says so in its diary, and challenges again when it's ready.
+
 ---
 
 # Reference: how the built systems work
