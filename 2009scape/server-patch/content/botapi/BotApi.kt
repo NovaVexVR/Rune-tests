@@ -602,6 +602,12 @@ object BotRegistry {
         // interfaces / dialog
         val chat = p.interfaceManager.chatbox?.id
         o["iface"] = p.interfaceManager.opened?.id
+        // duels: the session's fight state (0 waiting, 1 fighting, 2 over) and the zones we're in, to see why "Fight" does nothing
+        runCatching {
+            val ds = p.getExtension<content.minigame.duel.DuelSession>(content.minigame.duel.DuelSession::class.java)
+            if (ds != null) o["duel"] = JSONObject().apply { this["fightState"] = ds.fightState; this["opponent"] = ds.getOpposite(p)?.username }
+            o["zones"] = JSONArray().apply { p.zoneMonitor.zones.forEach { add(it.zone.name) } }
+        }
         // text on the open main interface (child -> text), e.g. the Certer's three answers
         p.interfaceManager.opened?.id?.let { oid -> val t = synchronized(bot) { bot.strings[oid]?.toMap() }; if (!t.isNullOrEmpty()) o["ifaceText"] = JSONObject().apply { t.forEach { (k, v) -> this[k.toString()] = strip(v) } } }
         o["chatbox"] = chat

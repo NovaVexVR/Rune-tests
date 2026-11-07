@@ -37,7 +37,7 @@ async function climb(bot, op, z) {
 
 // Romeo & Juliet (Varrock): Romeo in the square, Juliet upstairs in her house to the west, Father Lawrence in
 // the north-east church, the Apothecary south-west; cadava berries from the bushes south-east of Varrock
-const RJ = { romeo: { x: 3210, y: 3424 }, julietStairs: { x: 3156, y: 3434 }, juliet: { x: 3157, y: 3427 }, lawrence: { x: 3254, y: 3484 }, apothecary: { x: 3196, y: 3404 }, bushes: { x: 3269, y: 3369 } };
+const RJ = { romeo: { x: 3210, y: 3424 }, julietStairs: { x: 3157, y: 3433 } /* the staircase (3156,3435) is reached from the south room, door 3160,3432 */, juliet: { x: 3157, y: 3427 }, lawrence: { x: 3254, y: 3484 }, apothecary: { x: 3196, y: 3404 }, bushes: { x: 3269, y: 3369 } };
 const RJ_ANSWERS = /perhaps i could help to find her|yes okay, i'll let her know|i guess i could look for him|yes i've met him|heard anything from juliet|potion that makes it seem like i'm dead/i;
 async function talkWait(bot, name, at, z = 0) {
     if (bot.s.z !== z || dist(bot.s, at) > 6) await bot.travel(at.x, at.y, { tol: 3 });
@@ -48,7 +48,7 @@ async function talkWait(bot, name, at, z = 0) {
 }
 async function toJuliet(bot) {
     if (bot.s.z !== 1) {
-        await bot.travel(RJ.julietStairs.x, RJ.julietStairs.y + 1, { tol: 2 });
+        await bot.travel(RJ.julietStairs.x, RJ.julietStairs.y, { tol: 1 });
         await bot.state(8);
         const st = bot.nearestScenery(l => /staircase/i.test(l.name) && l.ops.includes('Climb-up'));
         if (!st) { bot.log('quest: no staircase to Juliet'); return false; }
