@@ -68,7 +68,7 @@ Clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, r
 32. **Group combat outings:** teams go together to the Varrock sewers or the moss giants, with roles (front fighter, food carrier, looter), building on escorts.
 33. **Wilderness risk and reward:** wilderness mines and resources that bold bots visit for better pay, with a real risk of being attacked (wilderness PvP is on).
 34. **Karamja trips:** the boat from Port Sarim for lobsters and better food at higher fishing levels.
-35. **Merchants:** a trading career that buys low and sells high on the Grand Exchange and at market days (the merchant personality exists, no career uses it yet).
+35. *(done and verified: `merchant` task and career: at the GE it collects last time's offers, bids ~80% of the board's going price on popular goods and lists its stock at ~120%, using at most a third of its coins)* **Merchants:** a trading career that buys low and sells high on the Grand Exchange and at market days (the merchant personality exists, no career uses it yet).
 36. *(done: `bots/records.mjs`: hourly firsts (10/20/.../50 per skill) and all-time bests (richest, total level, quest points, duel wins); diary lines, the crier, a "Hall of fame" in the recap; `market/records.json`)* **Records and hall of fame:** firsts and milestones (first to Smithing 50, richest bot, most duels won) kept in `market/records.json`, shown in the recap and on the dashboard.
 
 ### I. Fun and quirks (planned)

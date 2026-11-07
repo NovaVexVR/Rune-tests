@@ -1,8 +1,10 @@
 // Skill-training tasks shared by scripted bots and Claude-directed bots (2009Scape).
 // Each task: { id, skills, canRun(bot) -> true | reason, run(bot, untilMs) }
 import { fearOf } from './phobias.mjs';
+import { readBoard } from './noticeboard.mjs';
+import { note } from './diary.mjs';
 import { doRitual, luckyOf } from './superstition.mjs';
-import { dist, rand, sleep, FOOD, gearInfo } from './lib.mjs';
+import { dist, rand, sleep, FOOD, gearInfo, GE } from './lib.mjs';
 import { faction, TASK_NEEDS } from './market.mjs';
 import { getShears, shear, spin } from './quests.mjs';
 
@@ -1068,3 +1070,46 @@ export const HERBLORE = {
     }
 };
 TASKS.push(HERBLORE);
+
+// ---- Merchants (roadmap 35): buy low, sell high at the Grand Exchange, guided by the notice board's going prices.
+// Collect last time's offers, bid ~80% of the going price on popular goods, list own stock at ~120%, spending at
+// most a third of its coins. A merchant career (merchant personalities lean to it).
+export const MERCHANT = {
+    id: 'merchant',
+    skills: [],
+    canRun: bot => (bot.s.coins + ((bot.s.bank ?? []).find(i => i.name === 'Coins')?.count ?? 0) >= 150) || 'needs 150 coins to trade with',
+    async run(bot, until) {
+        const board = readBoard()?.prices ?? {};
+        const goods = Object.entries(board).filter(([item, p]) => p.sales >= 3 && TRADE_OK(item)).sort((a, b) => b[1].sales - a[1].sales);
+        if (!goods.length) { bot.log('merchant: no going prices on the board yet'); return; }
+        const banked = name => (bot.s.bank ?? []).filter(i => i.name === name).reduce((t, i) => t + i.count, 0);
+        // stock to sell: banked goods with a going price, taken as notes
+        const stock = goods.filter(([item]) => banked(item) > 0).slice(0, 2);
+        const budget = Math.floor((bot.s.coins + banked('Coins')) / 3);
+        if (await bot.openBank()) {
+            await bot.depositAll(i => !KEEP(i.name));
+            if (bot.s.coins < budget) await bot.withdrawN('Coins', budget - bot.s.coins);
+            for (const [item] of stock) await bot.withdrawNoted(item, Math.min(banked(item), 20));
+            await bot.leaveBank();
+        }
+        await bot.travel(GE.x, GE.y + 5, { tol: 3 });
+        // last time's offers: collect what filled, cancel what didn't
+        for (const o of (await bot.state(1)).ge ?? []) if (o.done < o.amount) await bot.geAbort(o.slot);
+        if ((await bot.state(1)).ge?.length) await bot.geCollect();
+        let spent = 0, listed = 0, bids = 0;
+        for (const [item, p] of stock) {
+            const n = bot.count(item);
+            if (n && (await bot.geOffer({ item, sell: true, amount: n, price: Math.max(1, Math.round(p.price * 1.2)) })) >= 0) listed++;
+        }
+        for (const [item, p] of goods.filter(([item]) => !stock.some(([s]) => s === item)).slice(0, 2)) {
+            const price = Math.max(1, Math.floor(p.price * 0.8)), qty = Math.min(10, Math.floor((budget - spent) / price));
+            if (qty < 1) break;
+            if ((await bot.geOffer({ item, sell: false, amount: qty, price })) >= 0) { bids++; spent += qty * price; }
+        }
+        await bot.closeInterfaces();
+        bot.log(`merchant: ${listed} lots listed at +20%, ${bids} bids at -20% (${spent}gp committed); back next time to collect`);
+        note(bot.name, `Traded at the Grand Exchange: ${listed} lots up for sale, ${bids} bids in.`);
+    }
+};
+const TRADE_OK = item => !/^(Coins|Bones)$/.test(item);
+TASKS.push(MERCHANT);

@@ -23,11 +23,12 @@ export const CAREERS = {
     fighter: { skill: 'attack', tasks: ['melee', 'ranged'], title: 'a fighter', gear: true },
     thief: { skill: 'thieving', tasks: ['thieving'], title: 'a thief' },
     mystic: { skill: 'runecrafting', tasks: ['runecraft', 'magic'], title: 'a runecrafter' },
-    herbalist: { skill: 'herblore', tasks: ['herblore', 'melee'], title: 'a herbalist' }
+    herbalist: { skill: 'herblore', tasks: ['herblore', 'melee'], title: 'a herbalist' },
+    merchant: { skill: 'thieving', tasks: ['merchant', 'thieving'], title: 'a merchant' }
 };
 // personality leanings (added to the skill level when choosing)
 const LEAN = {
-    merchant: { crafter: 4, smith: 3, fletcher: 2 },
+    merchant: { merchant: 8, crafter: 4, smith: 3, fletcher: 2 },
     miser: { fighter: -5, smith: 2, fisher: 3 },
     gambler: { fighter: 4, thief: 3 },
     opportunist: { thief: 5, fighter: 1 },

@@ -27,7 +27,7 @@ function buyableNeeds(bot, task) {
 }
 
 function chooseTask(bot, lastId) {
-    const runnable = TASKS.filter(t => t.id !== lastId && (t.canRun(bot) === true || buyableNeeds(bot, t)));
+    const runnable = TASKS.filter(t => t.skills.length && t.id !== lastId && (t.canRun(bot) === true || buyableNeeds(bot, t)));
     // score = average level of the task's skills (lower is better) + noise for variety
     const scored = runnable.map(t => {
         const avg = t.skills.reduce((a, k) => a + bot.lvl(k), 0) / t.skills.length;
