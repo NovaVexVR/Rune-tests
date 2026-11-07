@@ -166,7 +166,7 @@ async function runBot(name, delay) {
                 await bot.wait(30);
             }
             await bot.state(1);
-            fs.appendFileSync(PROGRESS, JSON.stringify({ t: Date.now(), bot: name, kind: 'claude', task: item.task, total: bot.s.totalLevel, combat: bot.s.combat, x: bot.s.x, y: bot.s.y, stats: Object.fromEntries(Object.entries(bot.s.stats).map(([k, v]) => [k, v.level])) }) + '\n');
+            fs.appendFileSync(PROGRESS, JSON.stringify({ t: Date.now(), bot: name, kind: 'claude', task: item.task, total: bot.s.totalLevel, combat: bot.s.combat, x: bot.s.x, y: bot.s.y, stats: Object.fromEntries(Object.entries(bot.s.stats ?? {}).map(([k, v]) => [k, v.level])) }) + '\n');
         } catch (e) {
             bot.log(`error: ${e.stack ?? e}`);
             await sleep(15_000);
