@@ -1195,6 +1195,7 @@ export const WILD_MINE = {
         bot.standGround = true; // in the wilderness: fight what attacks, running blind is worse
         try {
             while (now() < until) {
+                if (!(await crossDitch(bot, true))) { bot.log('wild mine: could not cross the wilderness ditch'); return; }
                 if (!(await bot.travel(M.x, M.y, { tol: 4, timeout: 600 }))) return;
                 while (now() < until && (await bot.state(12)).invFree > 1) {
                     if (await bot.handleInterrupts()) continue;
@@ -1211,7 +1212,9 @@ export const WILD_MINE = {
                     if (!rock) { await bot.wait(4); continue; }
                     await gatherOnce(bot, rock, 'Mine', 'scenery', 30);
                 }
-                // never carry a load around the wilderness: bank it (Edgeville is the nearest ground-floor bank)
+                // never carry a load around the wilderness: back over the ditch and bank it at Edgeville
+                await bot.travel(3101, 3525, { tol: 3, timeout: 600 });
+                await crossDitch(bot, false);
                 if (!(await bot.bankItems(i => /ore$|^Coal$|^Uncut/.test(i.name)))) return;
             }
         } finally { bot.standGround = false; }
@@ -1228,6 +1231,20 @@ function wildFoe(bot) {
         if (social.isRival(bot.name, name) || feud) return { name };
     }
     return null;
+}
+// the wilderness ditch north of Edgeville: "Cross", then confirm the warning (interface 382, button 18)
+async function crossDitch(bot, north) {
+    const side = north ? { x: 3101, y: 3519 } : { x: 3101, y: 3524 };
+    if (north ? bot.s.y > 3521 : bot.s.y < 3521) return true;
+    await bot.travel(side.x, side.y, { tol: 2 });
+    for (let i = 0; i < 4 && (north ? (await bot.state(6)).y < 3522 : (await bot.state(6)).y > 3520); i++) {
+        if (bot.s.iface === 382) { await bot.act({ type: 'button', iface: 382, child: 18 }); await bot.waitIdle({ timeout: 8, quiet: 2 }); continue; }
+        const d = bot.nearestScenery(l => /wilderness ditch/i.test(l.name) && l.ops.includes('Cross'));
+        if (!d) { await bot.walkTo(side.x, side.y, { tol: 1 }); continue; }
+        await bot.act({ type: 'scenery', x: d.x, y: d.y, id: d.id, op: 'Cross' });
+        await bot.waitIdle({ timeout: 8, quiet: 2 });
+    }
+    return north ? bot.s.y > 3521 : bot.s.y < 3521;
 }
 const personalityCaution = name => { try { return JSON.parse(fs.readFileSync(new URL(`./orders/${name}.json`, import.meta.url), 'utf8')).personality?.caution ?? 1; } catch { return 1; } };
 TASKS.push(WILD_MINE);
