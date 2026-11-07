@@ -5,6 +5,7 @@
 // (quests, shopping, banking, exploring).
 //
 // usage: node claude_runner.mjs [count=5]
+import { coinsOf, recordFlow } from './economy.mjs';
 import fs from 'fs';
 import path from 'path';
 
@@ -152,9 +153,11 @@ async function runBot(name, delay) {
                 continue;
             }
             bot.log(`[plan step ${step}] ${item.task} for ${item.minutes}m — ${item.why ?? ''} | ${summary(bot.s)}`);
+            const coins0 = coinsOf(await bot.state(1).catch(() => null));
             await prepare(bot, item.task);
             try { await task.run(bot, marketDay.deadline(name, Date.now() + (item.minutes ?? 15) * 60_000)); }
             finally { if (bot.escort) escorts.finish(name); }
+            recordFlow(name, item.task, coins0, coinsOf(await bot.state(1).catch(() => null))); // coin sources and sinks (27)
             checkGoal(bot);
             writeStep(name, step + 1);
             // habit: now and then, drift to a favorite spot between tasks

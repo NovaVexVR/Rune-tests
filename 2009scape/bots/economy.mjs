@@ -66,3 +66,20 @@ if (process.argv[1]?.endsWith('economy.mjs')) {
     const r = await sampleEconomy();
     console.log(JSON.stringify({ ...r, perBot: `(${Object.keys(r.perBot).length} bots)` }, null, 1));
 }
+
+// ---- coin flows (roadmap 27): each task step's change in a bot's coins (carried + banked) -> market/flows.jsonl.
+// Positive tasks are coin sources (thieving, selling), negative ones sinks (tolls, shops, tanning, fines).
+const FLOWS = path.join(HERE, 'market', 'flows.jsonl');
+export const coinsOf = s => (s?.coins ?? 0) + (s?.bank ?? []).filter(i => i.name === 'Coins').reduce((t, i) => t + i.count, 0);
+export function recordFlow(bot, task, before, after) {
+    if (before === null || after === null || before === after) return;
+    fs.appendFileSync(FLOWS, JSON.stringify({ t: Date.now(), bot, task, delta: after - before }) + '\n');
+}
+export function flowSummary(hours = 24) {
+    const since = Date.now() - hours * 3600_000, by = {};
+    let rows = [];
+    try { rows = fs.readFileSync(FLOWS, 'utf8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l)).filter(r => r.t >= since); } catch {}
+    for (const r of rows) { const b = (by[r.task] ??= { in: 0, out: 0, steps: 0 }); b.steps++; if (r.delta > 0) b.in += r.delta; else b.out -= r.delta; }
+    return { hours, net: rows.reduce((t, r) => t + r.delta, 0), byTask: by };
+}
+

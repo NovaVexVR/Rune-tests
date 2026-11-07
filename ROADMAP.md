@@ -51,7 +51,7 @@ What's planned for the bot world, in priority order, plus how the built systems 
 
 ### F. Before the real run (planned)
 26. *(done: `bots/backup.mjs` -> `2009scape/backups/world-<time>-<label>.tar.gz`, at every launch and daily from the runner, 14 days kept; `node bots/backup.mjs list`)* **Automatic backups:** daily snapshots of the player saves, `bots/market/`, diaries and recaps, plus one before every reset or restart; keep the last 14 days. Weeks of history shouldn't be one broken save or full disk away.
-27. **Economy balance watch:** track where coins enter (thieving, shop sales, quest rewards) and leave (tolls, shops, tanning, fines); a director alert on runaway inflation or deflation, so wealth keeps growing slowly.
+27. *(done: runners record each task step's coin change in `market/flows.jsonl` (`economy.mjs` recordFlow / flowSummary); the director briefing shows coin sources and sinks per task; alerts on total coins +50% or -30% in a day)* **Economy balance watch:** track where coins enter (thieving, shop sales, quest rewards) and leave (tolls, shops, tanning, fines); a director alert on runaway inflation or deflation, so wealth keeps growing slowly.
 28. **Performance check for running locally:** CPU and memory of the server and 60+ bots with every feature on; tune polling and bot count to the user's machine before the switch.
 
 ### Milestone: reset to level 1 and start the real run

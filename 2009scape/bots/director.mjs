@@ -9,6 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import { spawnSync } from 'child_process';
 import { readDiaries } from './diary.mjs';
+import { flowSummary } from './economy.mjs';
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
 const DIR = path.join(HERE, 'director');
@@ -19,6 +20,8 @@ const TASKS = ['woodcut_fire', 'fish_cook', 'mine', 'smelt', 'smith', 'mine_iron
 const read = (f, d) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return d; } };
 const state = () => read(STATE, { lastPass: 0, alerts: [] });
 const saveState = s => { fs.mkdirSync(path.dirname(STATE), { recursive: true }); fs.writeFileSync(STATE, JSON.stringify(s, null, 1)); };
+
+const topFlows = k => Object.entries(flowSummary(24).byTask).sort((a, b) => b[1][k] - a[1][k]).slice(0, 3).map(([t, v]) => `${t} ${v[k]}gp`).join(', ');
 
 // Trouble worth an early pass: many deaths, bots stuck again and again, a team running out of coins.
 export function checkAlerts() {
@@ -39,6 +42,16 @@ export function checkAlerts() {
             if (was && was.coins > 200 && now.coins < was.coins * 0.4) alerts.push(`${g} coins fell from ${was.coins} to ${now.coins} in ~6 hours`);
         }
     }
+    // runaway inflation or deflation: total coins (all bots, carried + banked) up 50% or down 30% in a day
+    try {
+        const all = fs.readFileSync(path.join(HERE, 'market', 'economy.jsonl'), 'utf8').trim().split('\n').map(l => JSON.parse(l));
+        const now = all.at(-1), dayAgo = all.findLast(r => Date.parse(r.t) <= Date.now() - 22 * 3600_000);
+        if (now && dayAgo?.coins > 1000) {
+            const ratio = now.coins / dayAgo.coins;
+            if (ratio > 1.5) alerts.push(`inflation: coins ${dayAgo.coins} -> ${now.coins} in a day (sources: ${topFlows('in')})`);
+            if (ratio < 0.7) alerts.push(`deflation: coins ${dayAgo.coins} -> ${now.coins} in a day (sinks: ${topFlows('out')})`);
+        }
+    } catch {}
     const s = state();
     const fresh = alerts.filter(a => !s.alerts.some(x => x.text === a));
     if (fresh.length) { s.alerts.push(...fresh.map(text => ({ text, t: new Date().toISOString() }))); saveState(s); }
@@ -69,6 +82,7 @@ async function brief() {
         `Last pass: ${s.lastPass ? new Date(s.lastPass).toISOString().slice(0, 16).replace('T', ' ') : 'never'}. Open alerts: ${s.alerts.length ? '' : 'none'}`,
         ...s.alerts.map(a => `- ${a.text} (${a.t.slice(0, 16)})`), '',
         `Valid tasks: ${TASKS.join(', ')}.`, '',
+        `Coin flows, last 24 h (task: in / out): ${(() => { const f = flowSummary(24); return Object.entries(f.byTask).sort((a, b) => (b[1].in - b[1].out) - (a[1].in - a[1].out)).map(([t, v]) => `${t} +${v.in}/-${v.out}`).join(', ') + ` (net ${f.net >= 0 ? '+' : ''}${f.net}gp)`; })()}`, '',
         '## Bots', '', '| bot | team | combat | total | best skills | coins | career / goal | deaths 24h | plan |', '|---|---|---|---|---|---|---|---|---|', ...rows, '',
         '## The last 24 hours', '', recap.trim()
     ].join('\n');
