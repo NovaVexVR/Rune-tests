@@ -17,9 +17,11 @@ import { council, STATE as POLITICS } from './politics.mjs';
 import { MarketDay } from './marketday.mjs';
 import { Parties } from './party.mjs';
 import { note, noteLevel } from './diary.mjs';
+import { Escorts } from './escort.mjs';
 
 const ALL_BOTS = [];
 const market = new Market((...a) => console.log(new Date().toISOString(), ...a));
+const escorts = new Escorts(market, (...a) => console.log(new Date().toISOString(), ...a), note);
 const marketDay = new MarketDay(market, (...a) => console.log(new Date().toISOString(), ...a));
 const parties = new Parties(market, (...a) => console.log(new Date().toISOString(), ...a));
 
@@ -76,6 +78,7 @@ async function runBot(name, delay) {
             while (await market.step(b)) {}
             return true;
         }
+        if (escorts.jobFor(b.name)) { await escorts.guard(b); return true; } // a teammate asked for an escort
         if (Date.now() - lastSeek > 60_000) {
             lastSeek = Date.now();
             await market.seek(b.name);
@@ -118,8 +121,11 @@ async function runBot(name, delay) {
             }
             const task = taskById(item.task);
             if (!task) { bot.log(`unknown task ${item.task}, skipping`); writeStep(name, step + 1); continue; }
-            const ok = task.canRun(bot);
+            let ok = task.canRun(bot);
+            // too weak for the place (e.g. muggers at the iron mine): ask the team for an escort
+            if (ok !== true && /combat|escort/i.test(ok) && (await escorts.request(bot, item.task))) ok = task.canRun(bot);
             if (ok !== true) {
+                escorts.finish(name, 'none');
                 bot.log(`cannot run ${item.task}: ${ok} (trading or shopping for it)`);
                 await market.seek(name);
                 if (market.dealFor(name)) { await bot.handleInterrupts(); continue; }
@@ -130,7 +136,8 @@ async function runBot(name, delay) {
             }
             bot.log(`[plan step ${step}] ${item.task} for ${item.minutes}m — ${item.why ?? ''} | ${summary(bot.s)}`);
             await prepare(bot, item.task);
-            await task.run(bot, marketDay.deadline(name, Date.now() + (item.minutes ?? 15) * 60_000));
+            try { await task.run(bot, marketDay.deadline(name, Date.now() + (item.minutes ?? 15) * 60_000)); }
+            finally { if (bot.escort) escorts.finish(name); }
             writeStep(name, step + 1);
             // habit: now and then, drift to a favorite spot between tasks
             const habits = personalityOf(name).habits;

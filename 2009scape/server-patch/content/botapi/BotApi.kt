@@ -635,6 +635,7 @@ object BotRegistry {
             j["dist"] = n.location.getDistance(loc).toInt()
             j["level"] = shown.definition.combatLevel
             j["inCombat"] = n.inCombat()
+            (n.properties.combatPulse.getVictim() as? Player)?.let { j["target"] = it.username } // who it is attacking (escorts guard their ward)
             j["ops"] = JSONArray().apply { shown.interaction.options.filterNotNull().forEach { add(it.name) } }
             npcs.add(j)
         }

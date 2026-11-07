@@ -1,6 +1,6 @@
 // Run the staged in-game tests one after another and write a pass/fail report to bots/tests/last-run.md.
 //   node run_tests.mjs            quick set: random events, Grand Exchange, quest party (about 30 minutes)
-//   node run_tests.mjs all        everything: + team stash, social mechanics, market day, duel (about 2 hours)
+//   node run_tests.mjs all        everything: + team stash, social mechanics, market day, escort, duel (about 2 hours)
 //   node run_tests.mjs ge events  just the named ones
 // Needs the server running (the fleet can keep running: the tests use their own bots). Each test's own output
 // is saved next to the report. Run it after any server or bot-API change.
@@ -24,6 +24,7 @@ const TESTS = {
     party: { steps: [['test_party.mjs']], judge: judgeChecks },
     social: { steps: [['test_social.mjs', 'setup'], ['test_social.mjs', 'run']], judge: judgeChecks },
     marketday: { steps: [['test_marketday.mjs', 'setup'], ['test_marketday.mjs', 'run']], judge: judgeChecks },
+    escort: { steps: [['test_escort.mjs', 'setup'], ['test_escort.mjs', 'run']], judge: judgeChecks },
     duel: { steps: [['test_duel.mjs', 'setup'], ['test_duel.mjs', 'run']], judge: out => ({ pass: /RESULT winner (?!null)/.test(out) && !/never got into the arena/.test(out), detail: (out.match(/RESULT.*$/m) ?? ['no result'])[0].slice(0, 160) }) }
 };
 function judgeChecks(out) {

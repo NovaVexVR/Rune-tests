@@ -26,7 +26,7 @@ What's planned for the bot world, in priority order, plus how the built systems 
 ### B. A real economy
 7. *(done)* **Team stash:** the treasurer keeps shared goods (food, armour, tools) as well as coins, and hands them out to members who need them.
 8. *(done: wool to balls of wool (`spin`), cowhide to leather to leather armour (`leather`, Al Kharid), ore to bars to armour, bank notes for trading)* **Reasons to trade:** crafting chains and selling surplus, so market days have real supply and demand.
-9. *(done in code: iron; steel (coal at Barbarian Village from Mining 30, steel bars from Smithing 30, steel armour); fighters buy armour at Horvik's with 30% of their savings. Steel still being tested in-game)* **Iron and steel.**
+9. *(done in code: iron; steel (coal at Barbarian Village from Mining 40, steel bars from Smithing 30, steel armour); fighters buy armour at Horvik's with 30% of their savings. Steel still being tested in-game)* **Iron and steel.**
 10. *(done: oak bows (willow bows and Lumbridge willows written, not yet tested in-game), fly fishing (rod from Port Sarim, feathers from chickens), leather crafting; agility still to do)* **More training methods.**
 11. *(done in code: the castle range after Cook's Assistant, Runecrafting after Rune Mysteries (essence via Aubury, air runes at the air altar; being tested), prayer from buried bones)* **Use what quests unlock.**
 

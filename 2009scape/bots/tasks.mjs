@@ -561,11 +561,11 @@ export const TASKS = [
         id: 'mine_iron',
         skills: ['mining'],
         // at Mining 15 a bronze pickaxe hardly ever gets iron; and a Mugger (level 6) roams this mine
-        canRun: bot => !['Bronze pickaxe', 'Iron pickaxe', 'Steel pickaxe'].some(a => bot.has(a)) ? 'need a pickaxe' : bot.lvl('mining') < 20 ? 'need Mining 20' : (bot.s.combat ?? 3) >= 10 || 'need combat 10 (muggers)',
+        canRun: bot => !['Bronze pickaxe', 'Iron pickaxe', 'Steel pickaxe'].some(a => bot.has(a)) ? 'need a pickaxe' : bot.lvl('mining') < 20 ? 'need Mining 20' : (bot.s.combat ?? 3) >= 10 || !!bot.escort || 'need combat 10 (muggers) or an escort',
         async run(bot, until) {
-            // from Mining 30, coal (Barbarian Village) whenever the bank has less than 2 coal per iron ore: steel needs both
+            // from Mining 40 (below that coal hardly ever comes: ~1 swing in 76 at 30, 1 in 7 at 40), coal (Barbarian Village) whenever the bank has less than 2 coal per iron ore: steel needs both
             const banked = x => bot.s.bank?.find(i => i.name === x)?.count ?? 0;
-            const coal = bot.lvl('mining') >= 30 && banked('Coal') < 2 * Math.max(5, banked('Iron ore'));
+            const coal = bot.lvl('mining') >= 40 && banked('Coal') < 2 * Math.max(5, banked('Iron ore'));
             const IRON = coal ? [11930, 11931, 11932] : [11954, 11955, 11956];
             const M = coal ? PLACES.barbarianCoal : PLACES.varrockIron;
             if (coal) bot.log(`mining coal at Barbarian Village (bank: ${banked('Coal')} coal, ${banked('Iron ore')} iron ore)`);
