@@ -1198,6 +1198,15 @@ export const WILD_MINE = {
                 if (!(await bot.travel(M.x, M.y, { tol: 4, timeout: 600 }))) return;
                 while (now() < until && (await bot.state(12)).invFree > 1) {
                     if (await bot.handleInterrupts()) continue;
+                    // a rival (or a feuding team's bot) in the wilderness, close in strength: settle it here (19)
+                    const foe = wildFoe(bot);
+                    if (foe && !bot.s.attacking) {
+                        bot.log(`wild mine: ${foe.name} is here. This is the wilderness.`);
+                        await bot.act({ type: 'say', text: `${foe.name}! No arena rules out here.` }).catch(() => {});
+                        await bot.act({ type: 'player', name: foe.name, op: 'Attack' }).catch(e => bot.log(`wild mine: ${e.message}`));
+                        await bot.waitIdle({ timeout: 60, quiet: 4, cond: st => !st.attacking && !st.inCombat });
+                        continue;
+                    }
                     const rock = bot.nearestScenery(l => l.ops.includes('Mine') && M.rocks.includes(l.id) && ok(l.id));
                     if (!rock) { await bot.wait(4); continue; }
                     await gatherOnce(bot, rock, 'Mine', 'scenery', 30);
@@ -1208,5 +1217,17 @@ export const WILD_MINE = {
         } finally { bot.standGround = false; }
     }
 };
+function wildFoe(bot) {
+    const social = bot.market?.social;
+    if (!social) return null;
+    for (const p of bot.s.players ?? []) {
+        const o = bot.market.bots?.get(p.name.toLowerCase())?.bot ?? bot.market.bots?.get(p.name)?.bot;
+        if (!o?.s || Math.abs((o.s.combat ?? 3) - (bot.s.combat ?? 3)) > 8) continue;
+        const name = o.name;
+        const feud = social.diplomacy?.(bot.name, name, 'allied', 'feud') === 'feud'; // their teams are feuding
+        if (social.isRival(bot.name, name) || feud) return { name };
+    }
+    return null;
+}
 const personalityCaution = name => { try { return JSON.parse(fs.readFileSync(new URL(`./orders/${name}.json`, import.meta.url), 'utf8')).personality?.caution ?? 1; } catch { return 1; } };
 TASKS.push(WILD_MINE);
