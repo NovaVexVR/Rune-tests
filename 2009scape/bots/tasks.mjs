@@ -1305,10 +1305,13 @@ async function toStronghold(bot) {
 export const AGILITY = {
     id: 'agility',
     skills: ['agility'],
-    canRun: bot => (bot.s.combat ?? 3) >= 30 || 'needs combat 30 for the trip past the White Wolf Mountain wolves',
+    canRun: bot => (bot.s.combat ?? 3) >= 45 || 'needs combat 45 for the trip over White Wolf Mountain (its wolves killed a combat-36 bot)',
     async run(bot, until) {
-        await bot.ensureFood?.(4).catch(() => {});
-        if (!(await toStronghold(bot))) return;
+        await bot.ensureFood?.(6).catch(() => {});
+        bot.standGround = true; // wolves on the mountain: running from them doesn't work, fighting does
+        let there;
+        try { there = await toStronghold(bot); } finally { bot.standGround = false; }
+        if (!there) return;
         bot.log('agility: at the Gnome Stronghold course');
         const x0 = bot.s.stats.agility.xp;
         let laps = 0;
@@ -1329,8 +1332,11 @@ export const AGILITY = {
             else await bot.wait(3);
         }
         bot.log(`agility: ${laps} laps, +${bot.s.stats.agility.xp - x0} xp; heading home`);
-        for (const leg of [...AGILITY_LEGS].reverse()) await bot.travel(leg.x, leg.y, { tol: 4, timeout: 900 });
-        await bot.travel(3222, 3218, { tol: 4, timeout: 900 });
+        bot.standGround = true;
+        try {
+            for (const leg of [...AGILITY_LEGS].reverse()) await bot.travel(leg.x, leg.y, { tol: 4, timeout: 900 });
+            await bot.travel(3222, 3218, { tol: 4, timeout: 900 });
+        } finally { bot.standGround = false; }
     }
 };
 TASKS.push(AGILITY);

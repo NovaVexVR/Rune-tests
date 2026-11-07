@@ -226,6 +226,86 @@ async function cauldronRunInner(bot) {
     return enchanted >= 4;
 }
 
+// The Knight's Sword (Falador): the Squire, Reldo in Varrock's library, a redberry pie from Romily in the Cooks'
+// Guild (Cooking 32 and a chef's hat worn) for Thurgo south of Port Sarim, the portrait in Sir Vyvin's cupboard
+// (Falador castle, top floor), and blurite from the Asgarnian Ice Dungeon (ice warriors) plus 2 iron bars.
+// For bots with combat 45+.
+const KS = { squire: { x: 2974, y: 3342 }, reldo: { x: 3209, y: 3494 }, guild: { x: 3143, y: 3445 }, romily: { x: 3139, y: 3446 }, thurgo: { x: 3001, y: 3145 },
+    castle: { x: 2965, y: 3340 }, cupboard: { x: 2984, y: 3336 }, trapdoor: { x: 3008, y: 3151 } };
+const KS_ANSWERS = /life as a squire|i can make a new sword|would these dwarves make another|ok, i'll give it a go|imcando dwarves\?|would you like some redberry pie|can you make me a special sword|^yes, please/i;
+async function ksTalk(bot, name, at) {
+    if (bot.s.z !== 0 || dist(bot.s, at) > 6) await bot.travel(at.x, at.y, { tol: 3 });
+    await bot.talkTo(name, { answer: KS_ANSWERS, maxSteps: 60 });
+    await bot.state(5);
+}
+async function buyRedberryPie(bot) {
+    if (count(bot, 'Redberry pie')) return true;
+    // the guild wants a chef's hat on the head: swap it in for the helmet, and back after
+    const hat = bot.s.inv.find(i => i.name === "Chef's hat");
+    if (!hat && !bot.s.worn.some(i => i.name === "Chef's hat")) { bot.log("quest: no chef's hat for the Cooks' Guild"); return false; }
+    if (hat) { await bot.act({ type: 'item', slot: hat.slot, op: hat.ops.find(o => /wear/i.test(o)) ?? 'Wear' }); await bot.wait(2); }
+    await bot.travel(KS.guild.x, KS.guild.y + 4, { tol: 2 });
+    const shop = await bot.openShop({ x: KS.romily.x, y: KS.romily.y, npcs: ['Romily Weaklax'] });
+    if (shop) { await bot.buy('Redberry pie', 1); await bot.closeInterfaces(); }
+    await bot.walkTo(KS.guild.x, KS.guild.y + 6, { tol: 2 });
+    await bot.gearUp().catch(() => {});
+    return count(bot, 'Redberry pie') > 0;
+}
+async function getPortrait(bot) {
+    if (count(bot, 'Portrait')) return true;
+    await bot.travel(KS.castle.x, KS.castle.y, { tol: 3 });
+    for (let i = 0; i < 6 && (await bot.state(12)).z < 2; i++) {
+        const up = bot.nearestScenery(l => /stair|ladder/i.test(l.name) && l.ops.some(o => /^climb(-up)?$/i.test(o)));
+        if (!up) { bot.log('quest: no way up Falador castle'); return false; }
+        const z0 = bot.s.z;
+        await bot.act({ type: 'scenery', x: up.x, y: up.y, id: up.id, op: up.ops.find(o => /^climb-up$/i.test(o)) ?? up.ops.find(o => /^climb$/i.test(o)) });
+        await bot.waitIdle({ timeout: 12, cond: x => x.z > z0 });
+        await bot.handleInterrupts({ answer: /climb up/i });
+    }
+    if (bot.s.z !== 2) return false;
+    await bot.walkTo(KS.cupboard.x, KS.cupboard.y + 1, { tol: 1, timeout: 60, direct: true });
+    for (let i = 0; i < 4 && !count(bot, 'Portrait'); i++) {
+        const c = (await bot.state(6), bot.nearestScenery(l => /cupboard/i.test(l.name)));
+        if (!c) break;
+        const op = c.ops.find(o => /search/i.test(o)) ?? c.ops.find(o => /open/i.test(o));
+        await bot.act({ type: 'scenery', x: c.x, y: c.y, id: c.id, op });
+        await bot.wait(3);
+        if (bot.s.dialog) await bot.act({ type: 'continue' }).catch(() => {});
+        await bot.state(3);
+    }
+    await downTower(bot); // down the castle stairs, same as the tower's
+    return count(bot, 'Portrait') > 0;
+}
+async function mineBlurite(bot) {
+    if (count(bot, 'Blurite ore')) return true;
+    await bot.travel(KS.trapdoor.x, KS.trapdoor.y, { tol: 2 });
+    const td = (await bot.state(8), bot.nearestScenery(l => /trapdoor/i.test(l.name)));
+    if (!td) { bot.log('quest: no ice dungeon trapdoor'); return false; }
+    await bot.act({ type: 'scenery', x: td.x, y: td.y, id: td.id, op: td.ops.find(o => /climb-down|open/i.test(o)) });
+    await bot.waitIdle({ timeout: 12, cond: x => x.y > 9000 });
+    if ((await bot.state(8)).y < 9000) { const t2 = bot.nearestScenery(l => /trapdoor/i.test(l.name) && l.ops.some(o => /climb-down/i.test(o))); if (t2) { await bot.act({ type: 'scenery', x: t2.x, y: t2.y, id: t2.id, op: 'Climb-down' }); await bot.waitIdle({ timeout: 12, cond: x => x.y > 9000 }); } }
+    if (bot.s.y < 9000) return false;
+    bot.standGround = true;
+    try {
+        // the blurite sits in the cliffs to the east: walk that way until a rock shows up
+        for (const wp of [{ x: 3030, y: 9555 }, { x: 3045, y: 9562 }, { x: 3050, y: 9568 }]) {
+            if (bot.nearestScenery(l => [33220, 33221].includes(l.id))) break;
+            await bot.walkTo(wp.x, wp.y, { tol: 2, timeout: 90, direct: true });
+            await bot.state(12);
+        }
+        for (let i = 0; i < 20 && !count(bot, 'Blurite ore'); i++) {
+            if (await bot.handleInterrupts()) continue;
+            const rock = (await bot.state(12), bot.nearestScenery(l => [33220, 33221].includes(l.id) && l.ops.includes('Mine')));
+            if (!rock) { await bot.wait(4); continue; }
+            await bot.act({ type: 'scenery', x: rock.x, y: rock.y, id: rock.id, op: 'Mine' });
+            await bot.waitIdle({ timeout: 30, quiet: 4, cond: st => st.inv.some(x => x.name === 'Blurite ore') });
+        }
+    } finally { bot.standGround = false; }
+    await bot.walkTo(3008, 9550, { tol: 3, timeout: 120, direct: true }); // back to the ladder (walkTo climbs out)
+    await bot.walkTo(KS.trapdoor.x, KS.trapdoor.y, { tol: 3, timeout: 120 });
+    return count(bot, 'Blurite ore') > 0;
+}
+
 // Ways to get one quest item (each returns true once the bot holds it). `n`: how many to get.
 export const GATHER = {
     ...Object.fromEntries(Object.entries(MEATS).map(([item, [npc, at]]) => [item, (bot, n = 1) => killFor(bot, npc, item, at, n)])),
@@ -443,6 +523,34 @@ export const QUESTS = {
                 await bot.travel(FRED.x + 1, FRED.y, { tol: 2 });
                 await bot.talkTo('Fred the Farmer', { answer: FRED_ANSWERS, maxSteps: 40 });
                 await bot.state(5);
+            }
+            return stageOf(bot, this.name) >= 100;
+        }
+    },
+    knights_sword: {
+        name: "The Knight's Sword",
+        items: [],
+        async start(bot) {
+            if (stageOf(bot, this.name) > 0) return true;
+            if ((bot.s.combat ?? 3) < 45 || bot.lvl('cooking') < 32 || bot.lvl('mining') < 10) { bot.log("quest: The Knight's Sword waits for combat 45, Cooking 32 and Mining 10"); return false; }
+            await ksTalk(bot, 'Squire', KS.squire);
+            return stageOf(bot, this.name) > 0;
+        },
+        async finish(bot) {
+            for (let i = 0; i < 14 && stageOf(bot, this.name) < 100; i++) {
+                const st = stageOf(bot, this.name);
+                if (st === 10) await ksTalk(bot, 'Reldo', KS.reldo);
+                else if (st === 20 || st === 30) { if (st === 20 && !(await buyRedberryPie(bot))) return false; await ksTalk(bot, 'Thurgo', KS.thurgo); }
+                else if (st === 40) await ksTalk(bot, 'Squire', KS.squire);
+                else if (st === 50) { if (!(await getPortrait(bot))) return false; await ksTalk(bot, 'Thurgo', KS.thurgo); }
+                else if (st === 60) {
+                    if (!count(bot, 'Blurite ore') && !(await mineBlurite(bot))) return false;
+                    if (count(bot, 'Iron bar') < 2 && (await bot.openBank())) { await bot.withdrawN('Iron bar', 2 - count(bot, 'Iron bar')); await bot.leaveBank(); }
+                    if (count(bot, 'Iron bar') < 2) { bot.log('quest: needs 2 iron bars for Thurgo'); return false; }
+                    await ksTalk(bot, 'Thurgo', KS.thurgo);
+                } else if (st === 70) await ksTalk(bot, 'Squire', KS.squire);
+                else break;
+                bot.log(`quest: The Knight's Sword stage ${st} -> ${stageOf(bot, this.name)}`);
             }
             return stageOf(bot, this.name) >= 100;
         }
