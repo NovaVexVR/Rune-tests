@@ -99,6 +99,7 @@ function makeHabits(name, p) {
 }
 
 import { note } from './diary.mjs';
+import { relationOf } from './politics.mjs';
 
 const load = (f, d) => (fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : d);
 const save = (f, v) => fs.writeFileSync(f, JSON.stringify(v, null, 2));
@@ -243,12 +244,18 @@ export class Social {
     askFactor(name, other) {
         const p = this.p(name);
         // personality markup, plus up to +25% for partners it distrusts
-        return (1 + 0.4 * p.greed - 0.25 * p.generosity) * (1 + 0.25 * Math.max(0, -this.trust(name, other))) * (this.rivalTeam(name, other) ? 1.3 : 1);
+        return (1 + 0.4 * p.greed - 0.25 * p.generosity) * (1 + 0.25 * Math.max(0, -this.trust(name, other))) * (this.rivalTeam(name, other) ? 1.3 : 1) * this.diplomacy(name, other, 0.9, 1.2);
     }
 
     bidFactor(name, other) {
         const p = this.p(name);
-        return (1 + 0.3 * p.generosity - 0.2 * p.greed) * (1 + 0.1 * this.trust(name, other));
+        return (1 + 0.3 * p.generosity - 0.2 * p.greed) * (1 + 0.1 * this.trust(name, other)) * this.diplomacy(name, other, 1.05, 0.9);
+    }
+
+    // allied teams give each other a better price, feuding teams a worse one
+    diplomacy(name, other, allied, feud) {
+        const r = relationOf(this.teamOf(name), this.teamOf(other));
+        return r === 'allied' ? allied : r === 'feud' ? feud : 1;
     }
 
     // Minimum fraction of what it gives that it must receive (by its own values) to accept a trade.

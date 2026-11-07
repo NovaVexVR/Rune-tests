@@ -37,7 +37,7 @@ What's planned for the bot world, in priority order, plus how the built systems 
 
 ### D. Society
 15. *(done: `bots/noticeboard.mjs` -> `market/noticeboard.json` every 10 min; in the recap; going prices pull bots' own prices toward them)* **Public notice board** for bounties, prices and reputations, readable in the recaps.
-16. **Team alliances and feuds** that go beyond single-bot grudges, with team-level trust.
+16. *(done: council diplomacy in `politics.mjs`: allied above +0.08 team trust twice running, feud below -0.08 or 3+ grudges; allies trade 10% cheaper and escort each other, feuds mark up 20%)* **Team alliances and feuds** that go beyond single-bot grudges, with team-level trust.
 17. **Disputes and justice:** a respected bot (or the most trusted per team) arbitrates defaults and fines repeat offenders.
 18. **Newcomers:** new bots join over time as fresh characters; teams recruit and mentor them.
 19. **PvP (Phase 5):** fix the duel blocker (bots reach the arena but "Fight" starts no combat), wire duels into grudges, then bounded wilderness fights (details below).

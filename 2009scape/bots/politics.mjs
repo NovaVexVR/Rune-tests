@@ -33,6 +33,12 @@ export function teamOf(name) {
     for (const [t, d] of Object.entries(STATE.teams)) if (d.members.includes(name)) return t;
     return 'individual';
 }
+// team diplomacy (D16): 'allied', 'feud' or 'neutral' between two teams
+const relKey = (a, b) => [a, b].sort().join('|');
+export function relationOf(ta, tb) {
+    if (!ta || !tb || ta === tb || ta === 'individual' || tb === 'individual') return 'neutral';
+    return STATE.relations?.[relKey(ta, tb)]?.status ?? 'neutral';
+}
 export const treasurerOfTeam = team => STATE.teams[team]?.treasurer ?? null;
 
 // treasurers keep a cut of what members pay in, set by their greed
@@ -191,6 +197,44 @@ export function council(market) {
             d.members.push(c);
             if (online(c)) say(c, `Proud to join ${team}!`);
             break;
+        }
+    }
+    // ---- D16 diplomacy: alliances and feuds between teams ----
+    // team trust = the average trust every member of one team holds in every member of the other, both ways.
+    // Allied after two councils in a row above +0.08 with no grudges between them; a feud below -0.08 or with
+    // three or more cross-team grudges. Alliances break below 0; feuds end above -0.05 (once 6 hours old).
+    STATE.relations ??= {};
+    const names = Object.keys(STATE.teams);
+    for (let i = 0; i < names.length; i++) for (let j = i + 1; j < names.length; j++) {
+        const [ta, tb] = [names[i], names[j]], A = STATE.teams[ta].members, B = STATE.teams[tb].members;
+        if (!A.length || !B.length) continue;
+        let sum = 0, n = 0, grudges = 0;
+        for (const a of A) for (const b of B) { sum += social.trust(a, b) + social.trust(b, a); n += 2; if (social.isRival?.(a, b) || social.isRival?.(b, a)) grudges++; }
+        const t = sum / n, key = relKey(ta, tb);
+        const r = (STATE.relations[key] ??= { status: 'neutral', since: now, streak: 0 });
+        r.trust = Math.round(t * 100) / 100;
+        const herald = team => STATE.teams[team].members.filter(online).sort((x, y) => social.p(y).sociability - social.p(x).sociability)[0];
+        if (r.status === 'neutral') {
+            if (t < -0.08 || grudges >= 3) {
+                Object.assign(r, { status: 'feud', since: now, streak: 0 });
+                event(log, `FEUD: ${ta} and ${tb} are at odds (team trust ${r.trust}, ${grudges} grudges)`);
+                for (const m of [...A, ...B]) note(m, `Our team is now feuding with ${A.includes(m) ? tb : ta}.`);
+                const h = herald(ta); if (h) say(h, `${tb} can't be trusted. Don't trade with them.`);
+            } else if (t > 0.08 && !grudges) {
+                if (++r.streak >= 2) {
+                    Object.assign(r, { status: 'allied', since: now, streak: 0 });
+                    event(log, `ALLIANCE: ${ta} and ${tb} are now allies (team trust ${r.trust})`);
+                    for (const m of [...A, ...B]) note(m, `Our team allied with ${A.includes(m) ? tb : ta}.`);
+                    const h = herald(ta); if (h) say(h, `${ta} and ${tb} stand together now.`);
+                }
+            } else r.streak = 0;
+        } else if (r.status === 'allied' && (t < 0 || grudges >= 2)) {
+            Object.assign(r, { status: 'neutral', since: now, streak: 0 });
+            event(log, `the ${ta}-${tb} alliance has broken (team trust ${r.trust})`);
+            for (const m of [...A, ...B]) note(m, `Our alliance with ${A.includes(m) ? tb : ta} is over.`);
+        } else if (r.status === 'feud' && t > -0.05 && grudges < 3 && now - r.since > 6 * 3600_000) {
+            Object.assign(r, { status: 'neutral', since: now, streak: 0 });
+            event(log, `${ta} and ${tb} have buried the hatchet (team trust ${r.trust})`);
         }
     }
     social.save();

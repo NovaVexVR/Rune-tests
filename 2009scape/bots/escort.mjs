@@ -5,6 +5,7 @@
 //   escorts.finish(bot.name)                        -> the job ends; the escort goes back to its own plan
 //   bot.hook: if (escorts.jobFor(b.name)) { await escorts.guard(b); return true; }
 import { dist, sleep, FOOD } from './lib.mjs';
+import { relationOf } from './politics.mjs';
 
 const WAIT_FOR_ESCORT = 4 * 60_000; // how long a ward waits for someone to take the job and arrive
 const MAX_JOB = 40 * 60_000;
@@ -21,7 +22,8 @@ export class Escorts {
     canEscort(name, job) {
         const m = this.market, e = m.bots.get(name)?.bot, w = m.bots.get(job.ward)?.bot;
         if (!e?.s || !w?.s || name === job.ward) return false;
-        if (m.social.teamOf(name) !== m.social.teamOf(job.ward) || m.social.teamOf(name) === 'individual') return false;
+        const [te, tw] = [m.social.teamOf(name), m.social.teamOf(job.ward)];
+        if (te === 'individual' || (te !== tw && relationOf(te, tw) !== 'allied')) return false; // teammates, or an allied team
         if (m.isBusy?.(name) || m.away?.has?.(name) || e.waiting) return false;
         if ([...this.jobs.values()].some(j => j.escort === name && j.state !== 'done')) return false;
         return (e.s.combat ?? 3) >= Math.max(20, (w.s.combat ?? 3) + 8) && e.s.hp > e.s.maxHp * 0.6;
