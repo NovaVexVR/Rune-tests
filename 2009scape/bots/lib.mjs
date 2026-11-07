@@ -442,7 +442,7 @@ export class Bot {
     // Carry some food: top up from the bank when there's food banked. Returns how much food the bot has.
     async ensureFood(n = 4) {
         let s = await this.state(1);
-        const have = () => this.s.inv.filter(i => FOOD.includes(i.name)).reduce((t, i) => t + i.count, 0);
+        const have = () => this.s.inv.filter(i => FOOD.includes(i.name) && !i.noted).reduce((t, i) => t + i.count, 0);
         if (have() >= n) return have();
         const banked = (s.bank ?? []).filter(i => FOOD.includes(i.name) && i.name !== this.favoriteFood);
         if (!banked.length || s.invFree < 2) return have();
@@ -938,10 +938,21 @@ export class Bot {
         }
     }
 
-    async withdraw(item, amount = 'all') {
-        await this.act({ type: 'withdraw', item, amount });
+    async withdraw(item, amount = 'all', { noted = false } = {}) {
+        await this.act({ type: 'withdraw', item, amount, noted });
         await this.wait(1);
         await this.state(2);
+    }
+
+    // take exactly n of an item as bank notes (one bag slot however many): for trading and selling
+    async withdrawNoted(item, n) {
+        const banked = () => (this.s.bank ?? []).filter(i => i.name === item).reduce((t, i) => t + i.count, 0);
+        if (n >= banked()) return this.withdraw(item, 'all', { noted: true });
+        for (let left = n; left > 0 && banked() > 0; ) {
+            const k = left >= 10 ? 10 : left >= 5 ? 5 : 1;
+            await this.withdraw(item, k, { noted: true });
+            left -= k;
+        }
     }
 
     async leaveBank() {

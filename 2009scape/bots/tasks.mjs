@@ -54,7 +54,7 @@ export function surplusInBank(bot) {
 }
 export async function clearOut(bot) {
     await bot.state(5);
-    let todo = surplusInBank(bot).filter(t => t.count <= 26); // a whole stack has to fit in the bag (stackables count as 1)
+    let todo = surplusInBank(bot); // withdrawn as notes: any stack takes one slot
     if (!todo.length) return 0;
     let sold = 0;
     for (let round = 0; round < 6 && todo.length; round++) {
@@ -62,8 +62,8 @@ export async function clearOut(bot) {
         await bot.depositAll(i => !KEEP(i.name));
         const taken = [];
         for (const it of todo) {
-            if (it.count > bot.s.invFree - 1) continue; // not enough room for this stack this trip
-            await bot.withdraw(it.name, 'all');
+            if (bot.s.invFree < 2) continue; // no room this trip
+            await bot.withdraw(it.name, 'all', { noted: true });
             taken.push(it);
         }
         await bot.leaveBank();

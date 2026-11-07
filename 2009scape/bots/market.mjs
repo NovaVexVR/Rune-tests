@@ -572,7 +572,9 @@ export class Market {
             if (!isBuyer && !['debtsale', 'repay', 'wager'].includes(deal.kind) && deal.item !== 'Coins' && carried < want && s.bank?.some(i => i.name === deal.item) && !deal.fetched) {
                 deal.fetched = true;
                 if (await bot.openBank()) {
-                    for (let k = carried; k < want && bot.s.invFree > 0; k++) await bot.withdraw(deal.item, 1);
+                    // several of a thing go as notes (one slot); food and single tools stay usable
+                    if (want - carried > 1 && !FOOD.includes(deal.item)) await bot.withdrawNoted(deal.item, want - carried);
+                    else for (let k = carried; k < want && bot.s.invFree > 0; k++) await bot.withdraw(deal.item, 1);
                     await bot.leaveBank();
                 }
                 return true;

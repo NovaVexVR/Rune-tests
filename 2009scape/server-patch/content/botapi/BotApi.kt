@@ -385,6 +385,8 @@ object BotRegistry {
                 if (p.interfaceManager.opened?.id != 762) throw BotError("bank not open")
                 val want = a["item"].toString()
                 val slot = (0 until p.bank.capacity()).firstOrNull { p.bank.get(it)?.name.equals(want, true) } ?: throw BotError("$want not in bank")
+                // noted withdrawals (bank "note" mode): a whole stack takes one bag slot, for trading and selling
+                p.bank.isNoteItems = a["noted"] == true
                 val opc = when ((a["amount"] as? Number)?.toInt()) { 1 -> 155; 5 -> 196; 10 -> 124; else -> 168 } // JSON numbers arrive as Long: compare as Int (else everything was "all")
                 PacketProcessor.enqueue(Packet.IfAction(p, opc, IF_OPCODES.indexOf(opc), 762, 73, slot))
                 "withdraw $want"
@@ -523,6 +525,7 @@ object BotRegistry {
                 val it = c.get(i) ?: continue
                 val j = JSONObject()
                 j["slot"] = i; j["id"] = it.id; j["name"] = it.name; j["count"] = it.amount
+                if (!it.definition.isUnnoted) j["noted"] = true
                 j["value"] = if (it.id == 995) 1 else it.definition.value
                 j["ops"] = JSONArray().apply { it.interaction.options.filterNotNull().forEach { op -> add(op.name) } }
                 arr.add(j)

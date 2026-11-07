@@ -91,7 +91,7 @@ export class MarketDay {
         await bot.state(5);
         const goods = (bot.s.bank ?? []).filter(i => m.storeValue && TRADEABLE.has(i.name) && i.count > 5).sort((a, b) => b.count * (b.value ?? 1) - a.count * (a.value ?? 1)).slice(0, 4);
         if (goods.length && (await bot.openBank())) {
-            for (const g of goods) if (bot.s.invFree > 6) await bot.withdraw(g.name, Math.min(10, g.count - 5) >= 10 ? 10 : 5);
+            for (const g of goods) if (bot.s.invFree > 2) await bot.withdrawNoted(g.name, g.count - 5); // as notes: the whole surplus in one slot
             await bot.leaveBank();
             bot.log(`[marketday] bringing ${goods.map(g => g.name).join(', ')} to sell`);
         }
