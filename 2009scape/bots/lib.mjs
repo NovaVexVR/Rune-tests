@@ -717,7 +717,10 @@ export class Bot {
                 const d = st.scenery.find(l => l.x === door[0] && l.y === door[1] && l.ops.includes('Open'));
                 if (d) {
                     const before = { x: st.x, y: st.y };
-                    await this.act({ type: 'scenery', x: d.x, y: d.y, id: d.id, op: 'Open' }).catch(() => {});
+                    // the Al Kharid toll gate: pay the 10gp toll (it walks you through) rather than "Open" (a dialogue)
+                    const toll = d.ops.find(o => /^pay-toll/i.test(o));
+                    if (toll && st.coins < 10) { this.log('route: no 10gp for the Al Kharid toll'); return false; }
+                    await this.act({ type: 'scenery', x: d.x, y: d.y, id: d.id, op: toll ?? 'Open' }).catch(() => {});
                     await this.waitIdle({ timeout: 8, quiet: 2 });
                     const after = await this.state(4);
                     // a refusal comes as a game message or a dialogue box ("I don't think that's the right way.")

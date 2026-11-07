@@ -22,11 +22,13 @@ import { buildBoard } from './noticeboard.mjs';
 import { careerTask, checkGoal, apprenticeships } from './careers.mjs';
 import { TownEvents } from './events.mjs';
 import { sampleEconomy } from './economy.mjs';
+import { GrudgeDuels } from './duel.mjs';
 
 const ALL_BOTS = [];
 const market = new Market((...a) => console.log(new Date().toISOString(), ...a));
 const escorts = new Escorts(market, (...a) => console.log(new Date().toISOString(), ...a), note);
 const townEvents = new TownEvents(market, (...a) => console.log(new Date().toISOString(), ...a));
+const duels = new GrudgeDuels(market, (...a) => console.log(new Date().toISOString(), ...a));
 const marketDay = new MarketDay(market, (...a) => console.log(new Date().toISOString(), ...a));
 const parties = new Parties(market, (...a) => console.log(new Date().toISOString(), ...a));
 
@@ -117,6 +119,7 @@ async function runBot(name, delay) {
                 if (sold) note(name, `Cleared out the bank: sold ${sold} things at the general store.`);
             }
             // quest party: wait for the rest of the party, then quest together
+            if (await duels.join(bot)) continue; // a grudge duel at the arena
             if (await parties.join(bot)) continue;
             let item = plan[step];
             // politics: the poorest team spends some of its time making money
@@ -184,6 +187,7 @@ setInterval(() => { try { apprenticeships(market, n => market.social.teamOf(n), 
 setInterval(() => market.social.driftMoods(), 10 * 60_000);
 setInterval(() => { try { buildBoard(); } catch (e) { console.log('notice board:', e.message); } }, 10 * 60_000); // the public notice board
 watchdog(ALL_BOTS, (...a) => console.log(new Date().toISOString(), ...a));
+setInterval(() => { try { if (!marketDay.upcoming()) duels.tick(); } catch (e) { console.log('duel error', e); } }, 30 * 60_000);
 setInterval(() => sampleEconomy().catch(e => console.log('economy sample:', e.message)), 30 * 60_000); // wealth over time (E23)
 setInterval(() => { try { townEvents.tick(); } catch (e) { console.log('town event error', e); } }, 60_000);
 setInterval(() => { try { marketDay.tick(); } catch (e) { console.log('market day error', e); } }, 60_000);
