@@ -35,8 +35,50 @@ async function climb(bot, op, z) {
     return bot.s.z === z;
 }
 
+// Romeo & Juliet (Varrock): Romeo in the square, Juliet upstairs in her house to the west, Father Lawrence in
+// the north-east church, the Apothecary south-west; cadava berries from the bushes south-east of Varrock
+const RJ = { romeo: { x: 3210, y: 3424 }, julietStairs: { x: 3156, y: 3434 }, juliet: { x: 3157, y: 3427 }, lawrence: { x: 3254, y: 3484 }, apothecary: { x: 3196, y: 3404 }, bushes: { x: 3269, y: 3369 } };
+const RJ_ANSWERS = /perhaps i could help to find her|yes okay, i'll let her know|i guess i could look for him|yes i've met him|heard anything from juliet|potion that makes it seem like i'm dead/i;
+async function talkWait(bot, name, at, z = 0) {
+    if (bot.s.z !== z || dist(bot.s, at) > 6) await bot.travel(at.x, at.y, { tol: 3 });
+    await bot.talkTo(name, { answer: RJ_ANSWERS, maxSteps: 60 });
+    // cutscenes: wait until we can move again
+    for (let i = 0; i < 30 && (await bot.state(10)).locked; i++) { await bot.handleInterrupts({ answer: RJ_ANSWERS }); await bot.wait(3); }
+    await bot.state(5);
+}
+async function toJuliet(bot) {
+    if (bot.s.z !== 1) {
+        await bot.travel(RJ.julietStairs.x, RJ.julietStairs.y + 1, { tol: 2 });
+        await bot.state(8);
+        const st = bot.nearestScenery(l => /staircase/i.test(l.name) && l.ops.includes('Climb-up'));
+        if (!st) { bot.log('quest: no staircase to Juliet'); return false; }
+        await bot.act({ type: 'scenery', x: st.x, y: st.y, id: st.id, op: 'Climb-up' });
+        await bot.waitIdle({ timeout: 12, cond: x => x.z === 1 });
+    }
+    if ((await bot.state(10)).z !== 1) return false;
+    await bot.walkTo(RJ.juliet.x, RJ.juliet.y, { tol: 2, timeout: 60, direct: true });
+    await bot.talkTo('Juliet', { answer: RJ_ANSWERS, maxSteps: 60 });
+    for (let i = 0; i < 30 && (await bot.state(10)).locked; i++) { await bot.handleInterrupts({ answer: RJ_ANSWERS }); await bot.wait(3); }
+    // back downstairs
+    const down = bot.nearestScenery(l => /staircase/i.test(l.name) && l.ops.includes('Climb-down'));
+    if (down) { await bot.act({ type: 'scenery', x: down.x, y: down.y, id: down.id, op: 'Climb-down' }); await bot.waitIdle({ timeout: 12, cond: x => x.z === 0 }); }
+    await bot.state(5);
+    return true;
+}
+
 // Ways to get one quest item (each returns true once the bot holds it). `n`: how many to get.
 export const GATHER = {
+    async 'Cadava berries'(bot, n = 1) {
+        await bot.travel(RJ.bushes.x, RJ.bushes.y, { tol: 3 });
+        for (let i = 0; i < 12 && count(bot, 'Cadava berries') < n; i++) {
+            await bot.state(10);
+            const bush = bot.nearestScenery(l => /cadava bush/i.test(l.name) && l.ops.includes('Pick-from'));
+            if (!bush) { await bot.wait(10); continue; } // picked clean: they grow back
+            await bot.act({ type: 'scenery', x: bush.x, y: bush.y, id: bush.id, op: 'Pick-from' });
+            await bot.waitIdle({ timeout: 10, quiet: 2 });
+        }
+        return count(bot, 'Cadava berries') >= n;
+    },
     async Egg(bot, n = 1) {
         for (let tries = 0; tries < 12 && count(bot, 'Egg') < n; tries++) {
             const spot = EGGS[tries % EGGS.length];
@@ -240,6 +282,29 @@ export const QUESTS = {
                 await bot.travel(FRED.x + 1, FRED.y, { tol: 2 });
                 await bot.talkTo('Fred the Farmer', { answer: FRED_ANSWERS, maxSteps: 40 });
                 await bot.state(5);
+            }
+            return stageOf(bot, this.name) >= 100;
+        }
+    },
+    romeo_juliet: {
+        name: 'Romeo & Juliet',
+        items: ['Cadava berries'],
+        async start(bot) {
+            if (stageOf(bot, this.name) > 0) return true;
+            await talkWait(bot, 'Romeo', RJ.romeo);
+            return stageOf(bot, this.name) > 0;
+        },
+        async finish(bot) {
+            for (let i = 0; i < 12 && stageOf(bot, this.name) < 100; i++) {
+                const st = stageOf(bot, this.name);
+                if (st === 10 || st === 60) await toJuliet(bot); // her message; then the cadava potion
+                else if (st === 20 || st === 70) await talkWait(bot, 'Romeo', RJ.romeo);
+                else if (st === 30) await talkWait(bot, 'Father Lawrence', RJ.lawrence);
+                else if (st === 40 || st === 50) {
+                    if (!count(bot, 'Cadava berries') && !count(bot, 'Cadava potion') && !(await GATHER['Cadava berries'](bot, 1))) return false;
+                    await talkWait(bot, 'Apothecary', RJ.apothecary);
+                } else break;
+                bot.log(`quest: Romeo & Juliet stage ${st} -> ${stageOf(bot, this.name)}`);
             }
             return stageOf(bot, this.name) >= 100;
         }
