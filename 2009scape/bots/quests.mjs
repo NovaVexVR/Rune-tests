@@ -48,14 +48,15 @@ async function talkWait(bot, name, at, z = 0) {
 }
 async function toJuliet(bot) {
     if (bot.s.z !== 1) {
-        await bot.travel(RJ.julietStairs.x, RJ.julietStairs.y, { tol: 1 });
+        await bot.travel(RJ.julietStairs.x, RJ.julietStairs.y, { tol: 3 });
+        await bot.walkTo(RJ.julietStairs.x, RJ.julietStairs.y, { tol: 0, timeout: 60, direct: true }); // into the stair room, through its doors
         await bot.state(8);
         const st = bot.nearestScenery(l => /staircase/i.test(l.name) && l.ops.includes('Climb-up'));
         if (!st) { bot.log('quest: no staircase to Juliet'); return false; }
         await bot.act({ type: 'scenery', x: st.x, y: st.y, id: st.id, op: 'Climb-up' });
         await bot.waitIdle({ timeout: 12, cond: x => x.z === 1 });
     }
-    if ((await bot.state(10)).z !== 1) return false;
+    if ((await bot.state(10)).z !== 1) { bot.log(`quest: couldn't climb to Juliet (at ${bot.s.x},${bot.s.y}: ${bot.msgs.slice(-1)})`); return false; }
     await bot.walkTo(RJ.juliet.x, RJ.juliet.y, { tol: 2, timeout: 60, direct: true });
     await bot.talkTo('Juliet', { answer: RJ_ANSWERS, maxSteps: 60 });
     for (let i = 0; i < 30 && (await bot.state(10)).locked; i++) { await bot.handleInterrupts({ answer: RJ_ANSWERS }); await bot.wait(3); }
