@@ -32,7 +32,7 @@ What's planned for the bot world, in priority order, plus how the built systems 
 
 ### C. Progression
 12. *(written: escorts (`bots/escort.mjs`, `test_escort.mjs`, used for the iron mine's muggers; in-game test pending a server rebuild) and apprenticeships (`careers.mjs`: hourly, a career bot with 20+ takes on a weaker teammate once a day and gives it the trade's starter goods))* **Escorts and apprenticeships:** stronger teammates escort or train weaker ones; needed for the next quests.
-13. **More quests:** The Knight's Sword and Druidic Ritual (both need escorts past ice warriors / Taverley dungeon), Romeo & Juliet, Imp Catcher.
+13. *(Romeo & Juliet done and verified; Imp Catcher written, not yet tested; The Knight's Sword and Druidic Ritual still to do)* **More quests:** The Knight's Sword and Druidic Ritual (both need escorts past ice warriors / Taverley dungeon), Romeo & Juliet, Imp Catcher.
 14. *(done: `bots/careers.mjs`: a career from total level 60 (best skill + personality), plans bend toward it (up to 40% of steps), skill-to-next-10 or full-armour-set goals with diary lines; `market/careers.json`)* **Careers and life goals:** each bot picks a career (smith, fisher, crafter, fighter) and a long-term goal from its personality (full steel armour, a skill to 50, a quest list), and its plan bends toward it. Diaries and recaps follow the goal.
 
 ### D. Society

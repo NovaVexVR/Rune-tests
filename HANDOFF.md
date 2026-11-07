@@ -124,6 +124,6 @@ Dashboard (snapshot, refreshed only on request): https://claude.ai/artifact/6HWG
 - Newcomers (D18, `claude_runner.mjs`): `newbie<n>` every 6 h (env `NEWCOMER_HOURS`, max `MAX_NEWCOMERS`=10), starter plan, welcomed by a team's most generous member with a gift and trust; `market/newcomers.json`; their orders files are gitignored.
 - `events.mjs` (D20): fishing contest / smithing fair alternating every 84 h (env `EVENT_EVERY_HOURS`, `EVENT_MINUTES`), announced an hour ahead; entrants switch task; the winner is cheered; `market/events.json`; in the recap.
 - `economy.mjs` (E23): sample every 30 min to `market/economy.jsonl`; `export_dashboard.mjs` writes `economy.json` and `wealth_latest.json` for charts. `node economy.mjs` samples once.
-- Quests (C13, `quests.mjs`): `romeo_juliet` (stage-driven; Juliet upstairs at 3157,3427 via the staircase at 3156,3435; cadava bushes 3269,3369; cutscene waits) and `imp_catcher` (hunt imps for the four beads; Mizgog on the tower's floor 2). Being tested.
+- Quests (C13, `quests.mjs`): `romeo_juliet` (verified in-game, 5 quest points: stage-driven; Juliet upstairs at 3157,3427 via the staircase at 3156,3435, reached from the room at 3157,3433; cadava bushes 3269,3369; cutscene waits; Juliet sometimes takes a few tries) and `imp_catcher` (hunt imps for the four beads; Mizgog on the tower's floor 2). Being tested.
 - Pending a server rebuild (stop the fleet first): BotApi NPC `target` field and `ruins` in the scenery use-targets (the air altar's Mysterious ruins have no options, so they were invisible).
 
