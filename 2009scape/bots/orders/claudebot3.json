@@ -2,29 +2,24 @@
   "role": "Woodsman (own goal: willows at 30 WC); also fishes, mines and fights",
   "plan": [
     {
+      "task": "fletch",
+      "minutes": 30,
+      "why": "fletcher career but Fletching still 1"
+    },
+    {
       "task": "woodcut_fire",
-      "minutes": 45,
-      "why": "main goal"
-    },
-    {
-      "task": "melee",
-      "minutes": 20,
-      "why": "combat"
-    },
-    {
-      "task": "fish_cook",
-      "minutes": 20,
-      "why": "food"
-    },
-    {
-      "task": "mine",
-      "minutes": 15,
-      "why": "mining"
+      "minutes": 25,
+      "why": "logs for the fletching"
     },
     {
       "task": "thieving",
       "minutes": 15,
-      "why": "coins"
+      "why": "coins: it has 38gp"
+    },
+    {
+      "task": "mine",
+      "minutes": 15,
+      "why": "safe levels instead of melee (6 deaths)"
     }
   ],
   "loop": true,

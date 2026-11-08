@@ -2,24 +2,29 @@
   "role": "[bear] Team fighter: combat first, gathers food between fights",
   "plan": [
     {
-      "task": "melee",
-      "minutes": 45,
-      "why": "strength-first melee (guide)"
-    },
-    {
       "task": "fish_cook",
       "minutes": 20,
-      "why": "food"
+      "why": "food first"
     },
     {
-      "task": "ranged",
-      "minutes": 15,
-      "why": "rapid ranged while arrows last"
+      "task": "thieving",
+      "minutes": 30,
+      "why": "its best skill, coins"
     },
     {
       "task": "woodcut_fire",
+      "minutes": 20,
+      "why": "safe levels"
+    },
+    {
+      "task": "mine",
       "minutes": 15,
-      "why": "variety"
+      "why": "safe levels"
+    },
+    {
+      "task": "melee",
+      "minutes": 15,
+      "why": "a little combat once fed"
     }
   ],
   "loop": true,

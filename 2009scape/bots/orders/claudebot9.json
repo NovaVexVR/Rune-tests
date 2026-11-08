@@ -4,22 +4,22 @@
     {
       "task": "fish_cook",
       "minutes": 20,
-      "why": "food before thieving"
-    },
-    {
-      "task": "melee",
-      "minutes": 30,
-      "why": "hitpoints: 6 deaths at combat 3"
+      "why": "food first"
     },
     {
       "task": "thieving",
-      "minutes": 30,
-      "why": "coins"
+      "minutes": 40,
+      "why": "its merchant career: thieving 30, and coins"
     },
     {
       "task": "woodcut_fire",
+      "minutes": 20,
+      "why": "safe levels"
+    },
+    {
+      "task": "mine",
       "minutes": 15,
-      "why": "variety"
+      "why": "safe levels"
     }
   ],
   "loop": true,

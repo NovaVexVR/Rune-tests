@@ -4,27 +4,22 @@
     {
       "task": "thieving",
       "minutes": 40,
-      "why": "coins"
+      "why": "merchant career: thieving"
+    },
+    {
+      "task": "merchant",
+      "minutes": 20,
+      "why": "it has 1074gp to trade with"
     },
     {
       "task": "mine",
-      "minutes": 30,
-      "why": "ore to bank/sell"
-    },
-    {
-      "task": "melee",
       "minutes": 20,
-      "why": "hp for stuns"
+      "why": "safe levels"
     },
     {
       "task": "woodcut_fire",
-      "minutes": 20,
-      "why": "variety"
-    },
-    {
-      "task": "fish_cook",
-      "minutes": 20,
-      "why": "food"
+      "minutes": 15,
+      "why": "safe levels instead of melee (2 deaths)"
     }
   ],
   "loop": true,

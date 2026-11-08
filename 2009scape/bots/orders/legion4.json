@@ -4,22 +4,22 @@
     {
       "task": "woodcut_fire",
       "minutes": 30,
-      "why": "wc/fm"
+      "why": "logs"
     },
     {
       "task": "fletch",
       "minutes": 30,
-      "why": "shafts->bows (guide)"
+      "why": "fletcher career"
     },
     {
-      "task": "melee",
-      "minutes": 20,
-      "why": "combat"
+      "task": "thieving",
+      "minutes": 15,
+      "why": "coins: it has none"
     },
     {
       "task": "mine",
       "minutes": 10,
-      "why": "variety"
+      "why": "safe levels instead of melee (2 deaths)"
     }
   ],
   "loop": true,

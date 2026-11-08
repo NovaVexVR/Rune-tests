@@ -4,27 +4,27 @@
     {
       "task": "mine",
       "minutes": 40,
-      "why": "ore for the furnace"
+      "why": "smith career"
     },
     {
       "task": "smelt",
       "minutes": 20,
-      "why": "turn the ore into bars"
+      "why": "ore to bars"
     },
     {
       "task": "smith",
       "minutes": 20,
-      "why": "bars into armour and goods"
-    },
-    {
-      "task": "melee",
-      "minutes": 20,
-      "why": "enough combat for the iron mine"
+      "why": "bars to goods"
     },
     {
       "task": "fish_cook",
       "minutes": 15,
-      "why": "own food"
+      "why": "food"
+    },
+    {
+      "task": "thieving",
+      "minutes": 15,
+      "why": "coins: it has none"
     }
   ],
   "loop": true,

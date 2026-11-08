@@ -2,23 +2,23 @@
   "role": "[legion] Team cook: fish and cook food for the team, also fights and chops",
   "plan": [
     {
-      "task": "fish_cook",
+      "task": "lobsters",
       "minutes": 45,
-      "why": "food supply"
+      "why": "Fishing 42: lobsters on Karamja (verified today)"
+    },
+    {
+      "task": "fish_cook",
+      "minutes": 20,
+      "why": "cook the catch"
     },
     {
       "task": "melee",
       "minutes": 20,
-      "why": "combat"
+      "why": "hitpoints"
     },
     {
       "task": "woodcut_fire",
       "minutes": 15,
-      "why": "fires"
-    },
-    {
-      "task": "fletch",
-      "minutes": 10,
       "why": "variety"
     }
   ],
