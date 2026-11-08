@@ -36,7 +36,8 @@
       "spot": "riverbank",
       "food": "Cooked meat",
       "collection": "logs",
-      "gambles": true
+      "gambles": true,
+      "collectionDone": "2026-11-08T18:47:35.330Z"
     }
   }
 }
