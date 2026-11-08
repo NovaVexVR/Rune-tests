@@ -552,7 +552,10 @@ export const QUESTS = {
         items: [],
         async start(bot) {
             if (stageOf(bot, this.name) > 0) return true;
-            if ((bot.s.combat ?? 3) < 45 || bot.lvl('cooking') < 32 || bot.lvl('mining') < 20) { bot.log("quest: The Knight's Sword waits for combat 45, Cooking 32 and Mining 20 (blurite at Mining 10 takes minutes a swing under the ice giants)"); return false; }
+            // combat 60, not the quest's 45: on this server any monster's attack stops a player's mining, and the ice warrior
+            // by the blurite (59 hp, slash defence 40, a swing every 4 ticks, back 18 s after dying) has to be killed
+            // first; a combat-45 bot with 16 trout couldn't (2026-11-08). Mining 20 for a decent roll (2.6% at 10, 29% at 20).
+            if ((bot.s.combat ?? 3) < 60 || bot.lvl('cooking') < 32 || bot.lvl('mining') < 20) { bot.log("quest: The Knight's Sword waits for combat 60, Cooking 32 and Mining 20"); return false; }
             await ksTalk(bot, 'Squire', KS.squire);
             return stageOf(bot, this.name) > 0;
         },
