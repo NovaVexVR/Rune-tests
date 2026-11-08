@@ -82,7 +82,7 @@ const CERTER_DECOYS = ['an axe', 'an arrow', 'a pair of boots', 'a pair of glove
 // experience-lamp interface (134) skill buttons
 const LAMP_BUTTON = { attack: 29, strength: 30, defence: 31, ranged: 32, prayer: 33, hitpoints: 34, magic: 35, agility: 36, herblore: 37, thieving: 38, crafting: 39, fletching: 40, mining: 41, smithing: 42, fishing: 43, firemaking: 44, cooking: 45, woodcutting: 46, runecrafting: 47, slayer: 48, hunter: 49, farming: 50, construction: 51, summoning: 52 };
 // Places low-level bots keep away from on long trips: the dark wizards' circle south of Varrock, the Draynor wizards
-export const DANGER = [{ x: 3227, y: 3369, r: 18 }, { x: 3095, y: 3232, r: 14 }];
+export const DANGER = [{ x: 3227, y: 3369, r: 18 }, { x: 3095, y: 3232, r: 14 }, { x: 3120, y: 3247, r: 16 }]; // the last: the Draynor jail guards (five, aggressive, one after another)
 // Grand Exchange: centre of the building, and interface 105 buttons per offer slot (0-5)
 export const GE = { x: 3165, y: 3487 };
 const GE_BUY = [30, 46, 62, 81, 100, 119], GE_SELL = [31, 47, 63, 82, 101, 120], GE_BOX = [18, 34, 50, 69, 88, 107];
@@ -794,7 +794,8 @@ export class Bot {
             const food = s.inv.find(i => FOOD.includes(i.name) && i.ops.includes('Eat'));
             if (s.hp <= s.maxHp * 0.5 && food) { await this.act({ type: 'item', slot: food.slot, op: 'Eat' }); await this.wait(2); return true; }
         }
-        if (attacker && !this.pressOn && !this.dueling && (s.y > 6000 || this.standGround || (attacker.level ?? 99) * 1.5 < (s.combat ?? 3))) {
+        const lowNoFood = s.y < 6000 && s.hp < s.maxHp * 0.5 && !s.inv.some(i => FOOD.includes(i.name) && i.ops.includes('Eat')); // on the surface, hurt and out of food: run instead
+        if (attacker && !lowNoFood && !this.pressOn && !this.dueling && (s.y > 6000 || this.standGround || (attacker.level ?? 99) * 1.5 < (s.combat ?? 3))) {
             const food = s.inv.find(i => FOOD.includes(i.name) && i.ops.includes('Eat'));
             if (s.hp <= s.maxHp * 0.4 && food) { await this.act({ type: 'item', slot: food.slot, op: 'Eat' }); await this.wait(2); return true; }
             this.log(`fighting back: ${attacker.name} (level ${attacker.level}) at ${s.x},${s.y}`);
