@@ -1,7 +1,7 @@
 // Phase 4.2: quests as scripts of steps (walk, talk with dialog choices, gather, hand in).
 // Each quest lists the items it needs, and how to get each one, so a party can split the gathering
 // (see party.mjs). Quest progress comes from the bot API's `quests` state (stage 100 = done).
-import { sleep, dist, DANGER } from './lib.mjs';
+import { sleep, dist, DANGER, FOOD } from './lib.mjs';
 import { SHOPS } from './tasks.mjs';
 
 // A bucket or pot to fill: buy one at the Lumbridge general store if the bot has none.
@@ -286,6 +286,7 @@ async function getPortrait(bot) {
 }
 async function mineBlurite(bot) {
     if (count(bot, 'Blurite ore')) return true;
+    await bot.ensureFood(10).catch(() => {}); // ice giants and hobgoblins on the way
     await bot.travel(KS.trapdoor.x, KS.trapdoor.y, { tol: 2 });
     const td = (await bot.state(8), bot.nearestScenery(l => /trapdoor/i.test(l.name)));
     if (!td) { bot.log('quest: no ice dungeon trapdoor'); return false; }
@@ -293,7 +294,7 @@ async function mineBlurite(bot) {
     await bot.waitIdle({ timeout: 12, cond: x => x.y > 9000 });
     if ((await bot.state(8)).y < 9000) { const t2 = bot.nearestScenery(l => /trapdoor/i.test(l.name) && l.ops.some(o => /climb-down/i.test(o))); if (t2) { await bot.act({ type: 'scenery', x: t2.x, y: t2.y, id: t2.id, op: 'Climb-down' }); await bot.waitIdle({ timeout: 12, cond: x => x.y > 9000 }); } }
     if (bot.s.y < 9000) return false;
-    bot.standGround = true;
+    bot.pressOn = true; // ice giants roam the blurite: one swing gets the ore, so don't stop to fight them
     try {
         // the blurite (3049,9566, more at 3059,9564) is round the long way through the cave: a planned route
         const r = await fetch(`http://127.0.0.1:8899/route?from=${bot.s.x},${bot.s.y}&to=3048,9567&z=0`).then(x => x.json()).catch(() => null);
@@ -302,14 +303,15 @@ async function mineBlurite(bot) {
         await bot.state(12);
         for (let i = 0; i < 20 && !count(bot, 'Blurite ore'); i++) {
             if (await bot.handleInterrupts()) continue;
+            if (bot.s.hp < bot.s.maxHp * 0.35 && !bot.s.inv.some(x => FOOD.includes(x.name))) { bot.log('quest: too hurt for the blurite, backing off'); break; }
             const rock = (await bot.state(12), bot.nearestScenery(l => [33220, 33221].includes(l.id) && l.ops.includes('Mine')));
             if (!rock) { await bot.wait(4); continue; }
             await bot.act({ type: 'scenery', x: rock.x, y: rock.y, id: rock.id, op: 'Mine' });
             await bot.waitIdle({ timeout: 30, quiet: 4, cond: st => st.inv.some(x => x.name === 'Blurite ore') });
         }
-    } finally { bot.standGround = false; }
-    await bot.walkTo(3008, 9550, { tol: 3, timeout: 120, direct: true }); // back to the ladder (walkTo climbs out)
-    await bot.walkTo(KS.trapdoor.x, KS.trapdoor.y, { tol: 3, timeout: 120 });
+        await bot.walkTo(3008, 9550, { tol: 3, timeout: 120, direct: true }); // back to the ladder (walkTo climbs out)
+        await bot.walkTo(KS.trapdoor.x, KS.trapdoor.y, { tol: 3, timeout: 120 });
+    } finally { bot.pressOn = false; }
     return count(bot, 'Blurite ore') > 0;
 }
 

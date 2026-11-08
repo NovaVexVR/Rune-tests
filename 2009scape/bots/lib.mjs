@@ -788,7 +788,13 @@ export class Bot {
         // underground (running blind down there gets you cornered), or if the task said to stand our ground;
         // else run toward Lumbridge. Eat first if it's getting low.
         const attacker = s.inCombat && !s.attacking ? (s.npcs ?? []).find(n => String(n.target ?? '').toLowerCase() === this.name.toLowerCase() && (n.ops ?? []).includes('Attack')) : null;
-        if (attacker && !this.dueling && (s.y > 6000 || this.standGround || (attacker.level ?? 99) * 1.5 < (s.combat ?? 3))) {
+        // pressing on (a quick errand past monsters it can't beat, like the blurite under the ice giants): don't fight,
+        // just eat when it gets low and let the task carry on
+        if (this.pressOn && s.inCombat && !this.dueling) {
+            const food = s.inv.find(i => FOOD.includes(i.name) && i.ops.includes('Eat'));
+            if (s.hp <= s.maxHp * 0.5 && food) { await this.act({ type: 'item', slot: food.slot, op: 'Eat' }); await this.wait(2); return true; }
+        }
+        if (attacker && !this.pressOn && !this.dueling && (s.y > 6000 || this.standGround || (attacker.level ?? 99) * 1.5 < (s.combat ?? 3))) {
             const food = s.inv.find(i => FOOD.includes(i.name) && i.ops.includes('Eat'));
             if (s.hp <= s.maxHp * 0.4 && food) { await this.act({ type: 'item', slot: food.slot, op: 'Eat' }); await this.wait(2); return true; }
             this.log(`fighting back: ${attacker.name} (level ${attacker.level}) at ${s.x},${s.y}`);
