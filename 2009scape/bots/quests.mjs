@@ -302,14 +302,22 @@ async function mineBlurite(bot) {
         if (r?.ok) await bot.followRoute(r);
         else await bot.walkTo(3048, 9567, { tol: 2, timeout: 180, direct: true });
         await bot.state(12);
-        for (let i = 0; i < 20 && !count(bot, 'Blurite ore'); i++) {
-            if (await bot.handleInterrupts()) continue;
-            if (bot.s.hp < bot.s.maxHp * 0.35 && !bot.s.inv.some(x => FOOD.includes(x.name))) { bot.log('quest: too hurt for the blurite, backing off'); break; }
-            const rock = (await bot.state(12), bot.nearestScenery(l => [33220, 33221].includes(l.id) && l.ops.includes('Mine')));
-            if (!rock) { await bot.wait(4); continue; }
-            await bot.act({ type: 'scenery', x: rock.x, y: rock.y, id: rock.id, op: 'Mine' });
-            await bot.waitIdle({ timeout: 30, quiet: 4, cond: st => st.inv.some(x => x.name === 'Blurite ore') });
+        // every swing a monster takes at a player stops its skilling, so watch closely (`busy` = a skill pulse running)
+        // and swing again the moment it stops; a roll comes every 4 ticks
+        const until = Date.now() + 6 * 60_000;
+        while (Date.now() < until && !count(bot, 'Blurite ore')) {
+            const st = await bot.state(12);
+            if (st.dialog || st.randomEvent) { await bot.handleInterrupts(); continue; }
+            const food = st.inv.find(i => FOOD.includes(i.name) && i.ops.includes('Eat'));
+            if (st.hp <= st.maxHp * 0.5 && food) { await bot.act({ type: 'item', slot: food.slot, op: 'Eat' }); await sleep(1200); continue; }
+            if (st.hp < st.maxHp * 0.35 && !food) { bot.log('quest: too hurt for the blurite, backing off'); break; }
+            if (st.busy || st.moving) { await sleep(600); continue; }
+            const rock = bot.nearestScenery(l => [33220, 33221].includes(l.id) && l.ops.includes('Mine'));
+            if (!rock) { await sleep(2000); continue; }
+            await bot.act({ type: 'scenery', x: rock.x, y: rock.y, id: rock.id, op: 'Mine' }).catch(() => {});
+            await sleep(900);
         }
+        if (count(bot, 'Blurite ore')) bot.log('quest: got the blurite');
         await bot.walkTo(3008, 9550, { tol: 3, timeout: 120, direct: true }); // back to the ladder (walkTo climbs out)
         await bot.walkTo(KS.trapdoor.x, KS.trapdoor.y, { tol: 3, timeout: 120 });
     } finally { bot.pressOn = false; await bot.act({ type: 'retaliate', on: true }).catch(() => {}); }
