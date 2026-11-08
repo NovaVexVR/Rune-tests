@@ -344,7 +344,7 @@ export class Bot {
         }
         const good = has(6202);
         if (good) {
-            const pot = this.nearestScenery(l => /uncooking pot/i.test(l.name)) ?? { x: 3421, y: 4777, id: 8985 };
+            const pot = this.nearestScenery(l => /uncooking pot/i.test(l.name)) ?? { x: 3420, y: 4778, id: 8985 }; // the pot has no options, so older servers leave it out of the state
             await this.act({ type: 'useitem', slot: good.slot, x: pot.x, y: pot.y, id: pot.id ?? 8985 }); await this.wait(4); return true;
         }
         const bad = has(6206);
