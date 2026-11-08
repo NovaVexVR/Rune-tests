@@ -1205,10 +1205,10 @@ export class Bot {
     }
 
     nearestScenery(pred, s = this.s) {
-        return s.scenery.filter(pred).sort((a, b) => a.dist - b.dist)[0] ?? null;
+        return (s?.scenery ?? []).filter(pred).sort((a, b) => a.dist - b.dist)[0] ?? null;
     }
     nearestNpc(pred, s = this.s) {
-        return s.npcs.filter(pred).sort((a, b) => a.dist - b.dist)[0] ?? null;
+        return (s?.npcs ?? []).filter(pred).sort((a, b) => a.dist - b.dist)[0] ?? null;
     }
 
     async dropAll(pred) {
