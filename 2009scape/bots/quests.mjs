@@ -255,10 +255,16 @@ async function getPortrait(bot) {
     if (count(bot, 'Portrait')) return true;
     await bot.travel(KS.castle.x, KS.castle.y, { tol: 3 });
     for (let i = 0; i < 8 && (await bot.state(14)).z < 2; i++) {
-        const up = bot.nearestScenery(l => /stair|ladder/i.test(l.name) && l.ops.some(o => /^climb(-up)?$/i.test(o)));
-        if (!up) { bot.log('quest: no way up Falador castle'); return false; }
-        // the stairs up are across the floor, behind doors: walk over first (the walker opens doors on the way)
-        if (up.dist > 2) { await bot.walkTo(up.x + 1, up.y, { tol: 2, timeout: 60, direct: true }); await bot.state(10); }
+        // stairs up on this floor (within 20 tiles), the one the shortest planned walk away (the castle's doors)
+        const found = await fetch(`http://127.0.0.1:8899/find?name=Staircase&x=${bot.s.x}&y=${bot.s.y}&z=${bot.s.z}&r=20&bot=${bot.name}`).then(r => r.json()).catch(() => ({ scenery: [] }));
+        let best = null;
+        for (const st of found.scenery.filter(l => l.ops.some(o => /^climb(-up)?$/i.test(o)))) {
+            const r = await fetch(`http://127.0.0.1:8899/route?from=${bot.s.x},${bot.s.y}&to=${st.x},${st.y}&z=${bot.s.z}`).then(r => r.json()).catch(() => null);
+            if (r?.ok && (!best || r.length < best.r.length)) best = { st, r };
+        }
+        if (!best) { bot.log('quest: no way up Falador castle'); return false; }
+        if (best.r.length > 2) { await bot.followRoute(best.r); await bot.state(10); }
+        const up = bot.nearestScenery(l => l.x === best.st.x && l.y === best.st.y) ?? best.st;
         const z0 = bot.s.z;
         await bot.act({ type: 'scenery', x: up.x, y: up.y, id: up.id, op: up.ops.find(o => /^climb-up$/i.test(o)) ?? up.ops.find(o => /^climb$/i.test(o)) });
         await bot.waitIdle({ timeout: 12, cond: x => x.z > z0 });
