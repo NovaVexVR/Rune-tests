@@ -323,8 +323,9 @@ export class Bot {
         const ZONES = [{ x: 3424, y: 4790 }, { x: 3438, y: 4777 }, { x: 3422, y: 4764 }, { x: 3406, y: 4776 }];
         if (s.dialog) {
             const said = (s.dialog.text ?? []).join(' ');
-            if (/falls asleep|fast asleep|snor/i.test(said)) this._bobDone = true;
-            if (/don't know if this is a good place/i.test(said)) this._bobAsk = true;
+            if (/going nowhere/i.test(said)) this._bobDone = false;
+            if (/catnap|appears to be sleeping|falls asleep|fast asleep|snor/i.test(said)) this._bobDone = true;
+            if (/don't know if this is a good place|get me another|less attentive/i.test(said)) this._bobAsk = true;
             return this.answerDialog();
         }
         const has = id => s.inv.find(i => i.id === id);
@@ -340,7 +341,7 @@ export class Bot {
         const raw = has(6200);
         if (raw) {
             const bob = this.nearestNpc(n => /evil bob/i.test(n.name));
-            if (bob) { this.log('random event: serving Evil Bob his fish'); await this.act({ type: 'useitem', item: raw.name, slot: raw.slot, npc: bob.npc }); await this.wait(4); this._bobDone = true; return true; }
+            if (bob) { this.log('random event: serving Evil Bob his fish'); await this.act({ type: 'npc', npc: bob.npc, op: 'Talk-to' }); await this.wait(4); return true; } // talking with the raw fish in the bag hands it over
         }
         const good = has(6202);
         if (good) {
