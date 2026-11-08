@@ -1289,12 +1289,16 @@ TASKS.push(WILD_MINE);
 // ---- Agility (roadmap 10): the Gnome Stronghold course, an expedition: Lumbridge -> Falador -> Taverley -> over
 // White Wolf Mountain -> Catherby -> Seers' Village -> the Stronghold gate (opened by hand) -> the course; laps until
 // time is up, then the same way home. Combat 30+ (the mountain's wolves). The route planner can't do it in one go.
-const AGILITY_LEGS = [{ x: 2965, y: 3380 }, { x: 2895, y: 3445 }, { x: 2850, y: 3495 }, { x: 2810, y: 3440 }, { x: 2720, y: 3480 }, { x: 2461, y: 3380 }];
+const AGILITY_LEGS = [{ x: 2965, y: 3380 }, { x: 2895, y: 3445 }, { x: 2810, y: 3440 }, { x: 2720, y: 3480 }, { x: 2461, y: 3380 }];
 const GNOME_COURSE = [['Log balance', /walk-across/i], ['Obstacle net', /climb-over/i], ['Tree branch', /^climb$/i], ['Balancing rope', /walk-on/i], ['Tree branch', /climb-down/i], ['Obstacle net', /climb-over/i], ['Obstacle pipe', /squeeze-through/i]];
 const inStronghold = s => s.x > 2380 && s.x < 2520 && s.y > 3384 && s.y < 3520;
 async function toStronghold(bot) {
     if (inStronghold(await bot.state(1))) return true;
-    for (const leg of AGILITY_LEGS) if (!(await bot.travel(leg.x, leg.y, { tol: 4, timeout: 900 }))) { bot.log(`agility: stuck on the way at ${bot.s.x},${bot.s.y}`); return false; }
+    for (const leg of AGILITY_LEGS) {
+        let ok = false; // wolf fights on the mountain break walks: plan again from wherever the bot ended up
+        for (let t = 0; t < 3 && !ok; t++) ok = await bot.travel(leg.x, leg.y, { tol: 4, timeout: 900 });
+        if (!ok) { bot.log(`agility: stuck on the way at ${bot.s.x},${bot.s.y}`); return false; }
+    }
     for (let i = 0; i < 4 && !inStronghold(await bot.state(8)); i++) {
         const gate = bot.nearestScenery(l => l.name === 'Gate' && l.id === 190 && l.ops.includes('Open'));
         if (gate) { await bot.act({ type: 'scenery', x: gate.x, y: gate.y, id: gate.id, op: 'Open' }); await bot.waitIdle({ timeout: 10 }); }
