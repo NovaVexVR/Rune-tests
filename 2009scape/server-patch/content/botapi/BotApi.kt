@@ -445,6 +445,12 @@ object BotRegistry {
                 PacketProcessor.enqueue(Packet.GESetOfferItem(p, id))
                 "ge item $id"
             }
+            "retaliate" -> {
+                // the combat tab's auto-retaliate button (CombatTabInterface toggles the same setting): {"on":false}
+                val want = a["on"] != false && a["on"]?.toString() != "false"
+                if (p.properties.isRetaliating != want) p.settings.toggleRetaliating()
+                "retaliate ${p.properties.isRetaliating}"
+            }
             "forceevent" -> {
                 // testing: spawn a specific random event on this bot
                 val ev = content.global.ame.RandomEvents.valueOf(a["event"].toString().uppercase())
@@ -518,6 +524,7 @@ object BotRegistry {
         o["moving"] = p.walkingQueue.isMoving
         o["busy"] = p.pulseManager.hasPulseRunning()
         o["inCombat"] = p.inCombat()
+        o["retaliate"] = p.properties.isRetaliating
         o["attacking"] = p.properties.combatPulse.isAttacking
         o["locked"] = p.locks.isInteractionLocked || p.locks.isMovementLocked
         val stats = JSONObject()

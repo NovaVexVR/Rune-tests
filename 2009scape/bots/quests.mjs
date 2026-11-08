@@ -294,7 +294,8 @@ async function mineBlurite(bot) {
     await bot.waitIdle({ timeout: 12, cond: x => x.y > 9000 });
     if ((await bot.state(8)).y < 9000) { const t2 = bot.nearestScenery(l => /trapdoor/i.test(l.name) && l.ops.some(o => /climb-down/i.test(o))); if (t2) { await bot.act({ type: 'scenery', x: t2.x, y: t2.y, id: t2.id, op: 'Climb-down' }); await bot.waitIdle({ timeout: 12, cond: x => x.y > 9000 }); } }
     if (bot.s.y < 9000) return false;
-    bot.pressOn = true; // ice giants roam the blurite: one swing gets the ore, so don't stop to fight them
+    bot.pressOn = true; // ice giants roam the blurite: don't stop to fight them
+    await bot.act({ type: 'retaliate', on: false }).catch(() => {}); // or every hit they land cancels the mining swing
     try {
         // the blurite (3049,9566, more at 3059,9564) is round the long way through the cave: a planned route
         const r = await fetch(`http://127.0.0.1:8899/route?from=${bot.s.x},${bot.s.y}&to=3048,9567&z=0`).then(x => x.json()).catch(() => null);
@@ -311,7 +312,7 @@ async function mineBlurite(bot) {
         }
         await bot.walkTo(3008, 9550, { tol: 3, timeout: 120, direct: true }); // back to the ladder (walkTo climbs out)
         await bot.walkTo(KS.trapdoor.x, KS.trapdoor.y, { tol: 3, timeout: 120 });
-    } finally { bot.pressOn = false; }
+    } finally { bot.pressOn = false; await bot.act({ type: 'retaliate', on: true }).catch(() => {}); }
     return count(bot, 'Blurite ore') > 0;
 }
 
