@@ -358,7 +358,8 @@ export class Bot {
             if (net) { await this.act({ type: 'ground', x: net.x, y: net.y, id: net.id }); await this.waitIdle({ timeout: 10 }); return true; }
         }
         const z = ZONES[this._bobZone ?? 0];
-        if (Math.max(Math.abs(s.x - z.x), Math.abs(s.y - z.y)) > 3) { await this.walkTo(z.x, z.y, { tol: 1, timeout: 30, direct: true }); return true; }
+        // a plain walk: walkTo would call handleInterrupts, which calls this solver again (an endless loop)
+        if (Math.max(Math.abs(s.x - z.x), Math.abs(s.y - z.y)) > 3) { await this.act({ type: 'walk', x: z.x, y: z.y }); await this.waitIdle({ timeout: 15, quiet: 2 }); return true; }
         const spot = this.nearestScenery(l => /fishing spot/i.test(l.name) && l.ops.includes('Net'));
         if (spot) { await this.act({ type: 'scenery', x: spot.x, y: spot.y, id: spot.id, op: 'Net' }); await this.wait(8); return true; }
         this._bobZone = ((this._bobZone ?? 0) + 1) % 4;
