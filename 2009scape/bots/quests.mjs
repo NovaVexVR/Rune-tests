@@ -254,9 +254,11 @@ async function buyRedberryPie(bot) {
 async function getPortrait(bot) {
     if (count(bot, 'Portrait')) return true;
     await bot.travel(KS.castle.x, KS.castle.y, { tol: 3 });
-    for (let i = 0; i < 6 && (await bot.state(12)).z < 2; i++) {
+    for (let i = 0; i < 8 && (await bot.state(14)).z < 2; i++) {
         const up = bot.nearestScenery(l => /stair|ladder/i.test(l.name) && l.ops.some(o => /^climb(-up)?$/i.test(o)));
         if (!up) { bot.log('quest: no way up Falador castle'); return false; }
+        // the stairs up are across the floor, behind doors: walk over first (the walker opens doors on the way)
+        if (up.dist > 2) { await bot.walkTo(up.x + 1, up.y, { tol: 2, timeout: 60, direct: true }); await bot.state(10); }
         const z0 = bot.s.z;
         await bot.act({ type: 'scenery', x: up.x, y: up.y, id: up.id, op: up.ops.find(o => /^climb-up$/i.test(o)) ?? up.ops.find(o => /^climb$/i.test(o)) });
         await bot.waitIdle({ timeout: 12, cond: x => x.z > z0 });
