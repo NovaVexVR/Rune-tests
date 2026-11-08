@@ -232,7 +232,7 @@ async function cauldronRunInner(bot) {
 // For bots with combat 45+.
 const KS = { squire: { x: 2974, y: 3342 }, reldo: { x: 3209, y: 3494 }, guild: { x: 3143, y: 3445 }, romily: { x: 3139, y: 3446 }, thurgo: { x: 3001, y: 3145 },
     castle: { x: 2965, y: 3340 }, cupboard: { x: 2984, y: 3336 }, trapdoor: { x: 3008, y: 3151 } };
-const KS_ANSWERS = /life as a squire|i can make a new sword|would these dwarves make another|ok, i'll give it a go|imcando dwarves\?|would you like some redberry pie|can you make me a special sword|^yes, please/i;
+const KS_ANSWERS = /^something else\.?$|life as a squire|i can make a new sword|would these dwarves make another|ok, i'll give it a go|imcando dwarves\?|would you like some redberry pie|can you make me a special sword|^yes, please/i;
 async function ksTalk(bot, name, at) {
     if (bot.s.z !== 0 || dist(bot.s, at) > 6) await bot.travel(at.x, at.y, { tol: 3 });
     await bot.talkTo(name, { answer: KS_ANSWERS, maxSteps: 60 });
