@@ -552,10 +552,13 @@ export const QUESTS = {
         items: [],
         async start(bot) {
             if (stageOf(bot, this.name) > 0) return true;
-            // combat 60, not the quest's 45: on this server any monster's attack stops a player's mining, and the ice warrior
-            // by the blurite (59 hp, slash defence 40, a swing every 4 ticks, back 18 s after dying) has to be killed
-            // first; a combat-45 bot with 16 trout couldn't (2026-11-08). Mining 20 for a decent roll (2.6% at 10, 29% at 20).
-            if ((bot.s.combat ?? 3) < 60 || bot.lvl('cooking') < 32 || bot.lvl('mining') < 20) { bot.log("quest: The Knight's Sword waits for combat 60, Cooking 32 and Mining 20"); return false; }
+            // Paused: on this server any monster's attack swing (hit or miss) stops a player's skilling, even with
+            // auto-retaliate off (CombatPulse clears the victim's pulses), and the blurite sits in a nest of ice warriors
+            // (respawn 18 s) and ice giants: a combat-45 bot (16 trout) and a combat-63 bot (steel scimitar, 16 trout) both
+            // fought there 6-8 minutes without one free mining roll (2026-11-08). Set KS_BLURITE=1 once the server lets
+            // a player keep mining while attacked with auto-retaliate off (see HANDOFF).
+            if (!process.env.KS_BLURITE) { bot.log("quest: The Knight's Sword is paused (the blurite can't be mined under attack on this server)"); return false; }
+            if ((bot.s.combat ?? 3) < 45 || bot.lvl('cooking') < 32 || bot.lvl('mining') < 20) { bot.log("quest: The Knight's Sword waits for combat 45, Cooking 32 and Mining 20"); return false; }
             await ksTalk(bot, 'Squire', KS.squire);
             return stageOf(bot, this.name) > 0;
         },
