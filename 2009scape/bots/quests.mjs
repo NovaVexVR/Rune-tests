@@ -295,12 +295,11 @@ async function mineBlurite(bot) {
     if (bot.s.y < 9000) return false;
     bot.standGround = true;
     try {
-        // the blurite sits in the cliffs to the east: walk that way until a rock shows up
-        for (const wp of [{ x: 3030, y: 9555 }, { x: 3045, y: 9562 }, { x: 3050, y: 9568 }]) {
-            if (bot.nearestScenery(l => [33220, 33221].includes(l.id))) break;
-            await bot.walkTo(wp.x, wp.y, { tol: 2, timeout: 90, direct: true });
-            await bot.state(12);
-        }
+        // the blurite (3049,9566, more at 3059,9564) is round the long way through the cave: a planned route
+        const r = await fetch(`http://127.0.0.1:8899/route?from=${bot.s.x},${bot.s.y}&to=3048,9567&z=0`).then(x => x.json()).catch(() => null);
+        if (r?.ok) await bot.followRoute(r);
+        else await bot.walkTo(3048, 9567, { tol: 2, timeout: 180, direct: true });
+        await bot.state(12);
         for (let i = 0; i < 20 && !count(bot, 'Blurite ore'); i++) {
             if (await bot.handleInterrupts()) continue;
             const rock = (await bot.state(12), bot.nearestScenery(l => [33220, 33221].includes(l.id) && l.ops.includes('Mine')));
