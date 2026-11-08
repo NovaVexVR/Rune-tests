@@ -542,7 +542,7 @@ export const QUESTS = {
         items: [],
         async start(bot) {
             if (stageOf(bot, this.name) > 0) return true;
-            if ((bot.s.combat ?? 3) < 45 || bot.lvl('cooking') < 32 || bot.lvl('mining') < 10) { bot.log("quest: The Knight's Sword waits for combat 45, Cooking 32 and Mining 10"); return false; }
+            if ((bot.s.combat ?? 3) < 45 || bot.lvl('cooking') < 32 || bot.lvl('mining') < 20) { bot.log("quest: The Knight's Sword waits for combat 45, Cooking 32 and Mining 20 (blurite at Mining 10 takes minutes a swing under the ice giants)"); return false; }
             await ksTalk(bot, 'Squire', KS.squire);
             return stageOf(bot, this.name) > 0;
         },
