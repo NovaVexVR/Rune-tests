@@ -171,8 +171,9 @@ export class Bot {
     count(name, s = this.s) {
         return this.inv(name, s).reduce((t, i) => t + i.count, 0);
     }
+    // holds a usable one (a bank note is no use as a tool or at an anvil; count() still counts notes, for trading)
     has(name, s = this.s) {
-        return this.count(name, s) > 0 || s.worn.some(i => i.name === name);
+        return this.inv(name, s).some(i => !i.noted) || s.worn.some(i => i.name === name);
     }
     lvl(skill) {
         return this.s.stats[skill].level;
@@ -1132,6 +1133,25 @@ export class Bot {
 
     // ---- bank: Lumbridge castle top floor (safe for low levels) ----
     async openBank() {
+        if (!(await this._openBank())) return false;
+        await this.unnoteTools().catch(() => {});
+        return true;
+    }
+    // tools that came out of the bank as notes (the bank's note toggle is shared by every withdrawal in a tick) are
+    // useless: put them back and take them out as real ones
+    async unnoteTools() {
+        const TOOL = /pickaxe$|(^| )axe$|^Hammer$|^Tinderbox$|fishing net$|fishing rod$|^Lobster pot$|^Knife$|^Chisel$|^Shears$|^Needle$|^Bucket$|^Pot$/;
+        const bad = (this.s.inv ?? []).filter(i => i.noted && TOOL.test(i.name));
+        if (!bad.length) return;
+        this.log(`bank: ${bad.map(i => i.name).join(', ')} came out as notes; swapping for real ones`);
+        for (const it of bad) {
+            await this.act({ type: 'deposit', slot: it.slot, amount: 'all' }).catch(() => {});
+            await this.wait(1);
+            await this.state(2);
+            if (this.s.invFree > 0) await this.withdraw(it.name, 1, { noted: false });
+        }
+    }
+    async _openBank() {
         // the nearest bank: Lumbridge castle's top floor, or a ground-floor bank (Varrock West by the anvils and
         // the iron mine, Varrock East by Aubury, Falador East, Al Kharid from inside its toll gate; Draynor is skipped: dark wizards)
         const s0 = await this.state(1);
