@@ -349,9 +349,9 @@ export class Bot {
         }
         const bad = has(6206);
         if (bad) { this._bobZone = ((this._bobZone ?? 0) + 1) % 4; this.log('random event: wrong fishing spot, trying another'); await this.act({ type: 'item', slot: bad.slot, op: 'Drop' }); await this.wait(2); return true; }
-        if (!s.inv.some(i => i.name === 'Small fishing net')) {
-            if (s.invFree === 0) { // no room for a net: drop the least valuable thing (not coins)
-                const junk = [...s.inv].filter(i => i.name !== 'Coins').sort((a, b) => (a.value ?? 0) * a.count - (b.value ?? 0) * b.count)[0];
+        if (s.invFree === 0 || !s.inv.some(i => i.name === 'Small fishing net')) {
+            if (s.invFree === 0) { // no room for a net or a catch: drop the least valuable thing (not coins, not the net)
+                const junk = [...s.inv].filter(i => !/^(Coins|Small fishing net)$/.test(i.name)).sort((a, b) => (a.value ?? 0) * a.count - (b.value ?? 0) * b.count)[0];
                 if (junk) { this.log(`random event: bag full, dropping ${junk.name} for a net`); await this.act({ type: 'item', slot: junk.slot, op: 'Drop' }); await this.wait(2); return true; }
             }
             const net = s.ground.find(g => g.name === 'Small fishing net');
