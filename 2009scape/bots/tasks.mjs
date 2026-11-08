@@ -1336,6 +1336,8 @@ export const AGILITY = {
             else await bot.wait(3);
         }
         bot.log(`agility: ${laps} laps, +${bot.s.stats.agility.xp - x0} xp; heading home`);
+        // home by teleport: the walk back crosses White Wolf Mountain again, often hurt and out of food after the laps
+        if (await bot.homeTeleport()) { await bot.state(1); if (dist(bot.s, { x: 3222, y: 3218 }) < 30) return; }
         bot.standGround = true;
         try {
             for (const leg of [...AGILITY_LEGS].reverse()) await bot.travel(leg.x, leg.y, { tol: 4, timeout: 900 });
