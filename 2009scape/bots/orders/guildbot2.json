@@ -1,24 +1,24 @@
 {
-  "role": "Guild treasurer: earns coins, collects spare coins from members, buys missing tools for members, banks the pool",
+  "role": "Guild cook: food for the guild, also fights and chops",
   "plan": [
     {
-      "task": "treasury",
-      "minutes": 40,
-      "why": "equip the guild + manage pool"
-    },
-    {
       "task": "fish_cook",
-      "minutes": 20,
-      "why": "food: 6 deaths"
+      "minutes": 45,
+      "why": "fisher career, food"
     },
     {
-      "task": "treasury",
-      "minutes": 40,
-      "why": "treasury"
-    },
-    {
-      "task": "fish_cook",
+      "task": "melee",
       "minutes": 15,
+      "why": "some hitpoints"
+    },
+    {
+      "task": "woodcut_fire",
+      "minutes": 15,
+      "why": "variety"
+    },
+    {
+      "task": "fletch",
+      "minutes": 10,
       "why": "variety"
     }
   ],

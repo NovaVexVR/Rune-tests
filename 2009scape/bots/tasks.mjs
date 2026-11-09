@@ -823,15 +823,17 @@ export async function fightLoop(bot, until, area, names, { pickup = [], stopIf =
     const feared = fearOf(bot.name); // a phobia (killed by one recently): leave those alone
     if (feared && names.includes(feared)) { names = names.filter(n => n !== feared); bot.log(`not fighting ${feared}s (still shaken)`); if (!names.length) return; }
     await bot.walkTo(area.x, area.y, { tol: 6 });
+    const started = Date.now();
     while (now() < until) {
         const s = await bot.state(12);
         if (await bot.handleInterrupts()) continue;
         if (stopIf && stopIf(bot)) return;
-        if (s.hp <= 3 && !s.inv.some(i => FOOD.includes(i.name))) {
-            bot.log('low hp and no food, resting');
-            await bot.walkTo(area.x + 10, area.y + 10);
-            bot.waiting = 'resting'; try { await bot.wait(60); } finally { bot.waiting = null; }
-            continue;
+        // died during this step: don't walk straight back into the same fight (hawkbot1 died 5 times in 20 minutes at the
+        // barbarian longhall that way); end the step and let the plan move on
+        if (bot._deathAt && bot._deathAt.t > started) { bot.log('died out there: ending this fight for now'); return; }
+        if (s.hp <= Math.max(3, s.maxHp * 0.3) && !s.inv.some(i => FOOD.includes(i.name))) {
+            bot.log('low hp and no food: leaving the fight'); // resting beside aggressive monsters got bots killed
+            return;
         }
         if (s.attacking || s.inCombat) { await bot.wait(2); continue; }
         const loot = s.ground.find(o => o.dist <= 5 && (['Bones', 'Big bones', 'Feather', ...pickup].includes(o.name) || /^Grimy /.test(o.name)) && s.invFree > 1); // herbs: for herblore (31)
