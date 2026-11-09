@@ -44,6 +44,15 @@ export const BRONZE_PIECES = [
     { name: 'Bronze dagger', lvl: 1, bars: 1, button: 24 }
 ];
 
+// melee training by level (roadmap 49), as players move up: [melee stats average, combat] to start each rung
+export const MELEE_LADDER = [
+    { avg: 0, combat: 3, at: { x: 3187, y: 3279 }, targets: ['Chicken'], label: 'the chickens north of Lumbridge' },
+    { avg: 12, combat: 8, at: { x: 3257, y: 3263 }, targets: ['Cow', 'Cow calf'], label: 'the Lumbridge cow field' },
+    { avg: 20, combat: 18, at: { x: 3080, y: 3418 }, targets: ['Barbarian'], label: 'the Barbarian Village longhall' },
+    { avg: 26, combat: 25, at: { x: 3293, y: 3172 }, targets: ['Al-Kharid warrior'], label: 'the Al Kharid warriors' },
+    { avg: 34, combat: 38, at: { x: 3176, y: 3430 }, targets: ['Guard'], label: 'the Varrock guards' }
+];
+
 // what a bot keeps on it when it banks: its tools and some food
 const KEEP = name => /pickaxe$|(^| )axe$|^Hammer$|^Tinderbox$|^Small fishing net$|^Knife$|^Chisel$|^Shears$|^Fly fishing rod$|^Lobster pot$|^Feather$|^Needle$|^Thread$|^Air talisman$|^(Red|Yellow|Black|White) bead$|^Enchanted (beef|rat meat|bear meat|chicken)$|^Cadava (berries|potion)$|^Coins$/.test(name) || FOOD.includes(name);
 
@@ -636,8 +645,10 @@ export const TASKS = [
             const style = str <= atk + 4 && str < def + 15 ? 1 : atk < str - 4 ? 0 : def + 10 < Math.min(atk, str) ? 3 : 1;
             await bot.act({ type: 'style', n: style });
             const avg = (atk + str + def) / 3;
-            const [area, targets] = avg < 20 ? [PLACES.chickens, ['Chicken']] : [PLACES.cows, ['Cow', 'Cow calf']];
-            await fightLoop(bot, until, area, targets);
+            // training spots by level (roadmap 49): the next rung once the melee stats average its level
+            const rung = MELEE_LADDER.filter(r => avg >= r.avg && (bot.s.combat ?? 3) >= r.combat).at(-1);
+            if (rung !== bot._meleeRung) { bot._meleeRung = rung; bot.log(`melee: training on ${rung.label} (attack/strength/defence average ${Math.floor(avg)})`); }
+            await fightLoop(bot, until, rung.at, rung.targets);
         }
     },
     {
@@ -758,9 +769,9 @@ export async function fightLoop(bot, until, area, names, { pickup = [], stopIf =
             continue;
         }
         if (s.attacking || s.inCombat) { await bot.wait(2); continue; }
-        const loot = s.ground.find(o => o.dist <= 5 && (['Bones', 'Feather', ...pickup].includes(o.name) || /^Grimy /.test(o.name)) && s.invFree > 1); // herbs: for herblore (31)
+        const loot = s.ground.find(o => o.dist <= 5 && (['Bones', 'Big bones', 'Feather', ...pickup].includes(o.name) || /^Grimy /.test(o.name)) && s.invFree > 1); // herbs: for herblore (31)
         if (loot) { await bot.act({ type: 'ground', x: loot.x, y: loot.y, id: loot.id }); await bot.waitIdle({ timeout: 8 }); continue; }
-        const bones = s.inv.find(i => i.name === 'Bones');
+        const bones = s.inv.find(i => i.name === 'Bones' || i.name === 'Big bones'); // Prayer (roadmap 50): big bones are worth 3x
         if (bones) { await bot.act({ type: 'item', slot: bones.slot, op: 'Bury' }); await bot.wait(2); continue; }
         if (s.invFree <= 2) { await bot.bankItems(i => /^(Raw chicken|Raw beef|Cowhide|Goblin mail|Chef's hat|Feather)$|^Grimy /.test(i.name) || (/^(Bronze|Iron)/.test(i.name) && !i.ops.some(o => /wield|wear/i.test(o))), { back: area }); continue; }
         const t = bot.nearestNpc(n => names.includes(n.name) && !n.inCombat && n.ops.includes('Attack'));
