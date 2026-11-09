@@ -11,7 +11,7 @@ import path from 'path';
 
 import { Bot, LOG_DIR, sleep, summary, watchdog, rememberDanger } from './lib.mjs';
 import { getStep, setStep } from './steps.mjs';
-import { taskById, RESUPPLY, prepare, clearOut, surplusInBank } from './tasks.mjs';
+import { taskById, RESUPPLY, prepare, clearOut, surplusInBank, sellGoods, goodsToSell } from './tasks.mjs';
 import { Market, TEAMS, TRADEABLE } from './market.mjs';
 import { personalityOf, SPOTS } from './social.mjs';
 import { council, STATE as POLITICS } from './politics.mjs';
@@ -136,6 +136,13 @@ async function runBot(name, delay) {
                 bot._lastClearOut = Date.now();
                 const sold = await clearOut(bot);
                 if (sold) note(name, `Cleared out the bank: sold ${sold} things at the general store.`);
+            }
+            // made goods to the shops that pay most for them (roadmap 53), every 6 hours
+            if (Date.now() - (bot._lastSell ?? 0) > 6 * 3600_000 && goodsToSell(bot).length) {
+                bot._lastSell = Date.now();
+                const c0 = coinsOf(bot.s);
+                const got = await sellGoods(bot).catch(() => 0);
+                if (got > 0) { note(name, `Sold my goods at the shops for ${got}gp.`); recordFlow(name, 'selling', c0, coinsOf(await bot.state(1).catch(() => null))); }
             }
             // quest party: wait for the rest of the party, then quest together
             if (await duels.join(bot)) continue; // a grudge duel at the arena

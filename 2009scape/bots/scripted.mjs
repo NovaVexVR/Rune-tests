@@ -8,7 +8,7 @@ import path from 'path';
 
 import { Bot, LOG_DIR, rand, sleep, summary, watchdog, rememberDanger } from './lib.mjs';
 import { careerOf, careerBonus, checkGoal } from './careers.mjs';
-import { TASKS, RESUPPLY, shopFor, prepare, clearOut, surplusInBank } from './tasks.mjs';
+import { TASKS, RESUPPLY, shopFor, prepare, clearOut, surplusInBank, sellGoods, goodsToSell } from './tasks.mjs';
 import { TASK_NEEDS, TRADEABLE } from './market.mjs';
 
 const COUNT = Number(process.argv[2] ?? 5);
@@ -58,6 +58,7 @@ async function runBot(name, startDelay) {
             const shopping = task.canRun(bot) === true ? null : buyableNeeds(bot, task);
             if (shopping) { bot.log(`buying ${shopping.join(', ')} for ${task.id}`); await RESUPPLY.run(bot, Date.now() + 10 * 60_000, shopping); }
             if (Date.now() - (bot._lastClearOut ?? 0) > 3600_000 && surplusInBank(bot).length) { bot._lastClearOut = Date.now(); await clearOut(bot); }
+            if (Date.now() - (bot._lastSell ?? 0) > 6 * 3600_000 && goodsToSell(bot).length) { bot._lastSell = Date.now(); const c0 = coinsOf(bot.s); await sellGoods(bot).catch(() => 0); recordFlow(name, 'selling', c0, coinsOf(await bot.state(1).catch(() => null))); }
             if (task.canRun(bot) === true) { const c0 = coinsOf(await bot.state(1).catch(() => null)); await prepare(bot, task.id); await task.run(bot, Date.now() + minutes * 60_000); checkGoal(bot); recordFlow(name, task.id, c0, coinsOf(await bot.state(1).catch(() => null))); }
             lastId = task.id;
             await bot.state(1);

@@ -70,6 +70,51 @@ export function surplusInBank(bot) {
     const free = Math.ceil((bot.s.bank?.length ?? 0) - BANK_SLOTS * ROOMY_AT); // slots to free
     return spare.sort((a, b) => a.count - b.count || a.count * (a.value ?? 1) - b.count * (b.value ?? 1)).slice(0, free).map(i => ({ name: i.name, count: i.count }));
 }
+// ---- Selling goods where they fetch most (roadmap 53): a shop that stocks an item pays its alchemy value (high alchemy,
+// ~60% of value, at the shops flagged high_alch), less only when it's overstocked; the general store pays the low value and
+// is soon overstocked. Bank piles of made goods go to the shop that stocks them; one of each piece of gear is kept.
+const COOK_LEVEL = { 'Raw shrimps': 1, 'Raw anchovies': 1, 'Raw sardine': 1, 'Raw herring': 5, 'Raw trout': 15, 'Raw pike': 20, 'Raw salmon': 25, 'Raw tuna': 30, 'Raw lobster': 40, 'Raw swordfish': 45 };
+export const SELL_ROUTES = [
+    { shop: { x: 2977, y: 3383, npcs: ['Cassie'] }, items: /^(Bronze|Iron|Steel|Mithril) (sq shield|kiteshield)$|^Wooden shield$/ },
+    { shop: { x: 3026, y: 3250, npcs: ['Brian'] }, items: /battleaxe$/ },
+    { shop: { x: 3012, y: 3206, npcs: ['Wydin'] }, items: /^(Redberries|Cabbage|Bread|Cheese|Tomato|Garlic|Banana)$/ },
+    { shop: { x: 3229, y: 3436, npcs: ['Horvik'] }, items: /^(Bronze|Iron|Steel|Black|Mithril) (chainbody|platebody|platelegs|plateskirt|sq shield)$|^Studded (chaps|body)$/ },
+    { shop: { x: 3072, y: 3430, npcs: ['Peksa'] }, items: /(med|full) helm$/ },
+    { shop: { x: 3013, y: 3224, npcs: ['Gerrant'] }, items: /^Raw (shrimps|sardine|herring|anchovies|trout|pike|salmon|tuna|lobster|swordfish)$/ },
+    { shop: { x: 3232, y: 3424, npcs: ['Lowe'] }, items: /^((Oak|Willow|Maple) )?(shortbow|longbow|Shortbow|Longbow)$|^(Bronze|Iron|Steel|Mithril|Adamant) arrow$/ },
+    { shop: { x: 3203, y: 3416, npcs: ['Thessalia'] }, items: /^Leather (body|gloves|boots)$/ },
+    { shop: { x: 3012, y: 3246, npcs: ['Grum'] }, items: /^(Gold|Sapphire|Emerald|Ruby|Diamond) (ring|necklace|amulet|bracelet)$/ }
+];
+export function goodsToSell(bot, min = 5) {
+    return (bot.s.bank ?? []).map(i => ({ ...i, route: SELL_ROUTES.find(r => r.items.test(i.name)) }))
+        .filter(i => i.route && !NEVER_SELL.test(i.name) && i.name !== luckyOf(bot.name))
+        .filter(i => !(i.name in COOK_LEVEL) || bot.lvl('cooking') < COOK_LEVEL[i.name]) // fish it can cook is worth more cooked (and the xp)
+        .map(i => ({ name: i.name, count: i.count - (gearInfo(i.name) ? 1 : 0), route: i.route })) // keep one of each piece of gear
+        .filter(i => i.count >= (gearInfo(i.name) ? 1 : min));
+}
+export async function sellGoods(bot) {
+    await bot.state(5);
+    const goods = goodsToSell(bot);
+    if (!goods.length) return 0;
+    let earned = 0;
+    for (const route of [...new Set(goods.map(g => g.route))]) {
+        const mine = goods.filter(g => g.route === route);
+        if (!(await bot.openBank())) break;
+        await bot.depositAll(i => !KEEP(i.name));
+        for (const g of mine) if (bot.s.invFree > 1) await bot.withdrawN(g.name, g.count, { noted: true });
+        await bot.leaveBank();
+        const before = bot.s.coins ?? 0;
+        if (await bot.openShop(route.shop)) {
+            for (const it of bot.s.inv.filter(i => mine.some(g => g.name === i.name))) await bot.sell(it.name, it.count).catch(() => {});
+            await bot.closeInterfaces();
+        }
+        const got = ((await bot.state(3)).coins ?? 0) - before;
+        earned += got;
+        bot.log(`goods: sold ${mine.map(g => `${g.count} ${g.name}`).join(', ')} to ${route.shop.npcs[0]} for ${got}gp`);
+    }
+    return earned;
+}
+
 export async function clearOut(bot) {
     await bot.state(5);
     let todo = surplusInBank(bot); // withdrawn as notes: any stack takes one slot
