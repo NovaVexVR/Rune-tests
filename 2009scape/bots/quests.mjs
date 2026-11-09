@@ -361,10 +361,31 @@ async function wpIngredients(bot) {
 // coffin and kill Count Draynor (level 34) with the stake and hammer in the bag. Combat 30+, with food. 4,825 Attack xp.
 const VS = { morgan: { x: 3099, y: 3267 }, harlow: { x: 3222, y: 3397 }, bar: { x: 3225, y: 3399 }, manorDoor: { x: 3108, y: 3352 }, stairs: { x: 3115, y: 3357 } };
 const VS_ANSWERS = /^Ok, I'm up for an adventure\.?$|^Morgan needs your help!?$|^Yes please!?$|^A glass of your finest ale please\.?$/i;
+// garlic from the cupboard upstairs in Morgan's house: without it the Count heals up to 12 at a time and a combat-46
+// bot can't out-damage him (2026-11-09: five minutes, no kill)
+async function vsGarlic(bot) {
+    if (count(bot, 'Garlic')) return true;
+    await bot.travel(3099, 3267, { tol: 1 });
+    await bot.state(8);
+    const up = bot.nearestScenery(l => /staircase/i.test(l.name) && l.ops.includes('Climb-up'));
+    if (up) { await bot.act({ type: 'scenery', x: up.x, y: up.y, id: up.id, op: 'Climb-up' }); await bot.waitIdle({ timeout: 10, cond: x => x.z === 1 }); }
+    if ((await bot.state(8)).z === 1) {
+        const c = bot.nearestScenery(l => l.id === 33502 || (/cupboard/i.test(l.name) && l.ops.includes('Open')));
+        if (c) { await bot.act({ type: 'scenery', x: c.x, y: c.y, id: c.id, op: c.ops.find(o => /open|search/i.test(o)) ?? 'Open' }); await bot.waitIdle({ timeout: 10, cond: x => x.inv.some(i => i.name === 'Garlic') }); }
+        const down = (await bot.state(8), bot.nearestScenery(l => /staircase/i.test(l.name) && l.ops.includes('Climb-down')));
+        if (down) { await bot.act({ type: 'scenery', x: down.x, y: down.y, id: down.id, op: 'Climb-down' }); await bot.waitIdle({ timeout: 10, cond: x => x.z === 0 }); }
+    }
+    return count(bot, 'Garlic') > 0;
+}
 async function vsKillCount(bot) {
     await bot.ensureFood(10).catch(() => {});
     if (!bot.has('Hammer')) { if (await bot.openShop(SHOPS.general)) { await bot.buy('Hammer', 1); await bot.closeInterfaces(); } }
     if (!bot.has('Hammer') || !count(bot, 'Stake')) { bot.log('quest: Vampire Slayer needs a stake and a hammer'); return false; }
+    if (bot.s.y > 9000 && !count(bot, 'Garlic')) { // in the basement without garlic: up first
+        const up = (await bot.state(10), bot.nearestScenery(l => /stairs/i.test(l.name) && l.ops.some(o => /walk-up/i.test(o))));
+        if (up) { await bot.act({ type: 'scenery', x: up.x, y: up.y, id: up.id, op: up.ops.find(o => /walk-up/i.test(o)) }); await bot.waitIdle({ timeout: 12, cond: x => x.y < 9000 }); }
+    }
+    if (bot.s.y < 9000 && !(await vsGarlic(bot))) bot.log("quest: no garlic from Morgan's cupboard; trying the Count anyway");
     if (bot.s.y < 9000) {
         await bot.travel(VS.manorDoor.x, VS.manorDoor.y - 2, { tol: 2 });
         await bot.travel(VS.stairs.x, VS.stairs.y - 1, { tol: 1, timeout: 180 }); // the stairs room is reached round the north side: a planned route
