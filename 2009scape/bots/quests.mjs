@@ -305,16 +305,19 @@ async function mineBlurite(bot) {
         // ice warriors and giants crowd the rock: with auto-retaliate off the bot keeps mining while they swing (as in
         // the real game; the server's CombatPulse was patched for it), so just mine, eat, and swing again if it stops
         const until = Date.now() + 8 * 60_000;
+        let lastSwing = 0;
         while (Date.now() < until && !count(bot, 'Blurite ore')) {
             const st = await bot.state(12);
             if (st.dialog || st.randomEvent) { await bot.handleInterrupts(); continue; }
             const food = st.inv.find(i => FOOD.includes(i.name) && i.ops.includes('Eat'));
             if (st.hp <= st.maxHp * 0.5 && food) { await bot.act({ type: 'item', slot: food.slot, op: 'Eat' }); await sleep(1200); continue; }
             if (st.hp < st.maxHp * 0.4 && !food) { bot.log('quest: out of food at the blurite, backing off'); break; }
-            if (st.busy || st.moving) { await sleep(600); continue; }
+            // `busy` can be some other pulse left over (it read true from login on), so swing again every 20 s regardless
+            if ((st.busy || st.moving) && Date.now() - lastSwing < 20_000) { await sleep(600); continue; }
             const rock = bot.nearestScenery(l => [33220, 33221].includes(l.id) && l.ops.includes('Mine'));
             if (!rock) { await sleep(2000); continue; }
             await bot.act({ type: 'scenery', x: rock.x, y: rock.y, id: rock.id, op: 'Mine' }).catch(() => {});
+            lastSwing = Date.now();
             await sleep(900);
         }
         if (count(bot, 'Blurite ore')) bot.log('quest: got the blurite');

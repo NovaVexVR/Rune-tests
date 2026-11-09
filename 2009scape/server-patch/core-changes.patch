@@ -1,5 +1,5 @@
 diff --git a/Server/src/main/core/game/node/entity/combat/CombatPulse.kt b/Server/src/main/core/game/node/entity/combat/CombatPulse.kt
-index ecae71c..f1cf957 100644
+index ecae71c..46615c0 100644
 --- a/Server/src/main/core/game/node/entity/combat/CombatPulse.kt
 +++ b/Server/src/main/core/game/node/entity/combat/CombatPulse.kt
 @@ -184,7 +184,8 @@ class CombatPulse(
@@ -12,6 +12,15 @@ index ecae71c..f1cf957 100644
              victim.pulseManager.clear()
          }
          victim.setAttribute("combat-time", System.currentTimeMillis() + 10000)
+@@ -292,7 +293,7 @@ class CombatPulse(
+         }
+         setVictim(victim)
+         entity.onAttack(victim as Entity?)
+-        if (isAttacking) {
++        if (isAttacking && !(victim is Player && !victim.properties.isRetaliating)) { // auto-retaliate off: keep skilling (see above)
+             victim.scripts.removeWeakScripts()
+         }
+ 
 diff --git a/Server/src/main/core/game/node/entity/player/Player.java b/Server/src/main/core/game/node/entity/player/Player.java
 index 4a375fd..1f0e6ad 100644
 --- a/Server/src/main/core/game/node/entity/player/Player.java
