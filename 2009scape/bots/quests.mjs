@@ -262,7 +262,7 @@ async function gatherForDoric(bot) {
     return !short().length;
 }
 
-// ---- The Restless Ghost (Lumbridge): Father Aereck (church) -> Father Urhney (swamp) for the Amulet of ghostspeak ->
+// ---- The Restless Ghost (Lumbridge): Father Aereck (church) -> Father Urhney (swamp) for the Ghostspeak amulet ->
 // wear it, open the coffin in the graveyard and talk to the ghost -> the skull from the altar in the Wizards' Tower
 // basement (a level-13 skeleton wakes up) -> the skull into the coffin. 1,125 Prayer xp.
 const RG = { aereck: { x: 3243, y: 3207 }, urhney: { x: 3147, y: 3174 }, coffin: { x: 3249, y: 3193 }, towerLadder: { x: 3105, y: 3162 }, altar: { x: 3120, y: 9566 } };
@@ -299,9 +299,9 @@ async function rgSkull(bot) {
 }
 
 // ---- Witch's Potion (Rimmington): Hetty wants an onion (the field north of Rimmington), an eye of newt (Betty, Port
-// Sarim), burnt meat (cook meat on the range next door, then cook it again: the server burns cooked meat on purpose) and
+// Sarim), burnt meat (cook raw beef (cows south of Falador) on the range next door, then cook it again: the server burns cooked meat on purpose) and
 // a rat's tail (the rats round her house drop them once the quest is started); then drink from her cauldron.
-const WP = { hetty: { x: 2968, y: 3207 }, onions: { x: 2948, y: 3251 }, rats: { x: 2960, y: 3205 }, giantRats: { x: 2997, y: 3194 }, range: { x: 2970, y: 3209 } };
+const WP = { hetty: { x: 2968, y: 3207 }, onions: { x: 2948, y: 3251 }, rats: { x: 2960, y: 3205 }, cows: { x: 3032, y: 3305 }, range: { x: 2970, y: 3209 } };
 const WP_ANSWERS = /^I am in search of a quest\.?$|^Yes,? help me become one with my darker side\.?$/i;
 async function wpCookAtRange(bot, item) {
     const it = bot.s.inv.find(i => i.name === item);
@@ -331,7 +331,7 @@ async function wpIngredients(bot) {
         }
     }
     if (!count(bot, 'Burnt meat')) {
-        if (!count(bot, 'Cooked meat') && !count(bot, 'Raw beef') && !count(bot, 'Raw rat meat')) await killFor(bot, 'Giant rat', 'Raw rat meat', WP.giantRats, 1);
+        if (!count(bot, 'Cooked meat') && !count(bot, 'Raw beef') && !count(bot, 'Raw rat meat')) await killFor(bot, 'Cow', 'Raw beef', WP.cows, 1); // the cows south of Falador: giant rats killed a combat-3 bot
         for (let i = 0; i < 4 && !count(bot, 'Burnt meat'); i++) {
             const meat = ['Raw rat meat', 'Raw beef', 'Cooked meat'].find(m => count(bot, m));
             if (!meat) break;
@@ -704,11 +704,11 @@ export const QUESTS = {
         async finish(bot) {
             for (let i = 0; i < 8 && stageOf(bot, this.name) < 100; i++) {
                 const st = stageOf(bot, this.name);
-                if (st === 10 || (st >= 20 && !count(bot, 'Amulet of ghostspeak') && !bot.s.worn.some(w => w.name === 'Amulet of ghostspeak'))) {
+                if (st === 10 || (st >= 20 && !count(bot, 'Ghostspeak amulet') && !bot.s.worn.some(w => w.name === 'Ghostspeak amulet'))) {
                     await bot.travel(RG.urhney.x, RG.urhney.y + 1, { tol: 2 });
                     await bot.talkTo('Father Urhney', { answer: RG_ANSWERS, maxSteps: 40 });
                 } else if (st === 20) {
-                    const am = bot.s.inv.find(i => i.name === 'Amulet of ghostspeak');
+                    const am = bot.s.inv.find(i => i.name === 'Ghostspeak amulet');
                     if (am) { await bot.act({ type: 'item', slot: am.slot, op: 'Wear' }); await bot.wait(2); }
                     await rgOpenCoffin(bot);
                     await bot.wait(2);
