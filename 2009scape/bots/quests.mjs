@@ -286,7 +286,7 @@ async function getPortrait(bot) {
 }
 async function mineBlurite(bot) {
     if (count(bot, 'Blurite ore')) return true;
-    await bot.ensureFood(16).catch(() => {}); // the ice warriors and giants by the blurite have to be killed first
+    await bot.ensureFood(12).catch(() => {}); // ice warriors and giants hit while it mines
     await bot.travel(KS.trapdoor.x, KS.trapdoor.y, { tol: 2 });
     const td = (await bot.state(8), bot.nearestScenery(l => /trapdoor/i.test(l.name)));
     if (!td) { bot.log('quest: no ice dungeon trapdoor'); return false; }
@@ -294,16 +294,16 @@ async function mineBlurite(bot) {
     await bot.waitIdle({ timeout: 12, cond: x => x.y > 9000 });
     if ((await bot.state(8)).y < 9000) { const t2 = bot.nearestScenery(l => /trapdoor/i.test(l.name) && l.ops.some(o => /climb-down/i.test(o))); if (t2) { await bot.act({ type: 'scenery', x: t2.x, y: t2.y, id: t2.id, op: 'Climb-down' }); await bot.waitIdle({ timeout: 12, cond: x => x.y > 9000 }); } }
     if (bot.s.y < 9000) return false;
-    bot.pressOn = true; // past the hobgoblins without stopping; at the rock it clears the monsters itself
-    await bot.act({ type: 'retaliate', on: false }).catch(() => {});
+    bot.pressOn = true; // past the hobgoblins without stopping
+    await bot.act({ type: 'retaliate', on: false }).catch(() => {}); // so their swings don't stop the mining
     try {
         // the blurite (3049,9566, more at 3059,9564) is round the long way through the cave: a planned route
         const r = await fetch(`http://127.0.0.1:8899/route?from=${bot.s.x},${bot.s.y}&to=3048,9567&z=0`).then(x => x.json()).catch(() => null);
         if (r?.ok) await bot.followRoute(r);
         else await bot.walkTo(3048, 9567, { tol: 2, timeout: 180, direct: true });
         await bot.state(12);
-        // every swing a monster takes at a player stops its skilling (even a miss), so nobody can mine with an ice
-        // warrior on them: kill whatever is attacking, then mine in the gap (a few seconds at Mining 20), eating as needed
+        // ice warriors and giants crowd the rock: with auto-retaliate off the bot keeps mining while they swing (as in
+        // the real game; the server's CombatPulse was patched for it), so just mine, eat, and swing again if it stops
         const until = Date.now() + 8 * 60_000;
         while (Date.now() < until && !count(bot, 'Blurite ore')) {
             const st = await bot.state(12);
@@ -311,8 +311,6 @@ async function mineBlurite(bot) {
             const food = st.inv.find(i => FOOD.includes(i.name) && i.ops.includes('Eat'));
             if (st.hp <= st.maxHp * 0.5 && food) { await bot.act({ type: 'item', slot: food.slot, op: 'Eat' }); await sleep(1200); continue; }
             if (st.hp < st.maxHp * 0.4 && !food) { bot.log('quest: out of food at the blurite, backing off'); break; }
-            const foe = (st.npcs ?? []).find(n => String(n.target ?? '').toLowerCase() === bot.name.toLowerCase() && (n.ops ?? []).includes('Attack'));
-            if (foe) { if (!st.attacking) { bot.log(`quest: clearing ${foe.name} (level ${foe.level}) off the blurite`); await bot.act({ type: 'npc', npc: foe.npc, op: 'Attack' }).catch(() => {}); } await sleep(1200); continue; }
             if (st.busy || st.moving) { await sleep(600); continue; }
             const rock = bot.nearestScenery(l => [33220, 33221].includes(l.id) && l.ops.includes('Mine'));
             if (!rock) { await sleep(2000); continue; }
@@ -552,13 +550,7 @@ export const QUESTS = {
         items: [],
         async start(bot) {
             if (stageOf(bot, this.name) > 0) return true;
-            // Paused: on this server any monster's attack swing (hit or miss) stops a player's skilling, even with
-            // auto-retaliate off (CombatPulse clears the victim's pulses), and the blurite sits in a nest of ice warriors
-            // (respawn 18 s) and ice giants: a combat-45 bot (16 trout) and a combat-63 bot (steel scimitar, 16 trout) both
-            // fought there 6-8 minutes without one free mining roll (2026-11-08). Set KS_BLURITE=1 once the server lets
-            // a player keep mining while attacked with auto-retaliate off (see HANDOFF).
-            if (!process.env.KS_BLURITE) { bot.log("quest: The Knight's Sword is paused (the blurite can't be mined under attack on this server)"); return false; }
-            if ((bot.s.combat ?? 3) < 45 || bot.lvl('cooking') < 32 || bot.lvl('mining') < 20) { bot.log("quest: The Knight's Sword waits for combat 45, Cooking 32 and Mining 20"); return false; }
+            if ((bot.s.combat ?? 3) < 45 || bot.lvl('cooking') < 32 || bot.lvl('mining') < 10) { bot.log("quest: The Knight's Sword waits for combat 45, Cooking 32 and Mining 10"); return false; }
             await ksTalk(bot, 'Squire', KS.squire);
             return stageOf(bot, this.name) > 0;
         },

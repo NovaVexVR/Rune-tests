@@ -1,3 +1,17 @@
+diff --git a/Server/src/main/core/game/node/entity/combat/CombatPulse.kt b/Server/src/main/core/game/node/entity/combat/CombatPulse.kt
+index ecae71c..f1cf957 100644
+--- a/Server/src/main/core/game/node/entity/combat/CombatPulse.kt
++++ b/Server/src/main/core/game/node/entity/combat/CombatPulse.kt
+@@ -184,7 +184,8 @@ class CombatPulse(
+                 victim.interfaceManager.close()
+             }
+         }
+-        if (!victim.pulseManager.isMovingPulse) {
++        // as in the real game: a player with auto-retaliate off keeps skilling while attacked (with it on, they turn to fight)
++        if (!victim.pulseManager.isMovingPulse && !(victim is Player && !victim.properties.isRetaliating)) {
+             victim.pulseManager.clear()
+         }
+         victim.setAttribute("combat-time", System.currentTimeMillis() + 10000)
 diff --git a/Server/src/main/core/game/node/entity/player/Player.java b/Server/src/main/core/game/node/entity/player/Player.java
 index 4a375fd..1f0e6ad 100644
 --- a/Server/src/main/core/game/node/entity/player/Player.java
