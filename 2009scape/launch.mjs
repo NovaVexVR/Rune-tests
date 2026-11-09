@@ -111,6 +111,23 @@ if (args.has('--setup')) { log('setup done'); process.exit(0); }
 
 const serverLog = path.join(HERE, 'server.log');
 fs.writeFileSync(serverLog, '');
+// broken player saves (empty or unreadable, e.g. written during a crash) lock that bot out for good: put back the
+// newest good copy from a backup, or set the file aside so the bot starts as a new character, and say so
+(function repairSaves() {
+    const dir = path.join(SRV, 'Server', 'data', 'players');
+    const backups = (() => { try { return fs.readdirSync(path.join(HERE, 'backups')).filter(f => f.endsWith('.tar.gz')).sort().reverse(); } catch { return []; } })();
+    for (const f of (() => { try { return fs.readdirSync(dir).filter(f => f.endsWith('.json')); } catch { return []; } })()) {
+        const file = path.join(dir, f);
+        try { JSON.parse(fs.readFileSync(file, 'utf8')); continue; } catch {}
+        let restored = null;
+        for (const b of backups) {
+            const r = spawnSync('tar', ['-xzOf', path.join(HERE, 'backups', b), `Server/data/players/${f}`], { maxBuffer: 64 << 20 });
+            try { if (r.status === 0 && r.stdout.length) { JSON.parse(r.stdout.toString('utf8')); fs.writeFileSync(file, r.stdout); restored = b; break; } } catch {}
+        }
+        if (restored) log(`repaired the broken save ${f} from ${restored}`);
+        else { fs.renameSync(file, `${file}.broken-${Date.now()}`); log(`the save ${f} was broken with no good copy in the backups: set aside, so ${f.replace(/\.json$/, '')} starts as a new character`); }
+    }
+})();
 // a backup before every launch, so a bad restart or a reset can be undone (bots/backup.mjs; kept 14 days)
 spawnSync(process.execPath, [path.join(HERE, 'bots', 'backup.mjs'), 'launch'], { stdio: 'inherit' });
 log('starting the server (bot API on 127.0.0.1:8899)');
