@@ -1505,3 +1505,91 @@ export const POTTERY = {
     }
 };
 TASKS.push(POTTERY);
+
+// ---- Jewellery (roadmap 51): gold bars (banked, or gold ore from Rimmington, Mining 40, smelted at the Lumbridge furnace,
+// Smithing 40) made into rings at the furnace with a ring mould (Dommik in Al Kharid, 5gp); sapphire rings from
+// Crafting 20 when it has cut sapphires (uncut ones cut with a chisel). Banked; sellGoods takes them to Grum.
+const JEWEL = { dommik: { x: 3323, y: 3195, npcs: ['Dommik'] }, goldRocks: { x: 2976, y: 3232 } };
+const GOLD_ROCKS = [9720, 9721, 9722];
+export const JEWELLERY = {
+    id: 'jewellery',
+    skills: ['crafting'],
+    canRun: bot => {
+        if (bot.lvl('crafting') < 5) return 'needs Crafting 5';
+        const bars = bot.has('Gold bar') || bot.s.bank?.some(i => i.name === 'Gold bar');
+        if (!bars && (bot.lvl('mining') < 40 || bot.lvl('smithing') < 40)) return 'needs gold bars, or Mining 40 and Smithing 40 to make them';
+        if (!bars && !['Bronze pickaxe', 'Iron pickaxe', 'Steel pickaxe', 'Mithril pickaxe'].some(p => bot.has(p))) return 'needs a pickaxe';
+        return (bot.has('Ring mould') || bot.s.bank?.some(i => i.name === 'Ring mould') || (bot.s.coins ?? 0) >= 5) || 'needs a ring mould (5gp)';
+    },
+    async run(bot, until) {
+        const n = name => bot.s.inv.filter(i => i.name === name && !i.noted).reduce((t, i) => t + i.count, 0);
+        // the ring mould
+        if (!bot.has('Ring mould')) {
+            if (bot.s.bank?.some(i => i.name === 'Ring mould') && (await bot.openBank())) { await bot.withdraw('Ring mould', 1); await bot.leaveBank(); }
+            if (!bot.has('Ring mould') && (await bot.openShop(JEWEL.dommik))) { await bot.buy('Ring mould', 1); await bot.closeInterfaces(); }
+            if (!bot.has('Ring mould')) { bot.log('jewellery: no ring mould'); return; }
+        }
+        while (now() < until) {
+            // gold bars and gems from the bank
+            if (await bot.openBank()) {
+                await bot.depositAll(i => !KEEP(i.name) && i.name !== 'Ring mould' && !/^Gold (bar|ore)$|^(Uncut )?sapphire$/i.test(i.name));
+                if (bot.s.bank?.some(i => i.name === 'Gold bar')) await bot.withdrawN('Gold bar', Math.min(13, bot.s.invFree - 1));
+                if (bot.lvl('crafting') >= 20) for (const g of ['Sapphire', 'Uncut sapphire']) if (bot.s.bank?.some(i => i.name === g) && bot.s.invFree > 1) await bot.withdrawN(g, Math.min(n('Gold bar'), 10));
+                if (bot.lvl('crafting') >= 20 && n('Uncut sapphire') && !bot.has('Chisel') && bot.s.bank?.some(i => i.name === 'Chisel')) await bot.withdraw('Chisel', 1);
+                await bot.leaveBank();
+            }
+            // no bars: mine gold at Rimmington and smelt it
+            if (!n('Gold bar')) {
+                if (bot.lvl('mining') < 40 || bot.lvl('smithing') < 40) { bot.log('jewellery: no gold bars'); return; }
+                await bot.travel(JEWEL.goldRocks.x, JEWEL.goldRocks.y, { tol: 3 });
+                for (let i = 0; i < 60 && bot.s.invFree > 0 && n('Gold ore') < 13 && now() < until; i++) {
+                    await bot.state(10);
+                    if (await bot.handleInterrupts()) continue;
+                    const rock = bot.nearestScenery(l => l.ops.includes('Mine') && GOLD_ROCKS.includes(l.id));
+                    if (!rock) { await bot.wait(5); continue; }
+                    await gatherOnce(bot, rock, 'Mine', 'scenery', 30);
+                }
+                await bot.travel(PLACES.furnace.x, PLACES.furnace.y, { tol: 2 });
+                for (let i = 0; i < 30 && n('Gold ore'); i++) {
+                    const st = await bot.state(6);
+                    if (st.iface === 311 || st.chatbox === 311) { await bot.act({ type: 'button', iface: 311, child: 34 }); await bot.waitIdle({ timeout: 40, quiet: 4 }); continue; } // gold, make 10
+                    const f = bot.nearestScenery(l => l.name === 'Furnace' && l.ops.includes('Smelt'));
+                    if (!f) break;
+                    await bot.act({ type: 'scenery', x: f.x, y: f.y, id: f.id, op: 'Smelt' });
+                    await bot.waitIdle({ timeout: 10, cond: x => x.iface === 311 || x.chatbox === 311 });
+                }
+                await bot.closeInterfaces();
+                if (!n('Gold bar')) { bot.log('jewellery: no gold smelted'); return; }
+            }
+            // cut sapphires
+            for (let i = 0; i < 12 && n('Uncut sapphire') && bot.has('Chisel'); i++) {
+                const u = bot.s.inv.find(x => x.name === 'Uncut sapphire'), c = bot.s.inv.find(x => x.name === 'Chisel');
+                await bot.act({ type: 'useitem', slot: c.slot, onSlot: u.slot }).catch(() => {});
+                await bot.wait(2);
+                if ((await bot.state(3)).dialog?.skillMenu) await bot.act({ type: 'skillmenu', index: 0 });
+                await bot.waitIdle({ timeout: 30, quiet: 3, cond: x => !x.inv.some(y => y.name === 'Uncut sapphire') });
+            }
+            // rings at the furnace: sapphire ones while there are sapphires, then gold
+            await bot.travel(PLACES.furnace.x, PLACES.furnace.y, { tol: 2 });
+            for (let i = 0; i < 6 && n('Gold bar'); i++) {
+                const st = await bot.state(6);
+                if (st.iface === 446) {
+                    const button = n('Sapphire') && bot.lvl('crafting') >= 20 ? 22 : 20; // sapphire ring, gold ring
+                    await bot.act({ type: 'button', iface: 446, child: button, op: 2 }); // make all
+                    await bot.waitIdle({ timeout: 60, quiet: 4 });
+                    continue;
+                }
+                const bar = st.inv.find(x => x.name === 'Gold bar'), f = bot.nearestScenery(l => l.name === 'Furnace');
+                if (!bar || !f) break;
+                await bot.act({ type: 'useitem', slot: bar.slot, x: f.x, y: f.y, id: f.id }).catch(() => {});
+                await bot.waitIdle({ timeout: 10, cond: x => x.iface === 446 });
+            }
+            await bot.closeInterfaces();
+            const made = bot.s.inv.filter(x => /ring$/.test(x.name)).reduce((t, x) => t + x.count, 0);
+            bot.log(`jewellery: made ${made} rings`);
+            await bot.bankItems(i => /^(Gold|Sapphire) ring$/.test(i.name) || i.name === 'Gold bar');
+            if (!made) return;
+        }
+    }
+};
+TASKS.push(JEWELLERY);
