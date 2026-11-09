@@ -19,7 +19,8 @@ const CHEERS = ['Congrats {b} on {what}!', 'Well done {b}! {what}!', 'gz {b}!!',
 function milestone(text) {
     let m;
     if ((m = /^Reached (\w+(?: \w+)?) level (\d+)\./.exec(text)) && [50, 60, 70, 80, 90, 99].includes(Number(m[2]))) return `${m[1]} ${m[2]}`;
-    if ((m = /first in town to (.+?)[.!]/i.exec(text))) return `first in town to ${m[1]}`;
+    // only the records module's own line: cheer and celebration lines repeat the phrase, and matching them set off a cascade
+    if ((m = /^Set a record: first in town to (.+?)[.!]/.exec(text))) return `first in town to ${m[1]}`;
     if ((m = /Completed .*?(\d+) Quest points/.exec(text)) && [10, 20, 30].includes(Number(m[1]))) return `${m[1]} quest points`;
     return null;
 }
