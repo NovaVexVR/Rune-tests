@@ -13,6 +13,7 @@ You are the director of the bot world. Once a day (or sooner when an alert fires
    Leave alone: treasurers' `treasury` steps, anything marked PAUSED, personalities, and bots doing fine.
 3. Edit `bots/orders/<bot>.json`: change only `plan` (and `role` if its job really changed). Each step is `{ "task": "<valid task>", "minutes": 10-45, "why": "<short reason>" }`, with 3 to 7 steps. Use only the valid tasks listed in the briefing. Keep the JSON valid. The runner re-reads orders after every step, so changes apply without a restart.
 4. Append a short entry to `bots/director/log.md`: the date, each bot changed and why (one line each), and anything worth a human's attention.
-5. Run `node bots/director.mjs done` to record the pass and clear the alerts.
+5. Once a week (on the first pass of a Monday, UTC), run `node bots/weekly.mjs` and publish `bots/reports/latest.html` as the "Rune Bots Weekly" artifact, updating the same artifact each week (its URL is in `bots/director/log.md` once published); note the link in the log.
+6. Run `node bots/director.mjs done` to record the pass and clear the alerts.
 
-Don't change code, don't restart anything, and don't touch files other than the orders, the log and the done command.
+Don't change code, don't restart anything, and don't touch files other than the orders, the log, the weekly report and the done command.
