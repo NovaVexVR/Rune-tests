@@ -387,13 +387,16 @@ async function vsKillCount(bot) {
     if (bot.s.y < 9000 && !(await vsGarlic(bot))) bot.log("quest: no garlic from Morgan's cupboard; trying the Count anyway");
     if (bot.s.y < 9000) {
         await bot.travel(VS.manorDoor.x, VS.manorDoor.y - 2, { tol: 2 });
-        await bot.travel(VS.stairs.x, VS.stairs.y - 1, { tol: 1, timeout: 180 }); // the stairs room is reached round the north side: a planned route
-        await bot.state(8);
-        const st = bot.nearestScenery(l => l.id === 32835 || (/stairs/i.test(l.name) && l.ops.includes('Walk-down')));
-        if (!st) { bot.log("quest: can't find the manor's stairs down"); return false; }
-        await bot.act({ type: 'scenery', x: st.x, y: st.y, id: st.id, op: 'Walk-down' });
-        await bot.waitIdle({ timeout: 12, cond: x => x.y > 9000 });
-        if ((await bot.state(8)).y < 9000) return false;
+        for (let t = 0; t < 3 && bot.s.y < 9000; t++) {
+            await bot.travel(VS.stairs.x, VS.stairs.y - 1, { tol: 1, timeout: 180 }); // the stairs room is reached round the north side: a planned route
+            await bot.state(10);
+            const st = bot.nearestScenery(l => l.id === 32835 || (/stairs/i.test(l.name) && l.ops.includes('Walk-down')));
+            if (!st) { bot.log("quest: can't find the manor's stairs down"); continue; }
+            await bot.act({ type: 'scenery', x: st.x, y: st.y, id: st.id, op: 'Walk-down' }).catch(() => {});
+            await bot.waitIdle({ timeout: 15, cond: x => x.y > 9000 });
+            await bot.state(8);
+        }
+        if (bot.s.y < 9000) { bot.log("quest: couldn't get down to the manor basement"); return false; }
     }
     bot.standGround = true;
     try {
