@@ -1601,3 +1601,93 @@ export const JEWELLERY = {
     }
 };
 TASKS.push(JEWELLERY);
+
+// ---- Catherby (moving west, members world): a fisher with Fishing 40 and the fare charters a ship from Port Sarim
+// (interface 95, Catherby = button 25, 1,000gp) and stays: lobsters from the shore, cooked on the range there from
+// Cooking 40, banked at the booths beside the shops. Bots there don't walk back east (White Wolf Mountain).
+const CATH = { trader: { x: 3039, y: 3193 }, bank: { x: 2809, y: 3440 }, range: { x: 2817, y: 3444 }, spots: { x: 2848, y: 3428 }, fare: 1000 };
+export const inCatherby = s => s?.z === 0 && s.x >= 2780 && s.x <= 2880 && s.y >= 3400 && s.y <= 3460;
+async function bankHere(bot, pred) {
+    await bot.travel(CATH.bank.x, CATH.bank.y, { tol: 2 });
+    for (let i = 0; i < 3 && (await bot.state(8)).iface !== 762; i++) {
+        const booth = bot.nearestScenery(l => /bank booth/i.test(l.name) && l.ops.some(o => /use/i.test(o)));
+        if (!booth) break;
+        await bot.act({ type: 'scenery', x: booth.x, y: booth.y, id: booth.id, op: booth.ops.find(o => /^use-quickly$/i.test(o)) ?? 'Use' });
+        await bot.waitIdle({ timeout: 12, cond: x => x.iface === 762 });
+    }
+    if (bot.s.iface !== 762) return false;
+    await bot.depositAll(pred);
+    await bot.leaveBank();
+    return true;
+}
+export async function charterToCatherby(bot) {
+    if (inCatherby(bot.s)) return true;
+    const coins = () => bot.s.coins ?? 0;
+    if (coins() < CATH.fare && (await bot.openBank())) { await bot.withdrawN('Coins', CATH.fare + 50 - coins()); await bot.leaveBank(); }
+    if (coins() < CATH.fare) { bot.log(`catherby: the charter costs ${CATH.fare}gp`); return false; }
+    await bot.travel(CATH.trader.x, CATH.trader.y, { tol: 3 });
+    for (let i = 0; i < 4 && !inCatherby(bot.s); i++) {
+        const st = await bot.state(10);
+        if (st.dialog) { await bot.answerDialog(/^(yes|ok|okay)/i); continue; }
+        if (st.iface === 95) { await bot.act({ type: 'button', iface: 95, child: 25 }); await bot.wait(3); continue; }
+        if (st.z === 1 && Math.abs(st.x - 2792) < 10) { // aboard at Catherby: down the gangplank
+            const g = bot.nearestScenery(l => /gangplank/i.test(l.name) && l.ops.includes('Cross'));
+            if (g) { await bot.act({ type: 'scenery', x: g.x, y: g.y, id: g.id, op: 'Cross' }); await bot.waitIdle({ timeout: 10, cond: x => x.z === 0 }); }
+            continue;
+        }
+        const crew = bot.nearestNpc(n => /trader crewmember/i.test(n.name) && n.ops.some(o => /charter/i.test(o)));
+        if (!crew) { await bot.wait(3); continue; }
+        await bot.act({ type: 'npc', npc: crew.npc, op: crew.ops.find(o => /charter/i.test(o)) });
+        await bot.waitIdle({ timeout: 10, cond: x => x.iface === 95 || !!x.dialog });
+    }
+    // the voyage takes a few seconds; then the gangplank
+    for (let i = 0; i < 8 && !inCatherby(await bot.state(10)); i++) {
+        if (bot.s.dialog) { await bot.answerDialog(/^(yes|ok|okay)/i); continue; }
+        const g = bot.s.z === 1 && bot.nearestScenery(l => /gangplank/i.test(l.name) && l.ops.includes('Cross'));
+        if (g) { await bot.act({ type: 'scenery', x: g.x, y: g.y, id: g.id, op: 'Cross' }); await bot.waitIdle({ timeout: 10, cond: x => x.z === 0 }); }
+        else await bot.wait(3);
+    }
+    if (inCatherby(bot.s)) { bot.log('catherby: arrived by charter ship'); note(bot.name, 'Took a charter ship to Catherby to fish lobsters.'); }
+    return inCatherby(bot.s);
+}
+export const CATHERBY = {
+    id: 'catherby',
+    skills: ['fishing', 'cooking'],
+    canRun: bot => {
+        if (bot.lvl('fishing') < 40) return 'needs Fishing 40';
+        if (!bot.has('Lobster pot') && !bot.s.bank?.some(i => i.name === 'Lobster pot')) return 'needs a lobster pot';
+        if (inCatherby(bot.s)) return true;
+        const wealth = (bot.s.coins ?? 0) + ((bot.s.bank ?? []).find(i => i.name === 'Coins')?.count ?? 0);
+        return wealth >= 2 * CATH.fare || `saving for the charter to Catherby (${CATH.fare}gp, wants ${2 * CATH.fare})`;
+    },
+    async run(bot, until) {
+        if (!bot.has('Lobster pot') && (await bot.openBank())) { await bot.withdraw('Lobster pot', 1); await bot.leaveBank(); }
+        if (!(await charterToCatherby(bot))) return;
+        const n = name => bot.s.inv.filter(i => i.name === name && !i.noted).reduce((t, i) => t + i.count, 0);
+        while (now() < until) {
+            await bot.travel(CATH.spots.x, CATH.spots.y, { tol: 4 });
+            for (let i = 0; i < 80 && bot.s.invFree > 0 && now() < until; i++) {
+                const st = await bot.state(12);
+                if (await bot.handleInterrupts()) continue;
+                const spot = bot.nearestNpc(x => /fishing spot/i.test(x.name) && x.ops.includes('Cage'));
+                if (!spot) { await bot.wait(4); continue; }
+                await gatherOnce(bot, spot, 'Cage', 'npc', 60);
+            }
+            // cook on the range (Cooking 40 for lobsters), then bank the lot
+            if (bot.lvl('cooking') >= 40 && n('Raw lobster')) {
+                await bot.travel(CATH.range.x, CATH.range.y - 1, { tol: 1 });
+                for (let i = 0; i < 4 && n('Raw lobster'); i++) {
+                    const raw = (await bot.state(8)).inv.find(x => x.name === 'Raw lobster');
+                    await bot.act({ type: 'useitem', slot: raw.slot, x: CATH.range.x, y: CATH.range.y }).catch(() => {});
+                    await bot.wait(2);
+                    await cookMenu(bot);
+                    await bot.waitIdle({ timeout: 90, quiet: 5, cond: x => !x.inv.some(y => y.name === 'Raw lobster') });
+                }
+            }
+            const caught = n('Raw lobster') + n('Lobster');
+            await bankHere(bot, i => /^(Raw lobster|Lobster|Burnt lobster)$/.test(i.name));
+            bot.log(`catherby: banked ${caught} lobsters`);
+        }
+    }
+};
+TASKS.push(CATHERBY);
