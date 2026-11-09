@@ -745,6 +745,7 @@ export const QUESTS = {
         items: [],
         async start(bot) {
             if (stageOf(bot, this.name) > 0) return true;
+            if ((bot.s.combat ?? 3) < 10) { bot.log("quest: Witch's Potion waits for combat 10 (the meat comes from a cow, and a combat-3 bot died to one)"); return false; }
             await bot.travel(WP.hetty.x, WP.hetty.y, { tol: 3 });
             await bot.talkTo('Hetty', { answer: WP_ANSWERS, maxSteps: 30 });
             await bot.state(5);
