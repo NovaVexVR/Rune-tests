@@ -86,7 +86,7 @@ Clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, r
 
 ### J. Growth, economy and life (added 2026-11-09)
 
-48. **More quests:** Doric's Quest, Witch's Potion, The Restless Ghost, Ernest the Chicken, Goblin Diplomacy, Vampire Slayer (Sheep Shearer is in already), solo and in parties.
+48. *(in progress: Doric's Quest verified (Rimmington mine, +1,470 Mining xp), The Restless Ghost verified (+1,125 Prayer xp), Witch's Potion in testing (combat 10+))* **More quests:** Doric's Quest, Witch's Potion, The Restless Ghost, Ernest the Chicken, Goblin Diplomacy, Vampire Slayer (Sheep Shearer is in already), solo and in parties.
 49. **Training spots by level:** combat moves chickens -> cows -> Al Kharid warriors -> hill giants; mining tin/copper -> iron -> coal; and so on, instead of one spot per task.
 50. **Prayer:** keep burying bones from fights, collect big bones from tougher monsters, and later use the bones on an altar.
 51. **Crafting beyond leather:** pottery (soft clay at Barbarian Village), jewellery (gold bars and the gems bots find), then glassblowing.
