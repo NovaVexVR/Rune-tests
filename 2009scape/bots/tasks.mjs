@@ -301,7 +301,9 @@ async function lightFires(bot) {
 }
 
 async function cookAll(bot) {
-    await cookOnFire(bot);
+    // the castle range burns less than a fire (roadmap 52): use it first when it's close and the Cook allows it
+    const nearCastle = bot.s.z === 0 && dist(bot.s, { x: 3209, y: 3214 }) < 60 && (bot.s.quests?.["Cook's Assistant"] ?? 0) >= 100;
+    if (!nearCastle) await cookOnFire(bot);
     // still raw (no fire would light, no tree nearby): the range in Lumbridge castle's kitchen, which the Cook only
     // lets you use after Cook's Assistant
     if (bot.s.inv.some(i => /^Raw /.test(i.name)) && (bot.s.quests?.["Cook's Assistant"] ?? 0) >= 100) {
@@ -355,6 +357,7 @@ async function cookMenu(bot) {
         const s = await bot.state(3);
         if (s.chatbox === 307) { await bot.act({ type: 'continue', child: 3 }); return true; } // cook all
         if (s.dialog?.skillMenu) { await bot.act({ type: 'skillmenu', index: 0 }); return true; }
+        if (s.dialog?.options?.some(o => /^Cook the meat/i.test(o))) { await bot.answerDialog(/^Cook the meat/i); continue; } // raw beef also offers sinew
         await bot.wait(2);
     }
     return false;
