@@ -406,6 +406,13 @@ async function vsKillCount(bot) {
         await bot.act({ type: 'scenery', x: coffin.x, y: coffin.y, id: coffin.id, op: 'Open' });
         await bot.wait(3);
         let mine = (await bot.state(14)).npcs.find(n => /count draynor/i.test(n.name) && !before.has(n.npc))?.npc; // the one this coffin opening woke
+        if (mine === undefined) { // the coffin woke nobody new (this session's Count is already up): find the one that takes our attack
+            for (const n of bot.s.npcs.filter(n => /count draynor/i.test(n.name))) {
+                await bot.act({ type: 'npc', npc: n.npc, op: 'Attack' }).catch(() => {});
+                await bot.wait(4);
+                if ((await bot.state(10)).attacking) { mine = n.npc; break; }
+            }
+        }
         const until = Date.now() + 5 * 60_000;
         while (Date.now() < until && stageOf(bot, 'Vampire Slayer') < 100) {
             const s = await bot.state(8);
