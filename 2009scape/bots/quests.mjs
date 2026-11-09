@@ -428,8 +428,11 @@ async function vsKillCount(bot) {
             await sleep(1500);
         }
     } finally { bot.standGround = false; }
-    const up = bot.nearestScenery(l => /stairs/i.test(l.name) && l.ops.some(o => /walk-up/i.test(o)));
-    if (up) { await bot.act({ type: 'scenery', x: up.x, y: up.y, id: up.id, op: up.ops.find(o => /walk-up/i.test(o)) }); await bot.waitIdle({ timeout: 12, cond: x => x.y < 9000 }); }
+    // out of the manor: its front doors don't open from inside, so teleport home from the basement once the fight is over
+    if (!(await bot.homeTeleport())) {
+        const up = bot.nearestScenery(l => /stairs/i.test(l.name) && l.ops.some(o => /walk-up/i.test(o)));
+        if (up) { await bot.act({ type: 'scenery', x: up.x, y: up.y, id: up.id, op: up.ops.find(o => /walk-up/i.test(o)) }); await bot.waitIdle({ timeout: 12, cond: x => x.y < 9000 }); }
+    }
     return stageOf(bot, 'Vampire Slayer') >= 100;
 }
 
