@@ -100,7 +100,7 @@ Last session's container had everything under `/home/user`; a new one starts emp
 
 ## Next steps (in order)
 State on 2026-11-09 ~22:00 UTC: roadmap items 1-59 are done or deliberately deferred, except those waiting on the user (24 Windows launcher test, 25/29/30 human players on hold, the level-1 reset milestone: confirm with the user first). The fleet runs from `launch.mjs` (server, 10 scripted + 50 Claude-directed bots, dashboard on :8090); the director pass is daily (`DIRECTOR.md`), the weekly report is published by the Monday pass (artifact https://claude.ai/artifact/AmncCAgy9FHP1pyAEjiaxT).
-1. **Move west (in progress):** strong or rich bots migrate to members areas: fishers with Fishing 40+ and 2,000gp take the Port Sarim charter to Catherby (lobsters, swordfish, bank beside the spots); then fletchers (flax at Seers, strung bows to Brian's Archery for high alchemy) and crafters (glassblowing).
+1. **Move west (in progress):** done for fishers: the `catherby` task (fisher career, director list) charters from Port Sarim (Trader Crewmember at 3038-3040,3192; iface 95 button 25), fishes lobsters, cooks on the range, banks there; a bot in Catherby given another task home-teleports in `prepare()` rather than cross White Wolf Mountain. Next: fletchers (flax at Seers, strung bows to Brian's Archery for high alchemy) and crafters (glassblowing).
 2. Ernest the Chicken (deferred: manor lever maze).
 3. Watch the newest live features: stalls (now demand-driven), celebrations (cascade fixed 2026-11-09), meetups (verified), deaths at the Barbarian Village longhall (37 -> 14 per 2 h after the fixes).
 
