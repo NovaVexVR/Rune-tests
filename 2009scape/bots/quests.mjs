@@ -298,6 +298,52 @@ async function rgSkull(bot) {
     return count(bot, 'Skull') > 0;
 }
 
+// ---- Witch's Potion (Rimmington): Hetty wants an onion (the field north of Rimmington), an eye of newt (Betty, Port
+// Sarim), burnt meat (cook meat on the range next door, then cook it again: the server burns cooked meat on purpose) and
+// a rat's tail (the rats round her house drop them once the quest is started); then drink from her cauldron.
+const WP = { hetty: { x: 2968, y: 3207 }, onions: { x: 2948, y: 3251 }, rats: { x: 2960, y: 3205 }, giantRats: { x: 2997, y: 3194 }, range: { x: 2970, y: 3209 } };
+const WP_ANSWERS = /^I am in search of a quest\.?$|^Yes,? help me become one with my darker side\.?$/i;
+async function wpCookAtRange(bot, item) {
+    const it = bot.s.inv.find(i => i.name === item);
+    if (!it) return;
+    await bot.travel(WP.range.x - 1, WP.range.y, { tol: 2 });
+    await bot.act({ type: 'useitem', slot: it.slot, x: WP.range.x, y: WP.range.y }).catch(() => {});
+    for (let i = 0; i < 6; i++) { const st = await bot.state(4); if (st.dialog?.skillMenu) { await bot.act({ type: 'skillmenu', index: 0 }); break; } if (st.dialog) { await bot.answerDialog?.(); } await bot.wait(1); }
+    await bot.waitIdle({ timeout: 10, quiet: 3 });
+}
+async function wpIngredients(bot) {
+    if (await bot.openBank()) {
+        for (const item of ['Onion', 'Eye of newt', 'Burnt meat', "Rat's tail", 'Cooked meat', 'Raw beef', 'Raw rat meat'])
+            if (!count(bot, item) && (bot.s.bank ?? []).some(b => b.name === item) && !(['Cooked meat', 'Raw beef', 'Raw rat meat'].includes(item) && (count(bot, 'Burnt meat') || count(bot, 'Cooked meat') || count(bot, 'Raw beef') || count(bot, 'Raw rat meat'))))
+                await bot.withdraw(item, 1);
+        if (!count(bot, 'Eye of newt') && (bot.s.coins ?? 0) < 10 && (bot.s.bank ?? []).some(b => b.name === 'Coins')) await bot.withdrawN('Coins', 50);
+        await bot.leaveBank();
+    }
+    if (!count(bot, 'Eye of newt')) { if (await bot.openShop(SHOPS.betty)) { await bot.buy('Eye of newt', 1); await bot.closeInterfaces(); } }
+    if (!count(bot, 'Onion')) {
+        await bot.travel(WP.onions.x, WP.onions.y, { tol: 3 });
+        for (let i = 0; i < 4 && !count(bot, 'Onion'); i++) {
+            await bot.state(8);
+            const onion = bot.nearestScenery(l => l.name === 'Onion' && l.ops.includes('Pick'));
+            if (!onion) { await bot.wait(5); continue; }
+            await bot.act({ type: 'scenery', x: onion.x, y: onion.y, id: onion.id, op: 'Pick' });
+            await bot.waitIdle({ timeout: 8, cond: x => x.inv.some(i => i.name === 'Onion') });
+        }
+    }
+    if (!count(bot, 'Burnt meat')) {
+        if (!count(bot, 'Cooked meat') && !count(bot, 'Raw beef') && !count(bot, 'Raw rat meat')) await killFor(bot, 'Giant rat', 'Raw rat meat', WP.giantRats, 1);
+        for (let i = 0; i < 4 && !count(bot, 'Burnt meat'); i++) {
+            const meat = ['Raw rat meat', 'Raw beef', 'Cooked meat'].find(m => count(bot, m));
+            if (!meat) break;
+            await wpCookAtRange(bot, meat); // raw -> cooked (or burnt), cooked -> burnt
+        }
+    }
+    if (!count(bot, "Rat's tail")) await killFor(bot, 'Rat', "Rat's tail", WP.rats, 1);
+    const missing = ['Onion', 'Eye of newt', 'Burnt meat', "Rat's tail"].filter(i => !count(bot, i));
+    if (missing.length) bot.log(`quest: Witch's Potion still needs ${missing.join(', ')}`);
+    return !missing.length;
+}
+
 // The Knight's Sword (Falador): the Squire, Reldo in Varrock's library, a redberry pie from Romily in the Cooks'
 // Guild (Cooking 32 and a chef's hat worn) for Thurgo south of Port Sarim, the portrait in Sir Vyvin's cupboard
 // (Falador castle, top floor), and blurite from the Asgarnian Ice Dungeon (ice warriors) plus 2 iron bars.
@@ -677,6 +723,35 @@ export const QUESTS = {
                 } else break;
                 await bot.state(5);
                 bot.log(`quest: The Restless Ghost stage ${st} -> ${stageOf(bot, this.name)}`);
+            }
+            return stageOf(bot, this.name) >= 100;
+        }
+    },
+    witchs_potion: {
+        name: "Witch's Potion",
+        items: [],
+        async start(bot) {
+            if (stageOf(bot, this.name) > 0) return true;
+            await bot.travel(WP.hetty.x, WP.hetty.y, { tol: 3 });
+            await bot.talkTo('Hetty', { answer: WP_ANSWERS, maxSteps: 30 });
+            await bot.state(5);
+            return stageOf(bot, this.name) > 0;
+        },
+        async finish(bot) {
+            for (let i = 0; i < 4 && stageOf(bot, this.name) < 100; i++) {
+                const st = stageOf(bot, this.name);
+                if (st < 40) {
+                    if (!(await wpIngredients(bot))) return false;
+                    await bot.travel(WP.hetty.x, WP.hetty.y, { tol: 3 });
+                    await bot.talkTo('Hetty', { answer: WP_ANSWERS, maxSteps: 30 });
+                } else {
+                    await bot.travel(WP.hetty.x, WP.hetty.y, { tol: 3 });
+                    await bot.state(8);
+                    const c = bot.nearestScenery(l => l.name === 'Cauldron' && l.ops.some(o => /drink/i.test(o)));
+                    if (c) { await bot.act({ type: 'scenery', x: c.x, y: c.y, id: c.id, op: c.ops.find(o => /drink/i.test(o)) }); await bot.wait(4); await bot.answerDialog?.(); }
+                }
+                await bot.state(5);
+                bot.log(`quest: Witch's Potion stage ${st} -> ${stageOf(bot, this.name)}`);
             }
             return stageOf(bot, this.name) >= 100;
         }

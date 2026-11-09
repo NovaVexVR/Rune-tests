@@ -222,8 +222,10 @@ export const SHOPS = {
     // Varrock archery shop (Lowe's): arrows and bows for rangers
     lowe: { x: 3232, y: 3424, npcs: ['Lowe'], sells: { 'Bronze arrow': 7, Shortbow: 50 } },
     // Port Sarim fishing shop (shops.json "Gerrant's Fishy Business"): rods and feathers for fly fishing
-    gerrant: { x: 3013, y: 3224, npcs: ['Gerrant'], sells: { 'Fly fishing rod': 5, Feather: 6, 'Small fishing net': 5, 'Lobster pot': 20 } }
-    // runes are only sold in Varrock: bots trade for those
+    gerrant: { x: 3013, y: 3224, npcs: ['Gerrant'], sells: { 'Fly fishing rod': 5, Feather: 6, 'Small fishing net': 5, 'Lobster pot': 20 } },
+    // Port Sarim rune shop (Betty's Magic Emporium): eye of newt, and elemental and mind runes
+    betty: { x: 3013, y: 3258, npcs: ['Betty'], sells: { 'Eye of newt': 3, 'Air rune': 4, 'Water rune': 4, 'Earth rune': 4, 'Fire rune': 4, 'Mind rune': 3 } }
+    // runes: Aubury in Varrock and Betty in Port Sarim
 };
 // Free respawning ground items near Lumbridge (wiki guides; coordinates from the server's ground spawns)
 export const FREE_SPAWNS = {
