@@ -406,6 +406,7 @@ async function vsKillCount(bot) {
         const until = Date.now() + 5 * 60_000;
         while (Date.now() < until && stageOf(bot, 'Vampire Slayer') < 100) {
             const s = await bot.state(8);
+            if (!s?.online) { bot.log('quest: went offline in the manor basement'); return false; }
             const food = s.inv.find(i => FOOD.includes(i.name) && i.ops.includes('Eat'));
             if (s.hp <= s.maxHp * 0.45 && food) { await bot.act({ type: 'item', slot: food.slot, op: 'Eat' }); await sleep(1500); continue; }
             if (s.hp < s.maxHp * 0.3 && !food) { bot.log('quest: out of food against the Count, backing off'); break; }
