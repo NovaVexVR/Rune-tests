@@ -226,6 +226,42 @@ async function cauldronRunInner(bot) {
     return enchanted >= 4;
 }
 
+// ---- Doric's Quest (north of Falador): 6 clay, 4 copper ore, 2 iron ore (Mining 15 for the iron). Rimmington mine has
+// all three and nothing aggressive; whatever is banked already is taken from the bank first.
+const DORIC = { x: 2952, y: 3449 }, RIMMINGTON = { x: 2981, y: 3238 };
+const DORIC_ANSWERS = /^I wanted to use your anvils\.?$|^Yes,? I will get you the materials|^Certainly,? I'll be right back/i;
+const DORIC_WANTS = { Clay: 6, 'Copper ore': 4, 'Iron ore': 2 };
+const ORE_ROCKS = { Clay: [9711, 9712, 9713, 15503, 15504, 15505, 11189, 11190, 11191], 'Copper ore': [9708, 9709, 9710, 11936, 11937, 11938], 'Iron ore': [9717, 9718, 9719, 11954, 11955, 11956] };
+const PICKAXES = ['Bronze pickaxe', 'Iron pickaxe', 'Steel pickaxe', 'Mithril pickaxe', 'Adamant pickaxe', 'Rune pickaxe'];
+async function gatherForDoric(bot) {
+    const short = () => Object.entries(DORIC_WANTS).filter(([item, n]) => count(bot, item) < n);
+    if (!short().length) return true;
+    if (await bot.openBank()) {
+        // room for the ores, and anything already banked
+        await bot.depositAll(i => !PICKAXES.includes(i.name) && !FOOD.includes(i.name) && !(i.name in DORIC_WANTS) && i.name !== 'Coins');
+        for (const [item, n] of short()) if ((bot.s.bank ?? []).some(b => b.name === item)) await bot.withdrawN(item, n - count(bot, item));
+        if (!PICKAXES.some(p => bot.has(p))) { const p = PICKAXES.find(p => (bot.s.bank ?? []).some(b => b.name === p)); if (p) await bot.withdraw(p, 1); }
+        await bot.leaveBank();
+    }
+    if (!short().length) return true;
+    if (!PICKAXES.some(p => bot.has(p))) { bot.log("quest: no pickaxe for Doric's ores"); return false; }
+    bot.log(`quest: mining for Doric at Rimmington: ${short().map(([i, n]) => `${n - count(bot, i)} ${i}`).join(', ')}`);
+    if (!(await bot.travel(RIMMINGTON.x, RIMMINGTON.y, { tol: 4 }))) return false;
+    const until = Date.now() + 20 * 60_000;
+    while (Date.now() < until && short().length) {
+        const st = await bot.state(12);
+        if (await bot.handleInterrupts()) continue;
+        if (st.invFree < 1) { bot.log('quest: bag full before the ores were in'); return false; }
+        const ids = short().flatMap(([item]) => item === 'Iron ore' && bot.lvl('mining') < 15 ? [] : ORE_ROCKS[item]);
+        const rock = bot.nearestScenery(l => l.ops.includes('Mine') && ids.includes(l.id));
+        if (!rock) { await bot.wait(5); continue; } // mined out: they grow back
+        const before = st.inv.length;
+        await bot.act({ type: 'scenery', x: rock.x, y: rock.y, id: rock.id, op: 'Mine' }).catch(() => {});
+        await bot.waitIdle({ timeout: 40, quiet: 4, cond: x => x.inv.length > before });
+    }
+    return !short().length;
+}
+
 // The Knight's Sword (Falador): the Squire, Reldo in Varrock's library, a redberry pie from Romily in the Cooks'
 // Guild (Cooking 32 and a chef's hat worn) for Thurgo south of Port Sarim, the portrait in Sir Vyvin's cupboard
 // (Falador castle, top floor), and blurite from the Asgarnian Ice Dungeon (ice warriors) plus 2 iron bars.
@@ -547,6 +583,27 @@ export const QUESTS = {
                 bot.log(`quest: taking ${count(bot, 'Ball of wool')} balls of wool to Fred`);
                 await bot.travel(FRED.x + 1, FRED.y, { tol: 2 });
                 await bot.talkTo('Fred the Farmer', { answer: FRED_ANSWERS, maxSteps: 40 });
+                await bot.state(5);
+            }
+            return stageOf(bot, this.name) >= 100;
+        }
+    },
+    dorics_quest: {
+        name: "Doric's Quest",
+        items: [],
+        async start(bot) {
+            if (stageOf(bot, this.name) > 0) return true;
+            if (bot.lvl('mining') < 15) { bot.log("quest: Doric's Quest waits for Mining 15 (the iron ore)"); return false; }
+            await bot.travel(DORIC.x, DORIC.y + 1, { tol: 2 });
+            await bot.talkTo('Doric', { answer: DORIC_ANSWERS, maxSteps: 30 });
+            await bot.state(5);
+            return stageOf(bot, this.name) > 0;
+        },
+        async finish(bot) {
+            for (let i = 0; i < 3 && stageOf(bot, this.name) < 100; i++) {
+                if (!(await gatherForDoric(bot))) return false;
+                await bot.travel(DORIC.x, DORIC.y + 1, { tol: 2 });
+                await bot.talkTo('Doric', { answer: DORIC_ANSWERS, maxSteps: 30 });
                 await bot.state(5);
             }
             return stageOf(bot, this.name) >= 100;
