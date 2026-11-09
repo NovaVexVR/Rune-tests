@@ -410,8 +410,9 @@ async function vsKillCount(bot) {
             const food = s.inv.find(i => FOOD.includes(i.name) && i.ops.includes('Eat'));
             if (s.hp <= s.maxHp * 0.45 && food) { await bot.act({ type: 'item', slot: food.slot, op: 'Eat' }); await sleep(1500); continue; }
             if (s.hp < s.maxHp * 0.3 && !food) { bot.log('quest: out of food against the Count, backing off'); break; }
-            // the Count that is after this bot (a leftover Count from an earlier attempt can only be fought by its own summoner)
-            const count_ = s.npcs.find(n => /count draynor/i.test(n.name) && String(n.target ?? '').toLowerCase() === bot.name.toLowerCase()) ?? s.npcs.find(n => /count draynor/i.test(n.name) && !n.target);
+            // the Count this session summoned: the newest one (highest index). Counts left from earlier sessions still name
+            // this bot as their target but only take hits from the session that opened the coffin.
+            const count_ = s.npcs.filter(n => /count draynor/i.test(n.name)).sort((a, b) => b.npc - a.npc)[0];
             if (count_ && !s.attacking) await bot.act({ type: 'npc', npc: count_.npc, op: 'Attack' }).catch(() => {});
             await sleep(1500);
         }
