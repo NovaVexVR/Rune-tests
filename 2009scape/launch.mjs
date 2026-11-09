@@ -141,6 +141,10 @@ if (!args.has('--server-only')) {
     start('scripted bots', process.execPath, ['scripted.mjs', '10', 'scriptbot'], { cwd: bots }, path.join(bots, 'logs', 'scripted.out'));
     start('Claude-directed bots', process.execPath, ['claude_runner.mjs', '5'], { cwd: bots }, path.join(bots, 'logs', 'claude_runner.out'));
     log('bots started (logs in bots/logs/); `node bots/status.mjs` shows levels');
+    if (!args.has('--no-dashboard')) {
+        start('dashboard', process.execPath, ['dashboard.mjs'], { cwd: bots }, path.join(bots, 'logs', 'dashboard.out'));
+        log(`live dashboard on http://127.0.0.1:${process.env.DASHBOARD_PORT ?? 8090} (--no-dashboard to skip)`);
+    }
 }
 log('running; press Ctrl+C to stop');
 process.on('SIGINT', stopAll);

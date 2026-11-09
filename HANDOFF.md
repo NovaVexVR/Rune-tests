@@ -140,5 +140,7 @@ Dashboard (snapshot, refreshed only on request): https://claude.ai/artifact/6HWG
 
 **Broken saves (2026-11-09):** wolfbot5's save had been an empty file since 2026-11-07 (written during a crash), so it never logged in again. `launch.mjs` now checks every player save at startup: an empty or unreadable one is restored from the newest backup that has a good copy, or set aside as `<name>.json.broken-<time>` so the bot starts as a new character; either way the launch log says so.
 
+**Dashboard (58):** `node bots/dashboard.mjs` (or just `launch.mjs`, which starts it) serves http://127.0.0.1:8090: a map of the bots, a bot table, total levels over time and the economy, refreshed every 30 s from `logs/progress.jsonl`, `market/economy.jsonl`, `market/teams.json`, `market/careers.json` and the bot API.
+
 **Backups (26):** `bots/backup.mjs` tars the player saves (`Server/data/players`), `bots/market`, diaries, recaps and orders into `2009scape/backups/` (gitignored) at every `launch.mjs` start and daily from the runner; 14 days kept (`BACKUP_KEEP_DAYS`). Restore: stop the launcher, `tar -xzf backups/<file> -C ../../2009scape-server` for `Server/...` and `-C .` for `bots/...` (the archive holds both trees; extract it twice with the path filter, or into a temp dir and copy).
 
