@@ -91,6 +91,13 @@ export async function clearOut(bot) {
 export async function prepare(bot, taskId) {
     bot._lastTask = taskId;
     await doRitual(bot, taskId).catch(() => {}); // a superstition (38)
+    // a bag full of odds and ends (scripted bots were found idle for a day with 20 wool and no room to catch a fish)
+    if ((bot.s.invFree ?? 28) < 4 && (await bot.openBank().catch(() => false))) {
+        const keepForTask = i => taskId === 'spin' && /^(Wool|Ball of wool)$/.test(i.name);
+        await bot.depositAll(i => !KEEP(i.name) && !FOOD.includes(i.name) && !keepForTask(i));
+        await bot.leaveBank();
+        bot.log(`bag nearly full before ${taskId}: banked the odds and ends (${bot.s.invFree} free)`);
+    }
     // the task's tools: if one is banked but not carried, fetch it
     const missing = (TASK_NEEDS[taskId] ?? []).filter(g => !g.some(n => bot.s.inv.some(i => i.name === n) || bot.s.worn.some(i => i.name === n)))
         .map(g => g.find(n => bot.s.bank?.some(i => i.name === n))).filter(Boolean);

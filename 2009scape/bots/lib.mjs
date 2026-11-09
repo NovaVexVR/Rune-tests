@@ -262,12 +262,13 @@ export class Bot {
         }
         if (HOSTILE.includes(ev.type)) {
             const healthy = this.s.hp > this.s.maxHp * 0.6;
-            if (healthy && !this.s.attacking) {
+            const attackable = (this.s.npcs ?? []).some(n => n.npc === ev.npc && (n.ops ?? []).includes('Attack')); // a swarm can't be attacked: walk off
+            if (healthy && attackable && !this.s.attacking) {
                 await this.act({ type: 'npc', npc: ev.npc, op: 'Attack' });
                 await this.wait(2);
                 return true;
             }
-            if (!healthy && Date.now() - (this._reFlee ?? 0) > 8000) {
+            if ((!healthy || !attackable) && Date.now() - (this._reFlee ?? 0) > 8000) {
                 // too hurt to fight it: put distance between us until it gives up
                 this._reFlee = Date.now();
                 const dx = Math.sign(this.s.x - ev.x) || 1, dy = Math.sign(this.s.y - ev.y) || 1;
