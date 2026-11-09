@@ -276,13 +276,17 @@ async function rgOpenCoffin(bot) {
 }
 async function rgSkull(bot) {
     if (count(bot, 'Skull')) return true;
-    await bot.travel(RG.towerLadder.x + 1, RG.towerLadder.y, { tol: 2 });
-    await bot.state(8);
-    const down = bot.nearestScenery(l => /ladder/i.test(l.name) && l.ops.some(o => /climb-down/i.test(o)));
-    if (!down) { bot.log("quest: can't find the Wizards' Tower ladder down"); return false; }
-    await bot.act({ type: 'scenery', x: down.x, y: down.y, id: down.id, op: 'Climb-down' });
-    await bot.waitIdle({ timeout: 12, cond: x => x.y > 9000 });
-    if ((await bot.state(8)).y < 9000) return false;
+    const inBasement = () => bot.s.y > 9000 && Math.abs(bot.s.x - RG.altar.x) < 30;
+    for (let t = 0; t < 3 && !inBasement(); t++) { // the tower's doors can get in the way of the first try
+        await bot.travel(RG.towerLadder.x + 1, RG.towerLadder.y, { tol: 2 });
+        await bot.state(8);
+        const down = bot.nearestScenery(l => /ladder/i.test(l.name) && l.ops.some(o => /climb-down/i.test(o)));
+        if (!down) { bot.log("quest: can't find the Wizards' Tower ladder down"); continue; }
+        await bot.act({ type: 'scenery', x: down.x, y: down.y, id: down.id, op: 'Climb-down' }).catch(() => {});
+        await bot.waitIdle({ timeout: 15, cond: x => x.y > 9000 });
+        await bot.state(8);
+    }
+    if (!inBasement()) { bot.log("quest: couldn't get down to the Wizards' Tower basement"); return false; }
     bot.standGround = true; // the skeleton that wakes up: fight it rather than run in a basement
     try {
         await bot.walkTo(RG.altar.x, RG.altar.y + 1, { tol: 2, timeout: 60 });
@@ -308,10 +312,11 @@ async function wpCookAtRange(bot, item) {
     if (!it) return;
     await bot.travel(WP.range.x - 1, WP.range.y, { tol: 2 });
     await bot.act({ type: 'useitem', slot: it.slot, x: WP.range.x, y: WP.range.y }).catch(() => {});
-    for (let i = 0; i < 6; i++) { const st = await bot.state(4); if (st.dialog?.skillMenu) { await bot.act({ type: 'skillmenu', index: 0 }); break; } if (st.dialog) { await bot.answerDialog?.(); } await bot.wait(1); }
+    for (let i = 0; i < 6; i++) { const st = await bot.state(4); if (st.dialog?.skillMenu) { await bot.act({ type: 'skillmenu', index: 0 }); break; } if (st.dialog) { await bot.answerDialog(/^Cook the meat/i); /* raw beef also offers 'Dry the meat into sinew' */ } await bot.wait(1); }
     await bot.waitIdle({ timeout: 10, quiet: 3 });
 }
 async function wpIngredients(bot) {
+    await bot.ensureFood(4).catch(() => {}); // something else to eat, so the quest meat doesn't get eaten
     if (await bot.openBank()) {
         for (const item of ['Onion', 'Eye of newt', 'Burnt meat', "Rat's tail", 'Cooked meat', 'Raw beef', 'Raw rat meat'])
             if (!count(bot, item) && (bot.s.bank ?? []).some(b => b.name === item) && !(['Cooked meat', 'Raw beef', 'Raw rat meat'].includes(item) && (count(bot, 'Burnt meat') || count(bot, 'Cooked meat') || count(bot, 'Raw beef') || count(bot, 'Raw rat meat'))))
