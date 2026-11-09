@@ -1,24 +1,24 @@
 {
-  "role": "[hawk] Team cook: fish and cook food for the team, also fights and chops",
+  "role": "[hawk] Team treasurer: earns coins, pools members' spare coins, buys their missing tools, banks the pool",
   "plan": [
     {
-      "task": "fish_cook",
-      "minutes": 45,
-      "why": "food supply"
+      "task": "treasury",
+      "minutes": 40,
+      "why": "equip team + manage pool"
     },
     {
       "task": "melee",
       "minutes": 20,
-      "why": "combat"
+      "why": "hp/combat"
     },
     {
-      "task": "woodcut_fire",
-      "minutes": 15,
-      "why": "fires"
+      "task": "treasury",
+      "minutes": 40,
+      "why": "treasury"
     },
     {
       "task": "fletch",
-      "minutes": 10,
+      "minutes": 15,
       "why": "variety"
     }
   ],
