@@ -310,10 +310,11 @@ async function mineBlurite(bot) {
             const st = await bot.state(12);
             if (st.dialog || st.randomEvent) { await bot.handleInterrupts(); continue; }
             const food = st.inv.find(i => FOOD.includes(i.name) && i.ops.includes('Eat'));
-            if (st.hp <= st.maxHp * 0.5 && food) { await bot.act({ type: 'item', slot: food.slot, op: 'Eat' }); await sleep(1200); continue; }
+            if (st.hp <= st.maxHp * 0.5 && food) { await bot.act({ type: 'item', slot: food.slot, op: 'Eat' }); lastSwing = 0; await sleep(1200); continue; } // eating stops the swing
             if (st.hp < st.maxHp * 0.4 && !food) { bot.log('quest: out of food at the blurite, backing off'); break; }
-            // `busy` can be some other pulse left over (it read true from login on), so swing again every 20 s regardless
-            if ((st.busy || st.moving) && Date.now() - lastSwing < 20_000) { await sleep(600); continue; }
+            // mining runs as a script, which `busy` (pulses) doesn't show, and every click starts the swing over before its
+            // first roll (4 ticks): swing once, then again only after 12 s or after eating
+            if (st.moving || Date.now() - lastSwing < 12_000) { await sleep(600); continue; }
             const rock = bot.nearestScenery(l => [33220, 33221].includes(l.id) && l.ops.includes('Mine'));
             if (!rock) { await sleep(2000); continue; }
             await bot.act({ type: 'scenery', x: rock.x, y: rock.y, id: rock.id, op: 'Mine' }).catch(() => {});
