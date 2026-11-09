@@ -48,7 +48,9 @@ export function checkAlerts() {
         const now = all.at(-1), dayAgo = all.findLast(r => Date.parse(r.t) <= Date.now() - 22 * 3600_000);
         if (now && dayAgo?.coins > 1000) {
             const ratio = now.coins / dayAgo.coins;
-            if (ratio > 1.5) alerts.push(`inflation: coins ${dayAgo.coins} -> ${now.coins} in a day (sources: ${topFlows('in')})`);
+            // fast growth is normal while bots are poor (100k coins is an ordinary fortune in the real game): only flag
+            // inflation once the average bot carries more than that
+            if (ratio > 1.5 && now.coins / Math.max(1, now.bots ?? 1) > 100_000) alerts.push(`inflation: coins ${dayAgo.coins} -> ${now.coins} in a day (sources: ${topFlows('in')})`);
             if (ratio < 0.7) alerts.push(`deflation: coins ${dayAgo.coins} -> ${now.coins} in a day (sinks: ${topFlows('out')})`);
         }
     } catch {}
