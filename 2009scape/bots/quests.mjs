@@ -402,7 +402,10 @@ async function vsKillCount(bot) {
     try {
         const coffin = (await bot.state(14), bot.nearestScenery(l => l.id === 2614 || /coffin/i.test(l.name))); // fresh view: the basement was just entered
         if (!coffin) { bot.log('quest: no coffin in the manor basement'); return false; }
+        const before = new Set(bot.s.npcs.filter(n => /count draynor/i.test(n.name)).map(n => n.npc));
         await bot.act({ type: 'scenery', x: coffin.x, y: coffin.y, id: coffin.id, op: 'Open' });
+        await bot.wait(3);
+        let mine = (await bot.state(14)).npcs.find(n => /count draynor/i.test(n.name) && !before.has(n.npc))?.npc; // the one this coffin opening woke
         const until = Date.now() + 5 * 60_000;
         while (Date.now() < until && stageOf(bot, 'Vampire Slayer') < 100) {
             const s = await bot.state(8);
@@ -410,9 +413,10 @@ async function vsKillCount(bot) {
             const food = s.inv.find(i => FOOD.includes(i.name) && i.ops.includes('Eat'));
             if (s.hp <= s.maxHp * 0.45 && food) { await bot.act({ type: 'item', slot: food.slot, op: 'Eat' }); await sleep(1500); continue; }
             if (s.hp < s.maxHp * 0.3 && !food) { bot.log('quest: out of food against the Count, backing off'); break; }
-            // the Count this session summoned: the newest one (highest index). Counts left from earlier sessions still name
-            // this bot as their target but only take hits from the session that opened the coffin.
-            const count_ = s.npcs.filter(n => /count draynor/i.test(n.name)).sort((a, b) => b.npc - a.npc)[0];
+            // the Count this coffin opening woke: Counts left from earlier sessions still name this bot as their target but
+            // only take hits from the session that summoned them (and NPC indices get reused, so "newest" can't be told by index)
+            const count_ = s.npcs.find(n => n.npc === mine) ?? s.npcs.find(n => /count draynor/i.test(n.name) && !before.has(n.npc));
+            if (count_) mine = count_.npc;
             if (count_ && !s.attacking) await bot.act({ type: 'npc', npc: count_.npc, op: 'Attack' }).catch(() => {});
             await sleep(1500);
         }
