@@ -797,7 +797,7 @@ export class Bot {
             if (s.hp <= s.maxHp * 0.5 && food) { await this.act({ type: 'item', slot: food.slot, op: 'Eat' }); await this.wait(2); return true; }
         }
         const lowNoFood = s.y < 6000 && s.hp < s.maxHp * 0.5 && !s.inv.some(i => FOOD.includes(i.name) && i.ops.includes('Eat')); // on the surface, hurt and out of food: run instead
-        if (attacker && !lowNoFood && !this.pressOn && !this.dueling && (s.y > 6000 || this.standGround || (attacker.level ?? 99) * 1.5 < (s.combat ?? 3))) {
+        if (attacker && !lowNoFood && !this.pressOn && !this.dueling && (s.y > 6000 || this.standGround || (attacker.level ?? 99) * 1.5 < (s.combat ?? 3) || ((attacker.level ?? 99) <= (s.combat ?? 3) && s.hp > s.maxHp * 0.6) /* an even fight while healthy: chasers like muggers catch a fleeing bot anyway */)) {
             const food = s.inv.find(i => FOOD.includes(i.name) && i.ops.includes('Eat'));
             if (s.hp <= s.maxHp * 0.4 && food) { await this.act({ type: 'item', slot: food.slot, op: 'Eat' }); await this.wait(2); return true; }
             this.log(`fighting back: ${attacker.name} (level ${attacker.level}) at ${s.x},${s.y}`);
