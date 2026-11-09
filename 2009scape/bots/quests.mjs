@@ -400,7 +400,7 @@ async function vsKillCount(bot) {
     }
     bot.standGround = true;
     try {
-        const coffin = bot.nearestScenery(l => l.id === 2614 || /coffin/i.test(l.name));
+        const coffin = (await bot.state(14), bot.nearestScenery(l => l.id === 2614 || /coffin/i.test(l.name))); // fresh view: the basement was just entered
         if (!coffin) { bot.log('quest: no coffin in the manor basement'); return false; }
         await bot.act({ type: 'scenery', x: coffin.x, y: coffin.y, id: coffin.id, op: 'Open' });
         const until = Date.now() + 5 * 60_000;
