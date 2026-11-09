@@ -11,7 +11,7 @@ const read = () => { try { return JSON.parse(fs.readFileSync(FILE, 'utf8')); } c
 
 export function feasts(market, log = () => {}) {
     const st = read(), s = market.social, now = Date.now();
-    const wins = readDiaries(st.last).filter(e => /^(Won the |Beat \w+ in a duel|Completed (?!my ).*Quest points|Elected mayor)/.test(e.text));
+    const wins = readDiaries(st.last).filter(e => /^(Won the |Beat \w+ in a duel|Completed (?!my ).*Quest points|Elected mayor|Reached \w+(?: \w+)? level (50|60|70|80|90|99)\.)/.test(e.text));
     st.last = now;
     for (const w of wins) {
         const team = s.teamOf(w.bot);

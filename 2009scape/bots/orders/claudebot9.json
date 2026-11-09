@@ -36,7 +36,8 @@
       "spot": "riverbank",
       "food": "Shrimps",
       "collection": "tools",
-      "gambles": true
+      "gambles": true,
+      "collectionDone": "2026-11-09T14:23:29.035Z"
     }
   }
 }

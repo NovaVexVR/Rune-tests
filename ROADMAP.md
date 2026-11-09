@@ -95,7 +95,7 @@ Clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, r
 54. *(done in code: `GEAR_SHOPS` in tasks.mjs: every 6 hours a fighter with 200gp+ spends up to 30% of its wealth on the best upgrade it can wear, now up to black and mithril platebodies at Horvik's and bronze to mithril scimitars at Zeke's in Al Kharid, within each metal's Defence or Attack level; runes for Magic already come from RESUPPLY (Aubury) and Betty's shop is known; adamant and rune need shops outside free-to-play)* **Spending sinks:** armour and weapon upgrades as bots get richer, runes for Magic, adamant and rune purchases.
 55. **Friends and meetups:** bots that trust each other train side by side and chat about what they're doing.
 56. **Bot-run stalls:** a merchant bot sets up in Varrock square and advertises in chat, like real players.
-57. **Milestone celebrations:** a level 99 or a first rune item draws a crowd, gets the crier's attention and a feast.
+57. *(done in code: `bots/celebrations.mjs`: a skill to 50/60/70/80/90/99, a town first, or 10/20/30 quest points starts a 15-minute celebration; online teammates and friends (trust 0.2+) within 120 tiles walk over between tasks, cheer, clap, wave or jump for joy (emote tab buttons), congratulate the bot in chat, moods and trust lift; feasts now also fire for the big level milestones)* **Milestone celebrations:** a level 99 or a first rune item draws a crowd, gets the crier's attention and a feast.
 58. **Live web dashboard:** bots on a map, levels over time, the economy charts (item 23).
 59. **Weekly report:** a shareable page with the week's growth, deaths, richest bots, quests and drama.
 
