@@ -433,6 +433,69 @@ async function vsKillCount(bot) {
     return stageOf(bot, 'Vampire Slayer') >= 100;
 }
 
+// ---- Goblin Diplomacy (Goblin Village, north of Falador): three goblin mails from the village crates (each refills after
+// ~5 minutes), one dyed orange (red dye from 3 redberries + yellow from 2 onions, mixed), one blue (2 woad leaves from
+// Wyson in Falador park, 15gp each), one left brown. Aggie in Draynor makes each dye for 5gp. Shown to the generals in turn.
+const GD = { generals: { x: 2956, y: 3511 }, aggie: { x: 3085, y: 3260 }, wyson: { x: 3021, y: 3375 }, redberries: { x: 3274, y: 3373 }, onions: { x: 2948, y: 3251 } };
+const GD_ANSWERS = /^Do you want me to pick an armour colour for you\?$|^I have some \w+ armour here\.?$/i;
+async function pickN(bot, at, name, op, item, n) {
+    await bot.travel(at.x, at.y, { tol: 3 });
+    for (let i = 0; i < 12 && count(bot, item) < n; i++) {
+        await bot.state(8);
+        const t = bot.nearestScenery(l => l.name === name && l.ops.includes(op));
+        if (!t) { await bot.wait(8); continue; } // picked clean: they grow back
+        await bot.act({ type: 'scenery', x: t.x, y: t.y, id: t.id, op });
+        await bot.waitIdle({ timeout: 8, quiet: 2 });
+    }
+    return count(bot, item) >= n;
+}
+async function aggieDye(bot, colour) {
+    await bot.travel(GD.aggie.x, GD.aggie.y, { tol: 2 });
+    await bot.talkTo('Aggie', { answer: new RegExp(`^Can you make dyes for me please\\?$|^What do you need to make (a )?${colour} dye\\?$`, 'i'), maxSteps: 20 });
+    await bot.state(4);
+}
+async function gdDyes(bot) {
+    const has = n => count(bot, n) > 0;
+    if (!has('Orange goblin mail') && !has('Orange dye')) {
+        if (!has('Red dye')) { if (count(bot, 'Redberries') < 3) await pickN(bot, GD.redberries, 'Redberry bush', 'Pick-from', 'Redberries', 3); await aggieDye(bot, 'red'); }
+        if (!has('Yellow dye')) { if (count(bot, 'Onion') < 2) await pickN(bot, GD.onions, 'Onion', 'Pick', 'Onion', 2); await aggieDye(bot, 'yellow'); }
+        const red = bot.s.inv.find(i => i.name === 'Red dye'), yellow = bot.s.inv.find(i => i.name === 'Yellow dye');
+        if (red && yellow) { await bot.act({ type: 'useitem', slot: red.slot, onSlot: yellow.slot }); await bot.wait(2); await bot.state(4); }
+    }
+    if (!has('Blue goblin mail') && !has('Blue dye')) {
+        for (let i = 0; i < 3 && count(bot, 'Woad leaf') < 2; i++) {
+            await bot.travel(GD.wyson.x, GD.wyson.y, { tol: 3 });
+            await bot.talkTo('Wyson the gardener', { answer: /^Yes please, I need woad leaves\.?$|^How about 15 coins\?$/i, maxSteps: 20 });
+            await bot.state(4);
+        }
+        await aggieDye(bot, 'blue');
+    }
+    const missing = [!has('Orange goblin mail') && !has('Orange dye') && 'orange dye', !has('Blue goblin mail') && !has('Blue dye') && 'blue dye'].filter(Boolean);
+    if (missing.length) bot.log(`quest: Goblin Diplomacy still needs ${missing.join(' and ')}`);
+    return !missing.length;
+}
+async function gdMails(bot) {
+    const mails = () => count(bot, 'Goblin mail') + count(bot, 'Orange goblin mail') + count(bot, 'Blue goblin mail');
+    const until = Date.now() + 12 * 60_000;
+    while (mails() < 3 && Date.now() < until) {
+        await bot.travel(GD.generals.x, GD.generals.y - 3, { tol: 3 });
+        for (const id of [16560, 16559, 16557, 16561]) {
+            if (mails() >= 3) break;
+            const c = (await bot.state(14), bot.nearestScenery(l => l.id === id && l.ops.includes('Search')));
+            if (!c) continue;
+            await bot.act({ type: 'scenery', x: c.x, y: c.y, id: c.id, op: 'Search' });
+            await bot.waitIdle({ timeout: 8, quiet: 2 });
+            await bot.answerDialog();
+        }
+        if (mails() < 3) { bot.log(`quest: ${mails()} goblin mails; the crates refill in a few minutes`); await bot.wait(60); }
+    }
+    return mails() >= 3;
+}
+async function gdDyeMail(bot, dye) {
+    const d = bot.s.inv.find(i => i.name === dye), m = bot.s.inv.find(i => i.name === 'Goblin mail');
+    if (d && m) { await bot.act({ type: 'useitem', slot: d.slot, onSlot: m.slot }); await bot.wait(2); await bot.state(4); }
+}
+
 // The Knight's Sword (Falador): the Squire, Reldo in Varrock's library, a redberry pie from Romily in the Cooks'
 // Guild (Cooking 32 and a chef's hat worn) for Thurgo south of Port Sarim, the portrait in Sir Vyvin's cupboard
 // (Falador castle, top floor), and blurite from the Asgarnian Ice Dungeon (ice warriors) plus 2 iron bars.
@@ -871,6 +934,34 @@ export const QUESTS = {
                 } else if (!(await vsKillCount(bot))) return false;
                 await bot.state(5);
                 bot.log(`quest: Vampire Slayer stage ${st} -> ${stageOf(bot, this.name)}`);
+            }
+            return stageOf(bot, this.name) >= 100;
+        }
+    },
+    goblin_diplomacy: {
+        name: 'Goblin Diplomacy',
+        items: [],
+        async start(bot) {
+            if (stageOf(bot, this.name) > 0) return true;
+            if ((bot.s.combat ?? 3) < 10) { bot.log('quest: Goblin Diplomacy waits for combat 10 (the goblins round the village)'); return false; }
+            if ((bot.s.coins ?? 0) + ((bot.s.bank ?? []).find(i => i.name === 'Coins')?.count ?? 0) < 60) { bot.log('quest: Goblin Diplomacy needs 60gp (woad leaves and dyes)'); return false; }
+            await bot.travel(GD.generals.x, GD.generals.y - 1, { tol: 2 });
+            await bot.talkTo('General Wartface', { answer: GD_ANSWERS, maxSteps: 60 });
+            await bot.state(5);
+            return stageOf(bot, this.name) > 0;
+        },
+        async finish(bot) {
+            for (let i = 0; i < 6 && stageOf(bot, this.name) < 100; i++) {
+                const st = stageOf(bot, this.name);
+                if ((bot.s.coins ?? 0) < 50 && (await bot.openBank())) { await bot.withdrawN('Coins', 100); await bot.leaveBank(); }
+                if (!(await gdMails(bot))) return false;
+                if (!(await gdDyes(bot))) return false;
+                await gdDyeMail(bot, 'Orange dye');
+                await gdDyeMail(bot, 'Blue dye');
+                await bot.travel(GD.generals.x, GD.generals.y - 1, { tol: 2 });
+                await bot.talkTo('General Wartface', { answer: GD_ANSWERS, maxSteps: 80 });
+                await bot.state(5);
+                bot.log(`quest: Goblin Diplomacy stage ${st} -> ${stageOf(bot, this.name)}`);
             }
             return stageOf(bot, this.name) >= 100;
         }
