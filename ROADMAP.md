@@ -86,9 +86,9 @@ Clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, r
 
 ### J. Growth, economy and life (added 2026-11-09)
 
-48. *(in progress: Doric's Quest verified (Rimmington mine, +1,470 Mining xp), The Restless Ghost verified (+1,125 Prayer xp), Witch's Potion in testing (combat 10+))* **More quests:** Doric's Quest, Witch's Potion, The Restless Ghost, Ernest the Chicken, Goblin Diplomacy, Vampire Slayer (Sheep Shearer is in already), solo and in parties.
-49. **Training spots by level:** combat moves chickens -> cows -> Al Kharid warriors -> hill giants; mining tin/copper -> iron -> coal; and so on, instead of one spot per task.
-50. **Prayer:** keep burying bones from fights, collect big bones from tougher monsters, and later use the bones on an altar.
+48. *(in progress: Doric's Quest verified (Rimmington mine, +1,470 Mining xp), The Restless Ghost verified (+1,125 Prayer xp), Witch's Potion verified (combat 10+, +325 Magic xp); next: Ernest the Chicken, Goblin Diplomacy, Vampire Slayer)* **More quests:** Doric's Quest, Witch's Potion, The Restless Ghost, Ernest the Chicken, Goblin Diplomacy, Vampire Slayer (Sheep Shearer is in already), solo and in parties.
+49. *(melee done and verified: `MELEE_LADDER` in tasks.mjs moves bots chickens -> cows -> Barbarian Village -> Al Kharid warriors -> Varrock guards by their melee stats and combat; a combat-46 bot got +712 Strength in a few minutes at the guards; mining already moves copper/tin -> iron -> coal)* **Training spots by level:** combat moves chickens -> cows -> Al Kharid warriors -> hill giants; mining tin/copper -> iron -> coal; and so on, instead of one spot per task.
+50. *(started: fights bury big bones as well as bones; The Restless Ghost gives 1,125 Prayer xp)* **Prayer:** keep burying bones from fights, collect big bones from tougher monsters, and later use the bones on an altar.
 51. **Crafting beyond leather:** pottery (soft clay at Barbarian Village), jewellery (gold bars and the gems bots find), then glassblowing.
 52. **Cooking and fishing upgrades:** the Lumbridge castle range, trout and salmon, Catherby later.
 53. **High-value goods:** bots sell the bows, armour and lobsters they make at the Grand Exchange and to each other at real prices, so wealth climbs through work (100k is an ordinary fortune in the real game).
