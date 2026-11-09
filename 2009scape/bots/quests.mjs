@@ -275,6 +275,13 @@ async function rgOpenCoffin(bot) {
     if (closed) { await bot.act({ type: 'scenery', x: closed.x, y: closed.y, id: closed.id, op: 'Open' }); await bot.wait(3); await bot.state(8); }
     return bot.nearestScenery(l => /coffin/i.test(l.name) && l.id !== 2145) ?? { x: 3249, y: 3192, id: 15061 };
 }
+async function rgLeaveBasement(bot) {
+    for (let t = 0; t < 3 && bot.s.y > 9000; t++) { // back to the ladder (3104,9576), through the basement's doors, and up
+        await bot.walkTo(3105, 9575, { tol: 2, timeout: 90 });
+        const up = (await bot.state(10), bot.nearestScenery(l => /ladder/i.test(l.name) && l.ops.some(o => /climb-up/i.test(o))));
+        if (up) { await bot.act({ type: 'scenery', x: up.x, y: up.y, id: up.id, op: 'Climb-up' }).catch(() => {}); await bot.waitIdle({ timeout: 15, cond: x => x.y < 9000 }); }
+    }
+}
 async function rgSkull(bot) {
     if (count(bot, 'Skull')) return true;
     const inBasement = () => bot.s.y > 9000 && Math.abs(bot.s.x - RG.altar.x) < 30;
@@ -297,11 +304,7 @@ async function rgSkull(bot) {
         await bot.act({ type: 'scenery', x: altar.x, y: altar.y, id: altar.id, op: altar.ops.find(o => /search/i.test(o)) ?? 'Search' });
         await bot.waitIdle({ timeout: 10, cond: x => x.inv.some(i => i.name === 'Skull') });
         for (let i = 0; i < 20 && (await bot.state(8)).inCombat; i++) await bot.handleInterrupts(); // deal with the skeleton
-        for (let t = 0; t < 3 && bot.s.y > 9000; t++) { // back to the ladder (3104,9576), through the basement's doors, and up
-            await bot.walkTo(3105, 9575, { tol: 2, timeout: 90 });
-            const up = (await bot.state(10), bot.nearestScenery(l => /ladder/i.test(l.name) && l.ops.some(o => /climb-up/i.test(o))));
-            if (up) { await bot.act({ type: 'scenery', x: up.x, y: up.y, id: up.id, op: 'Climb-up' }).catch(() => {}); await bot.waitIdle({ timeout: 15, cond: x => x.y < 9000 }); }
-        }
+        await rgLeaveBasement(bot);
     } finally { bot.standGround = false; }
     return count(bot, 'Skull') > 0;
 }
@@ -726,6 +729,7 @@ export const QUESTS = {
                     if (!(await rgSkull(bot))) return false;
                 } else if (st === 40) {
                     if (!count(bot, 'Skull') && !(await rgSkull(bot))) return false;
+                    if (bot.s.y > 9000) await rgLeaveBasement(bot);
                     const coffin = await rgOpenCoffin(bot);
                     const skull = bot.s.inv.find(i => i.name === 'Skull');
                     if (skull) { await bot.act({ type: 'useitem', slot: skull.slot, x: coffin.x, y: coffin.y }); await bot.wait(3); }
