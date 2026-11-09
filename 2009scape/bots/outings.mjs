@@ -10,7 +10,7 @@ const GROUNDS = [ // [min combat of the weakest member, place, monsters, label]
     // (the Varrock sewers' moss giants would need the manhole route underground: later)
     [28, { x: 3228, y: 3368 }, ['Dark wizard'], "the dark wizards' circle"],
     [14, { x: 3293, y: 3172 }, ['Al-Kharid warrior'], 'the Al Kharid warriors'],
-    [10, { x: 3080, y: 3418 }, ['Barbarian'], 'the Barbarian Village longhall']
+    [20, { x: 3080, y: 3418 }, ['Barbarian'], 'the Barbarian Village longhall'] // from 20: the longhall's barbarians come in groups
 ];
 const MINUTES = 20;
 export class Outings {

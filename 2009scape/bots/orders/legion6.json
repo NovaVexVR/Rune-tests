@@ -2,19 +2,19 @@
   "role": "[legion] Team fighter: combat first, gathers food between fights",
   "plan": [
     {
-      "task": "melee",
-      "minutes": 45,
-      "why": "strength-first melee (guide)"
+      "task": "fish_cook",
+      "minutes": 25,
+      "why": "food first: deaths at the barbarian longhall with nothing to eat"
     },
     {
-      "task": "fish_cook",
-      "minutes": 20,
-      "why": "food"
+      "task": "melee",
+      "minutes": 40,
+      "why": "fighter career"
     },
     {
       "task": "ranged",
       "minutes": 15,
-      "why": "rapid ranged while arrows last"
+      "why": "variety"
     },
     {
       "task": "woodcut_fire",

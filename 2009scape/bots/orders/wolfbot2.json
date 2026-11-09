@@ -3,23 +3,23 @@
   "plan": [
     {
       "task": "mine",
-      "minutes": 45,
-      "why": "copper/tin to bank"
+      "minutes": 40,
+      "why": "smith career"
     },
     {
-      "task": "melee",
+      "task": "smelt",
       "minutes": 20,
-      "why": "combat"
+      "why": "ore to bars"
     },
     {
-      "task": "fletch",
-      "minutes": 15,
-      "why": "arrow shafts"
+      "task": "smith",
+      "minutes": 20,
+      "why": "bars to goods"
     },
     {
-      "task": "fish_cook",
+      "task": "thieving",
       "minutes": 15,
-      "why": "food"
+      "why": "coins, instead of melee (3 deaths)"
     }
   ],
   "loop": true,

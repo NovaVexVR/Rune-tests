@@ -4,22 +4,17 @@
     {
       "task": "lobsters",
       "minutes": 45,
-      "why": "Fishing 40: lobsters on Karamja (verified today)"
+      "why": "Fishing 40+: lobsters"
     },
     {
       "task": "fish_cook",
-      "minutes": 20,
-      "why": "cook the catch"
-    },
-    {
-      "task": "melee",
-      "minutes": 20,
-      "why": "hitpoints"
+      "minutes": 25,
+      "why": "cook the catch, food"
     },
     {
       "task": "woodcut_fire",
       "minutes": 15,
-      "why": "variety"
+      "why": "safe levels instead of melee (2 deaths)"
     }
   ],
   "loop": true,
