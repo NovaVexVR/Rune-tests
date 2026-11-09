@@ -381,10 +381,9 @@ async function vsKillCount(bot) {
     await bot.ensureFood(10).catch(() => {});
     if (!bot.has('Hammer')) { if (await bot.openShop(SHOPS.general)) { await bot.buy('Hammer', 1); await bot.closeInterfaces(); } }
     if (!bot.has('Hammer') || !count(bot, 'Stake')) { bot.log('quest: Vampire Slayer needs a stake and a hammer'); return false; }
-    if (bot.s.y > 9000 && !count(bot, 'Garlic')) { // in the basement without garlic: up first
-        const up = (await bot.state(10), bot.nearestScenery(l => /stairs/i.test(l.name) && l.ops.some(o => /walk-up/i.test(o))));
-        if (up) { await bot.act({ type: 'scenery', x: up.x, y: up.y, id: up.id, op: up.ops.find(o => /walk-up/i.test(o)) }); await bot.waitIdle({ timeout: 12, cond: x => x.y < 9000 }); }
-    }
+    // inside the manor or its basement without garlic: the front doors don't open from inside, so teleport out
+    const inManor = b => (b.s.y > 9000 && Math.abs(b.s.x - 3077) < 20) || (b.s.x >= 3091 && b.s.x <= 3126 && b.s.y >= 3350 && b.s.y <= 3375);
+    if (!count(bot, 'Garlic') && inManor(bot)) await bot.homeTeleport();
     if (bot.s.y < 9000 && !(await vsGarlic(bot))) bot.log("quest: no garlic from Morgan's cupboard; trying the Count anyway");
     if (bot.s.y < 9000) {
         await bot.travel(VS.manorDoor.x, VS.manorDoor.y - 2, { tol: 2 });
