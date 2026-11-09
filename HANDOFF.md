@@ -92,9 +92,17 @@ Last session's container had everything under `/home/user`; a new one starts emp
 - Kill runners with `pkill -f "node claude_runner.mjs"` (a broader pattern can kill the calling shell).
 - Staged tests edit `Server/data/players/<bot>.json` only while that bot is logged out (the server overwrites the save on logout). Items go in `core_data.inventory` (`{amount, charge, slot, id}` strings), position in `core_data.location` (`"x,y,z"`).
 - Personalities live in `orders/<bot>.json`; bots without an orders file (test bots) get a seeded one. A tools collector won't sell a Knife or Hammer, which can make a staged trade test look broken.
+- This server is a members world (`members = true` in worldprops): members content is open to bots. Much of it (Catherby, Seers' flax, glassblowing supplies) lies west of White Wolf Mountain (wolves kill bots under combat ~45) or a 1,000gp charter ship from Port Sarim (`ShipCharter.java`).
+- Draynor Manor's front doors don't open from inside: it's a DANGER zone for routes and `prepare()` teleports trapped bots out.
+- Combat: any monster attack used to cancel a player's skilling; the core patch now keeps a player with auto-retaliate off skilling (`CombatPulse.kt`, two places). Skilling like mining runs as a weak *script*, which the state's `busy` (pulses) doesn't show: don't re-click every second (it restarts the swing before the 4-tick roll).
+- A bot logged out mid-fight lingers in the server's disconnection queue (up to 15 min): wait for `online: false` before editing its save, or `POST /bot/<name>/logout`.
+- Diary lines are read back by other modules (records, celebrations, gossip, the weekly report): avoid writing lines that repeat a trigger phrase (a cheer line repeating "first in town" set off a celebration cascade).
 
 ## Next steps (in order)
-Follow the numbered list in `ROADMAP.md` ("Planned, in priority order"): section A first (watchdog, bank clear-outs, food, danger memory, death recovery, regular tests), then B (team stash, reasons to trade, iron/steel, training, quest unlocks), then C, D and E (items 12–24); the reset-to-level-1 milestone comes just before human players (item 25). Open threads: the duel "Fight" blocker (item 19) and confirming in the fleet that thieving bots rest and fishers bank their catch.
+State on 2026-11-09 ~22:00 UTC: roadmap items 1-59 are done or deliberately deferred, except those waiting on the user (24 Windows launcher test, 25/29/30 human players on hold, the level-1 reset milestone: confirm with the user first). The fleet runs from `launch.mjs` (server, 10 scripted + 50 Claude-directed bots, dashboard on :8090); the director pass is daily (`DIRECTOR.md`), the weekly report is published by the Monday pass (artifact https://claude.ai/artifact/AmncCAgy9FHP1pyAEjiaxT).
+1. **Move west (in progress):** strong or rich bots migrate to members areas: fishers with Fishing 40+ and 2,000gp take the Port Sarim charter to Catherby (lobsters, swordfish, bank beside the spots); then fletchers (flax at Seers, strung bows to Brian's Archery for high alchemy) and crafters (glassblowing).
+2. Ernest the Chicken (deferred: manor lever maze).
+3. Watch the newest live features: stalls (now demand-driven), celebrations (cascade fixed 2026-11-09), meetups (verified), deaths at the Barbarian Village longhall (37 -> 14 per 2 h after the fixes).
 
 ## Usage rules (from the user)
 - **Keep usage low.** Don't spend tokens on anything not asked for: no unrequested status checks, polling loops, screenshots or dashboard refreshes.
