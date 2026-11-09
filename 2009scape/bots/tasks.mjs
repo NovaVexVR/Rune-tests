@@ -1227,7 +1227,7 @@ export const WILD_MINE = {
     skills: ['mining'],
     canRun: bot => {
         if (!['Bronze pickaxe', 'Iron pickaxe', 'Steel pickaxe', 'Mithril pickaxe'].some(p => bot.has(p))) return 'need a pickaxe';
-        if (bot.lvl('mining') < 40 || (bot.s.combat ?? 3) < 30) return 'needs Mining 40 and combat 30 (skeletons up to level 25 roam the shallow mine)';
+        if (bot.lvl('mining') < 40 || (bot.s.combat ?? 3) < 40) return 'needs Mining 40 and combat 40 (at combat 30 a test bot spent its 10 trout on skeletons for +250 xp in 13 minutes)';
         return (bot.market?.social?.p?.(bot.name)?.caution ?? personalityCaution(bot.name)) < 0.5 || 'too cautious for the wilderness';
     },
     async run(bot, until) {
