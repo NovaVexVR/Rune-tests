@@ -82,7 +82,7 @@ const CERTER_DECOYS = ['an axe', 'an arrow', 'a pair of boots', 'a pair of glove
 // experience-lamp interface (134) skill buttons
 const LAMP_BUTTON = { attack: 29, strength: 30, defence: 31, ranged: 32, prayer: 33, hitpoints: 34, magic: 35, agility: 36, herblore: 37, thieving: 38, crafting: 39, fletching: 40, mining: 41, smithing: 42, fishing: 43, firemaking: 44, cooking: 45, woodcutting: 46, runecrafting: 47, slayer: 48, hunter: 49, farming: 50, construction: 51, summoning: 52 };
 // Places low-level bots keep away from on long trips: the dark wizards' circle south of Varrock, the Draynor wizards
-export const DANGER = [{ x: 3227, y: 3369, r: 18 }, { x: 3095, y: 3232, r: 14 }, { x: 3120, y: 3247, r: 16 }]; // the last: the Draynor jail guards (five, aggressive, one after another)
+export const DANGER = [{ x: 3227, y: 3369, r: 18 }, { x: 3095, y: 3232, r: 14 }, { x: 3120, y: 3247, r: 16 }, { x: 3110, y: 3362, r: 13 }]; // then the Draynor jail guards (five, aggressive, one after another) and Draynor Manor (its front doors don't open from inside: routes through it trap bots)
 // Grand Exchange: centre of the building, and interface 105 buttons per offer slot (0-5)
 export const GE = { x: 3165, y: 3487 };
 const GE_BUY = [30, 46, 62, 81, 100, 119], GE_SELL = [31, 47, 63, 82, 101, 120], GE_BOX = [18, 34, 50, 69, 88, 107];

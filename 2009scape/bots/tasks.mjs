@@ -144,6 +144,9 @@ export async function clearOut(bot) {
 // and thieves carry some food from the bank.
 export async function prepare(bot, taskId) {
     bot._lastTask = taskId;
+    // trapped inside Draynor Manor (its front doors don't open from inside): teleport out before anything else
+    const s0 = bot.s;
+    if (s0?.z === 0 && s0.x >= 3097 && s0.x <= 3126 && s0.y >= 3354 && s0.y <= 3374) { bot.log('inside Draynor Manor: teleporting out'); await bot.homeTeleport().catch(() => {}); }
     await doRitual(bot, taskId).catch(() => {}); // a superstition (38)
     // a bag full of odds and ends (scripted bots were found idle for a day with 20 wool and no room to catch a fish)
     if ((bot.s.invFree ?? 28) < 4 && (await bot.openBank().catch(() => false))) {
@@ -705,7 +708,10 @@ export const TASKS = [
             await bot.act({ type: 'style', n: style });
             const avg = (atk + str + def) / 3;
             // training spots by level (roadmap 49): the next rung once the melee stats average its level
-            const rung = MELEE_LADDER.filter(r => avg >= r.avg && (bot.s.combat ?? 3) >= r.combat).at(-1);
+            // past the cows only with food on it: barbarians and warriors come in groups (22 deaths at the longhall in a few
+            // hours, mostly bots resting at low health with nothing to eat)
+            const food = bot.s.inv.filter(i => FOOD.includes(i.name)).reduce((t, i) => t + i.count, 0);
+            const rung = MELEE_LADDER.filter(r => avg >= r.avg && (bot.s.combat ?? 3) >= r.combat && (r.avg <= 12 || food >= 4)).at(-1);
             if (rung !== bot._meleeRung) { bot._meleeRung = rung; bot.log(`melee: training on ${rung.label} (attack/strength/defence average ${Math.floor(avg)})`); }
             await fightLoop(bot, until, rung.at, rung.targets);
         }

@@ -55,6 +55,8 @@ export class Stalls {
         const carried = () => bot.s.inv.filter(i => goods.some(g => g.name === i.name));
         bot.log(`stall: open in Varrock square with ${carried().map(i => `${i.count} ${i.name}`).join(', ')}`);
         note(bot.name, `Opened a stall in Varrock square: ${goods.map(g => g.name).join(', ')}.`);
+        bot.waiting = true; // standing at a stall isn't being stuck: keep the watchdog off
+        try {
         while (Date.now() < end && carried().length) {
             const ad = carried().slice(0, 3).map(i => `${i.name} ${Math.max(1, Math.round(m.perceived(bot.name, i.name) * 1.1))}gp`).join(', ');
             await bot.act({ type: 'say', text: `Selling ${ad}! Trade me!`.slice(0, 80) }).catch(() => {});
@@ -64,6 +66,7 @@ export class Stalls {
                 if (!m.isBusy(bot.name)) await bot.handleInterrupts().catch(() => {});
             }
         }
+        } finally { bot.waiting = false; }
         const earned = (bot.s.coins ?? 0) - c0;
         bot.log(`stall: closing, ${earned >= 0 ? '+' : ''}${earned}gp`);
         note(bot.name, `Closed my stall in Varrock square${earned > 0 ? ` with ${earned}gp more than I opened with` : ''}.`);
