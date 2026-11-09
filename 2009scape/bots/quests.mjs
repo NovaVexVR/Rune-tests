@@ -262,6 +262,42 @@ async function gatherForDoric(bot) {
     return !short().length;
 }
 
+// ---- The Restless Ghost (Lumbridge): Father Aereck (church) -> Father Urhney (swamp) for the Amulet of ghostspeak ->
+// wear it, open the coffin in the graveyard and talk to the ghost -> the skull from the altar in the Wizards' Tower
+// basement (a level-13 skeleton wakes up) -> the skull into the coffin. 1,125 Prayer xp.
+const RG = { aereck: { x: 3243, y: 3207 }, urhney: { x: 3147, y: 3174 }, coffin: { x: 3249, y: 3193 }, towerLadder: { x: 3105, y: 3162 }, altar: { x: 3120, y: 9566 } };
+const RG_ANSWERS = /^I'm looking for a quest\.?$|^Ok, let me help then\.?$|^Father Aereck sent me to talk to you\.?$/i;
+async function rgOpenCoffin(bot) {
+    await bot.travel(RG.coffin.x, RG.coffin.y + 1, { tol: 2 });
+    await bot.state(8);
+    const closed = bot.nearestScenery(l => l.id === 2145 && l.ops.includes('Open'));
+    if (closed) { await bot.act({ type: 'scenery', x: closed.x, y: closed.y, id: closed.id, op: 'Open' }); await bot.wait(3); await bot.state(8); }
+    return bot.nearestScenery(l => /coffin/i.test(l.name) && l.id !== 2145) ?? { x: 3249, y: 3192, id: 15061 };
+}
+async function rgSkull(bot) {
+    if (count(bot, 'Skull')) return true;
+    await bot.travel(RG.towerLadder.x + 1, RG.towerLadder.y, { tol: 2 });
+    await bot.state(8);
+    const down = bot.nearestScenery(l => /ladder/i.test(l.name) && l.ops.some(o => /climb-down/i.test(o)));
+    if (!down) { bot.log("quest: can't find the Wizards' Tower ladder down"); return false; }
+    await bot.act({ type: 'scenery', x: down.x, y: down.y, id: down.id, op: 'Climb-down' });
+    await bot.waitIdle({ timeout: 12, cond: x => x.y > 9000 });
+    if ((await bot.state(8)).y < 9000) return false;
+    bot.standGround = true; // the skeleton that wakes up: fight it rather than run in a basement
+    try {
+        await bot.walkTo(RG.altar.x, RG.altar.y + 1, { tol: 2, timeout: 60 });
+        await bot.state(10);
+        const altar = bot.nearestScenery(l => [15050, 15051].includes(l.id) || (/altar/i.test(l.name) && l.ops.some(o => /search/i.test(o))));
+        if (!altar) { bot.log('quest: no altar in the basement'); return false; }
+        await bot.act({ type: 'scenery', x: altar.x, y: altar.y, id: altar.id, op: altar.ops.find(o => /search/i.test(o)) ?? 'Search' });
+        await bot.waitIdle({ timeout: 10, cond: x => x.inv.some(i => i.name === 'Skull') });
+        for (let i = 0; i < 20 && (await bot.state(8)).inCombat; i++) await bot.handleInterrupts(); // deal with the skeleton
+        const up = bot.nearestScenery(l => /ladder/i.test(l.name) && l.ops.some(o => /climb-up/i.test(o)));
+        if (up) { await bot.act({ type: 'scenery', x: up.x, y: up.y, id: up.id, op: 'Climb-up' }); await bot.waitIdle({ timeout: 15, cond: x => x.y < 9000 }); }
+    } finally { bot.standGround = false; }
+    return count(bot, 'Skull') > 0;
+}
+
 // The Knight's Sword (Falador): the Squire, Reldo in Varrock's library, a redberry pie from Romily in the Cooks'
 // Guild (Cooking 32 and a chef's hat worn) for Thurgo south of Port Sarim, the portrait in Sir Vyvin's cupboard
 // (Falador castle, top floor), and blurite from the Asgarnian Ice Dungeon (ice warriors) plus 2 iron bars.
@@ -605,6 +641,42 @@ export const QUESTS = {
                 await bot.travel(DORIC.x, DORIC.y + 1, { tol: 2 });
                 await bot.talkTo('Doric', { answer: DORIC_ANSWERS, maxSteps: 30 });
                 await bot.state(5);
+            }
+            return stageOf(bot, this.name) >= 100;
+        }
+    },
+    restless_ghost: {
+        name: 'The Restless Ghost',
+        items: [],
+        async start(bot) {
+            if (stageOf(bot, this.name) > 0) return true;
+            await bot.travel(RG.aereck.x, RG.aereck.y, { tol: 3 });
+            await bot.talkTo('Father Aereck', { answer: RG_ANSWERS, maxSteps: 30 });
+            await bot.state(5);
+            return stageOf(bot, this.name) > 0;
+        },
+        async finish(bot) {
+            for (let i = 0; i < 8 && stageOf(bot, this.name) < 100; i++) {
+                const st = stageOf(bot, this.name);
+                if (st === 10 || (st >= 20 && !count(bot, 'Amulet of ghostspeak') && !bot.s.worn.some(w => w.name === 'Amulet of ghostspeak'))) {
+                    await bot.travel(RG.urhney.x, RG.urhney.y + 1, { tol: 2 });
+                    await bot.talkTo('Father Urhney', { answer: RG_ANSWERS, maxSteps: 40 });
+                } else if (st === 20) {
+                    const am = bot.s.inv.find(i => i.name === 'Amulet of ghostspeak');
+                    if (am) { await bot.act({ type: 'item', slot: am.slot, op: 'Wear' }); await bot.wait(2); }
+                    await rgOpenCoffin(bot);
+                    await bot.wait(2);
+                    await bot.talkTo('Restless ghost', { answer: RG_ANSWERS, maxSteps: 40 });
+                } else if (st === 30) {
+                    if (!(await rgSkull(bot))) return false;
+                } else if (st === 40) {
+                    if (!count(bot, 'Skull') && !(await rgSkull(bot))) return false;
+                    const coffin = await rgOpenCoffin(bot);
+                    const skull = bot.s.inv.find(i => i.name === 'Skull');
+                    if (skull) { await bot.act({ type: 'useitem', slot: skull.slot, x: coffin.x, y: coffin.y }); await bot.wait(3); }
+                } else break;
+                await bot.state(5);
+                bot.log(`quest: The Restless Ghost stage ${st} -> ${stageOf(bot, this.name)}`);
             }
             return stageOf(bot, this.name) >= 100;
         }
