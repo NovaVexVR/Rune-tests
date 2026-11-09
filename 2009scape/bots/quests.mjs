@@ -568,6 +568,7 @@ export const QUESTS = {
                 else if (st === 20 || st === 30) { if (st === 20 && !(await buyRedberryPie(bot))) return false; await ksTalk(bot, 'Thurgo', KS.thurgo); }
                 else if (st === 40) await ksTalk(bot, 'Squire', KS.squire);
                 else if (st === 50) { if (!(await getPortrait(bot))) return false; await ksTalk(bot, 'Thurgo', KS.thurgo); }
+                else if (st === 60 && count(bot, 'Blurite sword')) await ksTalk(bot, 'Squire', KS.squire); // Thurgo made it: take it back (the stage stays 60 until then)
                 else if (st === 60) {
                     if (!count(bot, 'Blurite ore') && !(await mineBlurite(bot))) return false;
                     if (count(bot, 'Iron bar') < 2 && (await bot.openBank())) { await bot.withdrawN('Iron bar', 2 - count(bot, 'Iron bar')); await bot.leaveBank(); }
