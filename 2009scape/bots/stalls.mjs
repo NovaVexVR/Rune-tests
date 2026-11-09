@@ -17,6 +17,13 @@ const SQUARE = { x: 3212, y: 3424 }, MINUTES = 40, EVERY_HOURS = 2;
 const CAREERS = path.join(path.dirname(new URL(import.meta.url).pathname), 'market', 'careers.json');
 const isMerchant = name => { try { if (JSON.parse(fs.readFileSync(CAREERS, 'utf8'))[name]?.career === 'merchant') return true; } catch {} return personalityOf(name).archetype === 'merchant'; };
 const goodsOf = s => (s?.bank ?? []).filter(i => TRADEABLE.has(i.name) && i.count >= 3 && i.name !== 'Coins');
+// what online bots need right now (the market's own need list), counted per item: a stall brings what sells
+function demand(m) {
+    const d = {};
+    for (const n of m.bots.keys()) if (m.bots.get(n).bot.s?.online) for (const need of m.needsOf(n)) d[need] = (d[need] ?? 0) + 1;
+    return d;
+}
+const wantedGoods = (s, d) => goodsOf(s).filter(i => d[i.name]).sort((a, b) => d[b.name] - d[a.name]);
 
 export class Stalls {
     constructor(market, log = () => {}) { this.market = market; this.log = log; }
@@ -24,9 +31,10 @@ export class Stalls {
         const st = read(), now = Date.now(), m = this.market;
         if (st.open && st.open.until < now) st.open = null;
         if (st.open || now - st.last < EVERY_HOURS * 3600_000) return write(st);
+        const d = demand(m);
         const keeper = [...m.bots.keys()].filter(n => isMerchant(n) && m.bots.get(n).bot.s?.online && !m.isBusy(n) && !m.away?.has(n))
-            .sort((a, b) => goodsOf(m.bots.get(b).bot.s).length - goodsOf(m.bots.get(a).bot.s).length)[0];
-        if (!keeper || !goodsOf(m.bots.get(keeper).bot.s).length) return write(st);
+            .sort((a, b) => wantedGoods(m.bots.get(b).bot.s, d).length - wantedGoods(m.bots.get(a).bot.s, d).length)[0];
+        if (!keeper || !wantedGoods(m.bots.get(keeper).bot.s, d).length) return write(st); // nobody needs what the merchants have: no stall
         st.open = { keeper, until: now + (MINUTES + 10) * 60_000, started: false };
         st.last = now;
         this.log(`[stall] ${keeper} will open a stall in Varrock square`);
@@ -37,7 +45,8 @@ export class Stalls {
         if (st.open?.keeper !== bot.name || st.open.started) return false;
         st.open.started = true; write(st);
         const m = this.market;
-        const goods = goodsOf(bot.s).slice(0, 6);
+        const d = demand(m);
+        const goods = [...wantedGoods(bot.s, d), ...goodsOf(bot.s).filter(i => !d[i.name])].slice(0, 6); // what's wanted first
         if (!goods.length || !(await bot.openBank())) return false;
         for (const g of goods) if (bot.s.invFree > 2) await bot.withdrawN(g.name, Math.min(g.count - 1, 30), { noted: true });
         await bot.leaveBank();
