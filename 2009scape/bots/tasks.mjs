@@ -1369,3 +1369,83 @@ export const AGILITY = {
     }
 };
 TASKS.push(AGILITY);
+
+// ---- Pottery (roadmap 51): clay (banked, or mined at the Varrock south-west mine) softened with a bucket of water filled
+// at the Varrock square fountain, shaped on the potter's wheel at Barbarian Village, fired in the oven next to it, banked
+// at Edgeville. The best piece its Crafting allows: pot 1, pie dish 7, bowl 8, plant pot 19, lid 25.
+const POTTERY_PIECES = [['Unfired pot', 1], ['Unfired pie dish', 7], ['Unfired bowl', 8], ['Unfired plant pot', 19], ['Unfired pot lid', 25]];
+const CLAY_ROCKS = [15503, 15504, 15505, 9711, 9712, 9713];
+const POT = { fountain: { x: 3211, y: 3428 }, wheel: { x: 3087, y: 3409 }, oven: { x: 3084, y: 3407 }, clayMine: { x: 3180, y: 3371 } };
+export const POTTERY = {
+    id: 'pottery',
+    skills: ['crafting'],
+    canRun: bot => (bot.s.bank?.some(i => i.name === 'Clay' || i.name === 'Soft clay') || bot.has('Clay') || bot.has('Soft clay') || ['Bronze pickaxe', 'Iron pickaxe', 'Steel pickaxe', 'Mithril pickaxe'].some(p => bot.has(p))) || 'needs clay or a pickaxe to mine some',
+    async run(bot, until) {
+        const n = name => bot.s.inv.filter(i => i.name === name && !i.noted).reduce((t, i) => t + i.count, 0);
+        while (now() < until) {
+            // 1. clay and a bucket
+            if (await bot.openBank()) {
+                await bot.depositAll(i => !KEEP(i.name) && !['Clay', 'Soft clay', 'Bucket', 'Bucket of water'].includes(i.name));
+                if (!n('Bucket') && !n('Bucket of water') && bot.s.bank?.some(i => i.name === 'Bucket')) await bot.withdraw('Bucket', 1);
+                for (const c of ['Soft clay', 'Clay']) if (bot.s.bank?.some(i => i.name === c) && bot.s.invFree > 1) await bot.withdrawN(c, Math.min(13, bot.s.invFree - 1));
+                await bot.leaveBank();
+            }
+            if (!n('Bucket') && !n('Bucket of water') && (await bot.openShop(SHOPS.general))) { await bot.buy('Bucket', 1); await bot.closeInterfaces(); }
+            if (!n('Clay') && !n('Soft clay')) {
+                if (!['Bronze pickaxe', 'Iron pickaxe', 'Steel pickaxe', 'Mithril pickaxe'].some(p => bot.has(p))) { bot.log('pottery: no clay and no pickaxe'); return; }
+                await bot.travel(POT.clayMine.x, POT.clayMine.y, { tol: 4 });
+                for (let i = 0; i < 40 && n('Clay') < 13 && bot.s.invFree > 1 && now() < until; i++) {
+                    const st = await bot.state(12);
+                    if (await bot.handleInterrupts()) continue;
+                    const rock = bot.nearestScenery(l => l.ops.includes('Mine') && CLAY_ROCKS.includes(l.id));
+                    if (!rock) { await bot.wait(4); continue; }
+                    await gatherOnce(bot, rock, 'Mine', 'scenery', 20);
+                }
+                if (!n('Clay')) { bot.log('pottery: no clay mined'); return; }
+            }
+            // 2. soften it: fill the bucket at the fountain, use clay on it, again for each lump
+            if (n('Clay')) {
+                await bot.travel(POT.fountain.x, POT.fountain.y, { tol: 3 });
+                for (let i = 0; i < 30 && n('Clay'); i++) {
+                    await bot.state(8);
+                    if (!n('Bucket of water')) {
+                        const b = bot.s.inv.find(x => x.name === 'Bucket'), f = bot.nearestScenery(l => /fountain/i.test(l.name));
+                        if (!b || !f) break;
+                        await bot.act({ type: 'useitem', slot: b.slot, x: f.x, y: f.y, id: f.id }).catch(() => {});
+                        await bot.waitIdle({ timeout: 8, quiet: 2, cond: x => x.inv.some(y => y.name === 'Bucket of water') });
+                        continue;
+                    }
+                    const c = bot.s.inv.find(x => x.name === 'Clay'), w = bot.s.inv.find(x => x.name === 'Bucket of water');
+                    await bot.act({ type: 'useitem', slot: c.slot, onSlot: w.slot }).catch(() => {});
+                    await bot.wait(2);
+                    if ((await bot.state(3)).dialog?.skillMenu) await bot.act({ type: 'skillmenu', index: 0 });
+                    await bot.waitIdle({ timeout: 6, quiet: 2 });
+                }
+            }
+            if (!n('Soft clay')) { bot.log('pottery: no soft clay'); return; }
+            // 3. the wheel, then the oven
+            const lvl = bot.lvl('crafting');
+            const pick = POTTERY_PIECES.map((p, i) => [...p, i]).filter(p => lvl >= p[1]).at(-1);
+            await bot.travel(POT.wheel.x + 1, POT.wheel.y, { tol: 2 });
+            for (let i = 0; i < 4 && n('Soft clay'); i++) {
+                const c = (await bot.state(8)).inv.find(x => x.name === 'Soft clay'), w = bot.nearestScenery(l => /potter's wheel/i.test(l.name)) ?? { x: POT.wheel.x, y: POT.wheel.y, id: 2642 };
+                await bot.act({ type: 'useitem', slot: c.slot, x: w.x, y: w.y, id: w.id }).catch(() => {});
+                await bot.wait(2);
+                if ((await bot.state(3)).dialog?.skillMenu) await bot.act({ type: 'skillmenu', index: pick[2] });
+                await bot.waitIdle({ timeout: 60, quiet: 4, cond: x => !x.inv.some(y => y.name === 'Soft clay') });
+            }
+            for (let i = 0; i < 4 && bot.s.inv.some(x => /^Unfired /.test(x.name)); i++) {
+                const o = (await bot.state(8), bot.nearestScenery(l => /pottery oven/i.test(l.name)));
+                if (!o) break;
+                const u = bot.s.inv.find(x => /^Unfired /.test(x.name));
+                await bot.act({ type: 'useitem', slot: u.slot, x: o.x, y: o.y, id: o.id }).catch(() => {});
+                await bot.wait(2);
+                if ((await bot.state(3)).dialog?.skillMenu) await bot.act({ type: 'skillmenu', index: POTTERY_PIECES.findIndex(p => p[0] === u.name) });
+                await bot.waitIdle({ timeout: 60, quiet: 4, cond: x => !x.inv.some(y => /^Unfired /.test(y.name)) });
+            }
+            bot.log(`pottery: made ${bot.s.inv.filter(x => ['Empty pot', 'Pie dish', 'Bowl', 'Plant pot', 'Pot lid'].includes(x.name)).length} pieces`);
+            await bot.bankItems(i => ['Empty pot', 'Pie dish', 'Bowl', 'Plant pot', 'Pot lid'].includes(i.name) || /^Unfired /.test(i.name));
+        }
+    }
+};
+TASKS.push(POTTERY);
