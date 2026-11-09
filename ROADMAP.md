@@ -84,6 +84,21 @@ Clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, r
 46. *(done: `bots/hunt.mjs`: every 3 days a riddle to a safe landmark; bots work it out hourly (teammates share), race there between tasks, the first wins 30gp from the mayor and the glory)* **Treasure hunts:** the director hides a prize (a bounty with a riddle clue to a place); bots follow the clues and teams race each other.
 47. *(done: in `duel.mjs`: the loser of a grudge duel vows a rematch (`market/revenge.json`), trains melee in 35% of its steps, and challenges again once its combat passes the rival's; two failed rematches and it lets it go)* **Revenge plots:** a bot that loses a grudge duel trains for a rematch, says so in its diary, and challenges again when it's ready.
 
+### J. Growth, economy and life (added 2026-11-09)
+
+48. **More quests:** Doric's Quest, Witch's Potion, The Restless Ghost, Ernest the Chicken, Goblin Diplomacy, Vampire Slayer (Sheep Shearer is in already), solo and in parties.
+49. **Training spots by level:** combat moves chickens -> cows -> Al Kharid warriors -> hill giants; mining tin/copper -> iron -> coal; and so on, instead of one spot per task.
+50. **Prayer:** keep burying bones from fights, collect big bones from tougher monsters, and later use the bones on an altar.
+51. **Crafting beyond leather:** pottery (soft clay at Barbarian Village), jewellery (gold bars and the gems bots find), then glassblowing.
+52. **Cooking and fishing upgrades:** the Lumbridge castle range, trout and salmon, Catherby later.
+53. **High-value goods:** bots sell the bows, armour and lobsters they make at the Grand Exchange and to each other at real prices, so wealth climbs through work (100k is an ordinary fortune in the real game).
+54. **Spending sinks:** armour and weapon upgrades as bots get richer, runes for Magic, adamant and rune purchases.
+55. **Friends and meetups:** bots that trust each other train side by side and chat about what they're doing.
+56. **Bot-run stalls:** a merchant bot sets up in Varrock square and advertises in chat, like real players.
+57. **Milestone celebrations:** a level 99 or a first rune item draws a crowd, gets the crier's attention and a feast.
+58. **Live web dashboard:** bots on a map, levels over time, the economy charts (item 23).
+59. **Weekly report:** a shareable page with the week's growth, deaths, richest bots, quests and drama.
+
 ---
 
 # Reference: how the built systems work
