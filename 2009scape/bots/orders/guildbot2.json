@@ -1,23 +1,23 @@
 {
-  "role": "Guild miner: banks ore for future smithing, also fights and fishes",
+  "role": "Guild treasurer: earns coins, collects spare coins from members, buys missing tools for members, banks the pool",
   "plan": [
     {
-      "task": "mine",
-      "minutes": 45,
-      "why": "ore stockpile in bank"
-    },
-    {
-      "task": "melee",
-      "minutes": 20,
-      "why": "combat"
+      "task": "treasury",
+      "minutes": 40,
+      "why": "equip the guild + manage pool"
     },
     {
       "task": "fish_cook",
       "minutes": 20,
-      "why": "food"
+      "why": "food: 6 deaths"
     },
     {
-      "task": "woodcut_fire",
+      "task": "treasury",
+      "minutes": 40,
+      "why": "treasury"
+    },
+    {
+      "task": "fish_cook",
       "minutes": 15,
       "why": "variety"
     }

@@ -173,6 +173,14 @@ export async function prepare(bot, taskId) {
 // 30% of its coins (bank + carried) and only once it has 200+, so wealth still grows. Body, legs and shield
 // (helms come from smiths and the market). Steel needs Defence 5.
 export const HORVIK = { x: 3229, y: 3436, npcs: ['Horvik'], sells: { 'Bronze sq shield': 48, 'Bronze chainbody': 60, 'Bronze platelegs': 80, 'Bronze platebody': 160, 'Iron sq shield': 168, 'Iron chainbody': 210, 'Iron platelegs': 280, 'Iron platebody': 560, 'Steel platebody': 2000 } };
+// gear shops (roadmap 54): spending grows with wealth, up to mithril. Prices are the shops' base values (what the budget
+// counts; the shop charges its own). Metal requirements: Defence for armour, Attack for weapons.
+export const GEAR_SHOPS = [
+    { shop: HORVIK, sells: { ...HORVIK.sells, 'Black platebody': 3840, 'Mithril platebody': 5200 } },
+    { shop: { x: 3287, y: 3190, npcs: ['Zeke'] }, sells: { 'Bronze scimitar': 32, 'Iron scimitar': 112, 'Steel scimitar': 400, 'Mithril scimitar': 1040 } }
+];
+const METAL_LEVEL = { Bronze: 1, Iron: 1, Steel: 5, Black: 10, Mithril: 20, Adamant: 30, Rune: 40 };
+const canWield = (bot, name, slot) => (METAL_LEVEL[name.split(' ')[0]] ?? 1) <= bot.lvl(slot === 'weapon' ? 'attack' : 'defence');
 export async function buyArmour(bot) {
     if (Date.now() < (bot._armourTry ?? 0)) return 0;
     bot._armourTry = Date.now() + 6 * 3600_000;
@@ -181,22 +189,25 @@ export async function buyArmour(bot) {
     if (wealth < 200) return 0;
     let budget = Math.floor(wealth * 0.3);
     const best = slot => Math.max(-1, ...[...bot.s.worn, ...bot.s.inv, ...(bot.s.bank ?? [])].map(i => gearInfo(i.name)).filter(g => g?.slot === slot).map(g => g.score));
-    const want = [];
-    for (const slot of ['body', 'legs', 'shield']) {
-        const pick = Object.entries(HORVIK.sells)
-            .filter(([name, price]) => gearInfo(name).slot === slot && gearInfo(name).score > best(slot) && price <= budget && (!/^Steel/.test(name) || bot.lvl('defence') >= 5))
-            .sort((a, b) => gearInfo(b[0]).score - gearInfo(a[0]).score)[0];
-        if (pick) { want.push(pick); budget -= pick[1]; }
-    }
-    if (!want.length) return 0;
-    const cost = want.reduce((t, [, p]) => t + p, 0);
-    bot.log(`armour: shopping at Horvik's for ${want.map(w => w[0]).join(', ')} (${cost}gp of ${wealth}gp)`);
-    if (bot.s.coins < cost && (await bot.openBank())) { await bot.withdrawN('Coins', cost - bot.s.coins); await bot.leaveBank(); }
     let bought = 0;
-    if (await bot.openShop(HORVIK)) {
-        for (const [name, price] of want) if (bot.s.coins >= price && (await bot.buy(name, 1))) bought++;
-        await bot.closeInterfaces();
+    for (const { shop, sells } of GEAR_SHOPS) {
+        const want = [];
+        for (const slot of ['body', 'legs', 'shield', 'weapon']) {
+            const pick = Object.entries(sells)
+                .filter(([name, price]) => gearInfo(name)?.slot === slot && gearInfo(name).score > best(slot) && price <= budget && canWield(bot, name, slot))
+                .sort((a, b) => gearInfo(b[0]).score - gearInfo(a[0]).score)[0];
+            if (pick) { want.push(pick); budget -= pick[1]; }
+        }
+        if (!want.length) continue;
+        const cost = want.reduce((t, [, p]) => t + p, 0);
+        bot.log(`gear: shopping at ${shop.npcs[0]}'s for ${want.map(w => w[0]).join(', ')} (${cost}gp of ${wealth}gp)`);
+        if (bot.s.coins < cost && (await bot.openBank())) { await bot.withdrawN('Coins', cost - bot.s.coins); await bot.leaveBank(); }
+        if (await bot.openShop(shop)) {
+            for (const [name, price] of want) if (bot.s.coins >= price && (await bot.buy(name, 1))) bought++;
+            await bot.closeInterfaces();
+        }
     }
+    if (!bought) return 0;
     await bot.gearUp().catch(() => {});
     if (bot.s.coins > 50) await bot.bankItems(i => i.name === 'Coins'); // don't walk around with savings
     return bought;
