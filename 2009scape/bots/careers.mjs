@@ -18,7 +18,7 @@ const write = all => { fs.mkdirSync(path.dirname(FILE), { recursive: true }); fs
 export const CAREERS = {
     smith: { skill: 'smithing', tasks: ['smith', 'smelt', 'mine', 'mine_iron', 'wild_mine'], title: 'a smith' },
     fisher: { skill: 'fishing', tasks: ['fish_cook', 'lobsters'], title: 'a fisher' },
-    crafter: { skill: 'crafting', tasks: ['leather', 'spin'], title: 'a crafter' },
+    crafter: { skill: 'crafting', tasks: ['leather', 'spin', 'pottery'], title: 'a crafter' },
     fletcher: { skill: 'fletching', tasks: ['fletch', 'woodcut_fire'], title: 'a fletcher' },
     fighter: { skill: 'attack', tasks: ['melee', 'ranged'], title: 'a fighter', gear: true },
     thief: { skill: 'thieving', tasks: ['thieving'], title: 'a thief' },
