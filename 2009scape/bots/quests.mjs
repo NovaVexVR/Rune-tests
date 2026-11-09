@@ -356,6 +356,46 @@ async function wpIngredients(bot) {
     return !missing.length;
 }
 
+// ---- Vampire Slayer: Morgan (Draynor) -> Dr Harlow in the Blue Moon Inn (Varrock) wants a beer (2gp from its bartender)
+// and gives a stake -> a hammer (general store) -> Draynor Manor: the stairs down by the east room (3115,3357), open the
+// coffin and kill Count Draynor (level 34) with the stake and hammer in the bag. Combat 30+, with food. 4,825 Attack xp.
+const VS = { morgan: { x: 3099, y: 3267 }, harlow: { x: 3222, y: 3397 }, bar: { x: 3225, y: 3399 }, manorDoor: { x: 3108, y: 3352 }, stairs: { x: 3115, y: 3357 } };
+const VS_ANSWERS = /^Ok, I'm up for an adventure\.?$|^Morgan needs your help!?$|^Yes please!?$|^A glass of your finest ale please\.?$/i;
+async function vsKillCount(bot) {
+    await bot.ensureFood(10).catch(() => {});
+    if (!bot.has('Hammer')) { if (await bot.openShop(SHOPS.general)) { await bot.buy('Hammer', 1); await bot.closeInterfaces(); } }
+    if (!bot.has('Hammer') || !count(bot, 'Stake')) { bot.log('quest: Vampire Slayer needs a stake and a hammer'); return false; }
+    if (bot.s.y < 9000) {
+        await bot.travel(VS.manorDoor.x, VS.manorDoor.y - 2, { tol: 2 });
+        await bot.walkTo(VS.stairs.x, VS.stairs.y - 1, { tol: 1, timeout: 90 }); // through the manor's front doors
+        await bot.state(8);
+        const st = bot.nearestScenery(l => l.id === 32835 || (/stairs/i.test(l.name) && l.ops.includes('Walk-down')));
+        if (!st) { bot.log("quest: can't find the manor's stairs down"); return false; }
+        await bot.act({ type: 'scenery', x: st.x, y: st.y, id: st.id, op: 'Walk-down' });
+        await bot.waitIdle({ timeout: 12, cond: x => x.y > 9000 });
+        if ((await bot.state(8)).y < 9000) return false;
+    }
+    bot.standGround = true;
+    try {
+        const coffin = bot.nearestScenery(l => l.id === 2614 || /coffin/i.test(l.name));
+        if (!coffin) { bot.log('quest: no coffin in the manor basement'); return false; }
+        await bot.act({ type: 'scenery', x: coffin.x, y: coffin.y, id: coffin.id, op: 'Open' });
+        const until = Date.now() + 5 * 60_000;
+        while (Date.now() < until && stageOf(bot, 'Vampire Slayer') < 100) {
+            const s = await bot.state(8);
+            const food = s.inv.find(i => FOOD.includes(i.name) && i.ops.includes('Eat'));
+            if (s.hp <= s.maxHp * 0.45 && food) { await bot.act({ type: 'item', slot: food.slot, op: 'Eat' }); await sleep(1500); continue; }
+            if (s.hp < s.maxHp * 0.3 && !food) { bot.log('quest: out of food against the Count, backing off'); break; }
+            const count_ = s.npcs.find(n => /count draynor/i.test(n.name));
+            if (count_ && !s.attacking) await bot.act({ type: 'npc', npc: count_.npc, op: 'Attack' }).catch(() => {});
+            await sleep(1500);
+        }
+    } finally { bot.standGround = false; }
+    const up = bot.nearestScenery(l => /stairs/i.test(l.name) && l.ops.some(o => /walk-up/i.test(o)));
+    if (up) { await bot.act({ type: 'scenery', x: up.x, y: up.y, id: up.id, op: up.ops.find(o => /walk-up/i.test(o)) }); await bot.waitIdle({ timeout: 12, cond: x => x.y < 9000 }); }
+    return stageOf(bot, 'Vampire Slayer') >= 100;
+}
+
 // The Knight's Sword (Falador): the Squire, Reldo in Varrock's library, a redberry pie from Romily in the Cooks'
 // Guild (Cooking 32 and a chef's hat worn) for Thurgo south of Port Sarim, the portrait in Sir Vyvin's cupboard
 // (Falador castle, top floor), and blurite from the Asgarnian Ice Dungeon (ice warriors) plus 2 iron bars.
@@ -766,6 +806,34 @@ export const QUESTS = {
                 }
                 await bot.state(5);
                 bot.log(`quest: Witch's Potion stage ${st} -> ${stageOf(bot, this.name)}`);
+            }
+            return stageOf(bot, this.name) >= 100;
+        }
+    },
+    vampire_slayer: {
+        name: 'Vampire Slayer',
+        items: [],
+        async start(bot) {
+            if (stageOf(bot, this.name) > 0) return true;
+            if ((bot.s.combat ?? 3) < 30) { bot.log('quest: Vampire Slayer waits for combat 30 (Count Draynor is level 34)'); return false; }
+            await bot.travel(VS.morgan.x, VS.morgan.y, { tol: 3 });
+            await bot.talkTo('Morgan', { answer: VS_ANSWERS, maxSteps: 30 });
+            await bot.state(5);
+            return stageOf(bot, this.name) > 0;
+        },
+        async finish(bot) {
+            for (let i = 0; i < 5 && stageOf(bot, this.name) < 100; i++) {
+                const st = stageOf(bot, this.name);
+                if (st < 30) {
+                    if (!count(bot, 'Beer')) {
+                        await bot.travel(VS.bar.x, VS.bar.y, { tol: 2 });
+                        await bot.talkTo('Bartender', { answer: VS_ANSWERS, maxSteps: 12 });
+                    }
+                    await bot.travel(VS.harlow.x, VS.harlow.y, { tol: 2 });
+                    await bot.talkTo('Dr Harlow', { answer: VS_ANSWERS, maxSteps: 40 });
+                } else if (!(await vsKillCount(bot))) return false;
+                await bot.state(5);
+                bot.log(`quest: Vampire Slayer stage ${st} -> ${stageOf(bot, this.name)}`);
             }
             return stageOf(bot, this.name) >= 100;
         }
