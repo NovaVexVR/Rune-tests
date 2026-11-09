@@ -286,6 +286,8 @@ async function getPortrait(bot) {
 }
 async function mineBlurite(bot) {
     if (count(bot, 'Blurite ore')) return true;
+    const inDungeon = () => bot.s.y > 9000 && bot.s.x > 2980 && bot.s.x < 3080; // already in the ice dungeon: skip the trapdoor
+    if (!inDungeon()) {
     await bot.ensureFood(12).catch(() => {}); // ice warriors and giants hit while it mines
     await bot.travel(KS.trapdoor.x, KS.trapdoor.y, { tol: 2 });
     const td = (await bot.state(8), bot.nearestScenery(l => /trapdoor/i.test(l.name)));
@@ -294,6 +296,7 @@ async function mineBlurite(bot) {
     await bot.waitIdle({ timeout: 12, cond: x => x.y > 9000 });
     if ((await bot.state(8)).y < 9000) { const t2 = bot.nearestScenery(l => /trapdoor/i.test(l.name) && l.ops.some(o => /climb-down/i.test(o))); if (t2) { await bot.act({ type: 'scenery', x: t2.x, y: t2.y, id: t2.id, op: 'Climb-down' }); await bot.waitIdle({ timeout: 12, cond: x => x.y > 9000 }); } }
     if (bot.s.y < 9000) return false;
+    }
     bot.pressOn = true; // past the hobgoblins without stopping
     await bot.act({ type: 'retaliate', on: false }).catch(() => {}); // so their swings don't stop the mining
     try {
