@@ -147,6 +147,8 @@ export async function prepare(bot, taskId) {
     // trapped inside Draynor Manor (its front doors don't open from inside): teleport out before anything else
     const s0 = bot.s;
     if (s0?.z === 0 && s0.x >= 3097 && s0.x <= 3126 && s0.y >= 3354 && s0.y <= 3374) { bot.log('inside Draynor Manor: teleporting out'); await bot.homeTeleport().catch(() => {}); }
+    // out west (Catherby) for any other task: teleport home rather than walk over White Wolf Mountain's wolves
+    if (taskId !== 'catherby' && inCatherby(s0)) { bot.log('in Catherby for another task: teleporting home'); await bot.homeTeleport().catch(() => {}); }
     await doRitual(bot, taskId).catch(() => {}); // a superstition (38)
     // a bag full of odds and ends (scripted bots were found idle for a day with 20 wool and no room to catch a fish)
     if ((bot.s.invFree ?? 28) < 4 && (await bot.openBank().catch(() => false))) {
@@ -1605,7 +1607,7 @@ TASKS.push(JEWELLERY);
 // ---- Catherby (moving west, members world): a fisher with Fishing 40 and the fare charters a ship from Port Sarim
 // (interface 95, Catherby = button 25, 1,000gp) and stays: lobsters from the shore, cooked on the range there from
 // Cooking 40, banked at the booths beside the shops. Bots there don't walk back east (White Wolf Mountain).
-const CATH = { trader: { x: 3039, y: 3193 }, bank: { x: 2809, y: 3440 }, range: { x: 2817, y: 3444 }, spots: { x: 2848, y: 3428 }, fare: 1000 };
+const CATH = { trader: { x: 3039, y: 3195 }, bank: { x: 2809, y: 3440 }, range: { x: 2817, y: 3444 }, spots: { x: 2848, y: 3428 }, fare: 1000 };
 export const inCatherby = s => s?.z === 0 && s.x >= 2780 && s.x <= 2880 && s.y >= 3400 && s.y <= 3460;
 async function bankHere(bot, pred) {
     await bot.travel(CATH.bank.x, CATH.bank.y, { tol: 2 });
