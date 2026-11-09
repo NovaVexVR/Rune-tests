@@ -39,6 +39,7 @@ import { superstitions } from './superstition.mjs';
 import { updateRecords } from './records.mjs';
 import { Outings } from './outings.mjs';
 import { Celebrations } from './celebrations.mjs';
+import { Meetups } from './meetups.mjs';
 import { readEconomy } from './economy.mjs';
 
 const ALL_BOTS = [];
@@ -50,6 +51,7 @@ townEvents.duels = duels; // the duel tournament uses the arena machinery
 const hunts = new Hunts(market, (...a) => console.log(new Date().toISOString(), ...a));
 const outings = new Outings(market, (...a) => console.log(new Date().toISOString(), ...a));
 const celebrations = new Celebrations(market, (...a) => console.log(new Date().toISOString(), ...a));
+const meetups = new Meetups(market, (...a) => console.log(new Date().toISOString(), ...a));
 const marketDay = new MarketDay(market, (...a) => console.log(new Date().toISOString(), ...a));
 const parties = new Parties(market, (...a) => console.log(new Date().toISOString(), ...a));
 
@@ -150,6 +152,7 @@ async function runBot(name, delay) {
             if (await duels.join(bot)) continue; // a grudge duel at the arena
             if (await hunts.join(bot)) continue; // a treasure hunt it has worked out
             if (await celebrations.join(bot)) continue; // cheer a friend's milestone (57)
+            if (await meetups.join(bot)) continue; // train beside a friend (55)
             if (await outings.join(bot)) continue; // a team outing (32)
             if (await parties.join(bot)) continue;
             let item = plan[step];
@@ -245,6 +248,7 @@ setInterval(() => { try { lottery(market, (...a) => console.log(new Date().toISO
 setInterval(() => { try { hunts.tick(); } catch (e) { console.log('hunt:', e.message); } }, 60 * 60_000); // treasure hunts (46)
 setInterval(() => { try { superstitions(market, (...a) => console.log(new Date().toISOString(), ...a)); } catch (e) { console.log('superstitions:', e.message); } }, 60 * 60_000); // superstitions and lucky charms (38)
 setInterval(() => { try { updateRecords(market, (...a) => console.log(new Date().toISOString(), ...a)); } catch (e) { console.log('records:', e.message); } }, 60 * 60_000); // records and the hall of fame (36)
+setInterval(() => { try { if (!marketDay.upcoming()) meetups.tick(); } catch (e) { console.log('meetups:', e.message); } }, 60 * 60_000); // friends and meetups (55)
 setInterval(() => { try { celebrations.tick(); } catch (e) { console.log('celebrations:', e.message); } }, 10 * 60_000); // milestone celebrations (57)
 setInterval(() => { try { if (!marketDay.upcoming()) outings.tick(); } catch (e) { console.log('outings:', e.message); } }, 60 * 60_000); // group combat outings (32)
 setInterval(() => backup('daily', (...a) => console.log(new Date().toISOString(), ...a)), 24 * 3600_000); // daily world backup (also one at every launch)
