@@ -146,7 +146,8 @@ const DR_ANSWERS = /in search of a quest|ok, i will try and help|sent to help pu
 const MEATS = { 'Raw beef': ['Cow', { x: 3257, y: 3263 }], 'Raw rat meat': ['Giant rat', { x: 3180, y: 3190 }], 'Raw chicken': ['Chicken', { x: 3187, y: 3279 }], 'Raw bear meat': ['Black bear', { x: 2960, y: 3450 }] };
 async function killFor(bot, npcName, item, at, n = 1) {
     if (!(await bot.travel(at.x, at.y, { tol: 5 }))) bot.log(`quest: couldn't reach the ${npcName}s at ${at.x},${at.y} (at ${bot.s.x},${bot.s.y})`);
-    for (let i = 0; i < 20 && count(bot, item) < n; i++) {
+    const until = Date.now() + 6 * 60_000; // by time, not tries: a weak bot's fight takes many waits
+    while (Date.now() < until && count(bot, item) < n) {
         const s = await bot.state(12);
         if (await bot.handleInterrupts()) continue;
         const drop = s.ground.find(g => g.name === item && g.dist <= 8);
@@ -296,8 +297,11 @@ async function rgSkull(bot) {
         await bot.act({ type: 'scenery', x: altar.x, y: altar.y, id: altar.id, op: altar.ops.find(o => /search/i.test(o)) ?? 'Search' });
         await bot.waitIdle({ timeout: 10, cond: x => x.inv.some(i => i.name === 'Skull') });
         for (let i = 0; i < 20 && (await bot.state(8)).inCombat; i++) await bot.handleInterrupts(); // deal with the skeleton
-        const up = bot.nearestScenery(l => /ladder/i.test(l.name) && l.ops.some(o => /climb-up/i.test(o)));
-        if (up) { await bot.act({ type: 'scenery', x: up.x, y: up.y, id: up.id, op: 'Climb-up' }); await bot.waitIdle({ timeout: 15, cond: x => x.y < 9000 }); }
+        for (let t = 0; t < 3 && bot.s.y > 9000; t++) { // back to the ladder (3104,9576), through the basement's doors, and up
+            await bot.walkTo(3105, 9575, { tol: 2, timeout: 90 });
+            const up = (await bot.state(10), bot.nearestScenery(l => /ladder/i.test(l.name) && l.ops.some(o => /climb-up/i.test(o))));
+            if (up) { await bot.act({ type: 'scenery', x: up.x, y: up.y, id: up.id, op: 'Climb-up' }).catch(() => {}); await bot.waitIdle({ timeout: 15, cond: x => x.y < 9000 }); }
+        }
     } finally { bot.standGround = false; }
     return count(bot, 'Skull') > 0;
 }
