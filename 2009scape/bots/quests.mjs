@@ -367,7 +367,7 @@ async function vsKillCount(bot) {
     if (!bot.has('Hammer') || !count(bot, 'Stake')) { bot.log('quest: Vampire Slayer needs a stake and a hammer'); return false; }
     if (bot.s.y < 9000) {
         await bot.travel(VS.manorDoor.x, VS.manorDoor.y - 2, { tol: 2 });
-        await bot.walkTo(VS.stairs.x, VS.stairs.y - 1, { tol: 1, timeout: 90 }); // through the manor's front doors
+        await bot.travel(VS.stairs.x, VS.stairs.y - 1, { tol: 1, timeout: 180 }); // the stairs room is reached round the north side: a planned route
         await bot.state(8);
         const st = bot.nearestScenery(l => l.id === 32835 || (/stairs/i.test(l.name) && l.ops.includes('Walk-down')));
         if (!st) { bot.log("quest: can't find the manor's stairs down"); return false; }
