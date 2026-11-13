@@ -18,8 +18,10 @@ const write = all => { fs.mkdirSync(path.dirname(FILE), { recursive: true }); fs
 export const CAREERS = {
     smith: { skill: 'smithing', tasks: ['smith', 'smelt', 'mine', 'mine_iron', 'wild_mine'], title: 'a smith' },
     fisher: { skill: 'fishing', tasks: ['fish_cook', 'lobsters', 'catherby'], title: 'a fisher' },
-    crafter: { skill: 'crafting', tasks: ['leather', 'spin', 'pottery', 'jewellery'], title: 'a crafter' },
-    fletcher: { skill: 'fletching', tasks: ['fletch', 'woodcut_fire'], title: 'a fletcher' },
+    crafter: { skill: 'crafting', tasks: ['leather', 'spin', 'pottery', 'jewellery', 'glass'], title: 'a crafter' },
+    fletcher: { skill: 'fletching', tasks: ['fletch', 'woodcut_fire', 'seers'], title: 'a fletcher',
+        // bow strings need Crafting 10: a fletcher ready for oak bows works on it at the wheel, the tannery or the potter's
+        extra: bot => bot.lvl('fletching') >= 20 && bot.lvl('crafting') < 10 ? ['spin', 'leather', 'pottery'] : [] },
     fighter: { skill: 'attack', tasks: ['melee', 'ranged'], title: 'a fighter', gear: true },
     thief: { skill: 'thieving', tasks: ['thieving'], title: 'a thief' },
     mystic: { skill: 'runecrafting', tasks: ['runecraft', 'magic'], title: 'a runecrafter' },
@@ -99,7 +101,8 @@ export function careerTask(bot, canRun, share = 0.4) {
     if (!rec) return null;
     const days = (Date.now() - Date.parse(rec.since)) / 86400_000;
     if (Math.random() > Math.min(share, 0.15 + 0.1 * days)) return null;
-    const options = CAREERS[rec.career].tasks.filter(t => canRun(t) === true);
+    const c = CAREERS[rec.career];
+    const options = [...c.tasks, ...(c.extra?.(bot) ?? [])].filter(t => canRun(t) === true);
     return options.length ? options[Math.floor(Math.random() * options.length)] : null;
 }
 

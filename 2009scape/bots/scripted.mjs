@@ -8,7 +8,7 @@ import path from 'path';
 
 import { Bot, LOG_DIR, rand, sleep, summary, watchdog, rememberDanger } from './lib.mjs';
 import { careerOf, careerBonus, checkGoal } from './careers.mjs';
-import { TASKS, RESUPPLY, shopFor, prepare, clearOut, surplusInBank, sellGoods, goodsToSell } from './tasks.mjs';
+import { TASKS, RESUPPLY, shopFor, prepare, clearOut, surplusInBank, sellGoods, goodsToSell, westStay, taskById } from './tasks.mjs';
 import { TASK_NEEDS, TRADEABLE } from './market.mjs';
 
 const COUNT = Number(process.argv[2] ?? 5);
@@ -52,7 +52,7 @@ async function runBot(name, startDelay) {
             }
             await bot.state();
             careerOf(bot); // settles on a career once it has found its feet
-            const task = chooseTask(bot, lastId);
+            const task = taskById(westStay(bot)) ?? chooseTask(bot, lastId); // out west it stays a while at its western trade
             const minutes = rand(50, 70); // roughly hourly task changes
             bot.log(`task -> ${task.id} for ${minutes}m | ${summary(bot.s)}`);
             const shopping = task.canRun(bot) === true ? null : buyableNeeds(bot, task);

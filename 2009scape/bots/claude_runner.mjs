@@ -9,9 +9,9 @@ import { coinsOf, recordFlow } from './economy.mjs';
 import fs from 'fs';
 import path from 'path';
 
-import { Bot, LOG_DIR, sleep, summary, watchdog, rememberDanger } from './lib.mjs';
+import { Bot, LOG_DIR, sleep, summary, watchdog, rememberDanger, inWest } from './lib.mjs';
 import { getStep, setStep } from './steps.mjs';
-import { taskById, RESUPPLY, prepare, clearOut, surplusInBank, sellGoods, goodsToSell } from './tasks.mjs';
+import { taskById, RESUPPLY, prepare, clearOut, surplusInBank, sellGoods, goodsToSell, westStay, WEST_TASKS } from './tasks.mjs';
 import { Market, TEAMS, TRADEABLE } from './market.mjs';
 import { personalityOf, SPOTS } from './social.mjs';
 import { council, STATE as POLITICS } from './politics.mjs';
@@ -133,7 +133,9 @@ async function runBot(name, delay) {
             }
             // market day at the Grand Exchange: go if it's about to open (and the bot wants to)
             const day = marketDay.day;
-            if (day && marketDay.upcoming() && day.start - Date.now() < 7 * 60_000 && marketDay.wants(name) && !day.arrived.includes(name)) {
+            // out west (Catherby, Seers' Village) the east's market, duels and gatherings are a ship and 1,000gp away: it stays at its work
+            const west = inWest(bot.s);
+            if (!west && day && marketDay.upcoming() && day.start - Date.now() < 7 * 60_000 && marketDay.wants(name) && !day.arrived.includes(name)) {
                 await marketDay.attend(bot);
                 continue;
             }
@@ -151,13 +153,15 @@ async function runBot(name, delay) {
                 if (got > 0) { note(name, `Sold my goods at the shops for ${got}gp.`); recordFlow(name, 'selling', c0, coinsOf(await bot.state(1).catch(() => null))); }
             }
             // quest party: wait for the rest of the party, then quest together
-            if (await duels.join(bot)) continue; // a grudge duel at the arena
-            if (await hunts.join(bot)) continue; // a treasure hunt it has worked out
-            if (await celebrations.join(bot)) continue; // cheer a friend's milestone (57)
-            if (await stalls.join(bot)) continue; // keep a stall in Varrock square (56)
-            if (await meetups.join(bot)) continue; // train beside a friend (55)
-            if (await outings.join(bot)) continue; // a team outing (32)
-            if (await parties.join(bot)) continue;
+            if (!west) {
+                if (await duels.join(bot)) continue; // a grudge duel at the arena
+                if (await hunts.join(bot)) continue; // a treasure hunt it has worked out
+                if (await celebrations.join(bot)) continue; // cheer a friend's milestone (57)
+                if (await stalls.join(bot)) continue; // keep a stall in Varrock square (56)
+                if (await meetups.join(bot)) continue; // train beside a friend (55)
+                if (await outings.join(bot)) continue; // a team outing (32)
+                if (await parties.join(bot)) continue;
+            }
             let item = plan[step];
             // politics: the poorest team spends some of its time making money
             const team = POLITICS.teams[market.social.teamOf(name)];
@@ -172,6 +176,9 @@ async function runBot(name, delay) {
             // a town event (fishing contest, smithing fair) is on: entrants do the event's skill until it ends
             const et = item.task !== 'treasury' && townEvents.taskFor(bot, id => taskById(id)?.canRun(bot));
             if (et) item = { task: et, minutes: Math.max(5, Math.ceil((townEvents.current.end - Date.now()) / 60_000)), why: `the ${townEvents.current.kind} event` };
+            // out west it stays a while (the ship costs 1,000gp): eastern steps wait, it keeps to its western trade
+            const ws = item.task !== 'treasury' && westStay(bot);
+            if (ws && !WEST_TASKS.includes(item.task)) item = { task: ws, minutes: item.minutes ?? 20, why: 'staying out west a while' };
             const task = taskById(item.task);
             if (!task) { bot.log(`unknown task ${item.task}, skipping`); writeStep(name, step + 1); continue; }
             let ok = task.canRun(bot);
@@ -206,7 +213,7 @@ async function runBot(name, delay) {
             writeStep(name, step + 1);
             // habit: now and then, drift to a favorite spot between tasks
             const habits = personalityOf(name).habits;
-            if (habits?.spot && Math.random() < 0.2 && market.social.mood(name) > -0.5) {
+            if (habits?.spot && Math.random() < 0.2 && market.social.mood(name) > -0.5 && !inWest(bot.s)) {
                 const spot = SPOTS[habits.spot];
                 bot.log(`habit: wandering to ${spot.label}`);
                 await bot.walkTo(spot.x, spot.y, { tol: 3, timeout: 120 });

@@ -1,6 +1,6 @@
 // usage: node test_task.mjs <botname> <taskid> <seconds>
 import { Bot, summary } from './lib.mjs';
-import { taskById } from './tasks.mjs';
+import { taskById, prepare } from './tasks.mjs';
 
 const [name, task, secs] = process.argv.slice(2);
 const bot = new Bot(name);
@@ -14,6 +14,7 @@ const iv = setInterval(async () => {
         bot.log('progress', summary(s), '|', bot.msgs.slice(-2).join(' / '));
     } catch {}
 }, 20000);
+await prepare(bot, task); // as the runners do: tools out of the bank, gear on
 await taskById(task).run(bot, Date.now() + Number(secs) * 1000);
 clearInterval(iv);
 await bot.state();

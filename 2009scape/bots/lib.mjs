@@ -16,6 +16,14 @@ export const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 export const SKILLS = ['attack', 'defence', 'strength', 'hitpoints', 'ranged', 'prayer', 'magic', 'cooking', 'woodcutting', 'fletching', 'fishing', 'firemaking', 'crafting', 'smithing', 'mining', 'herblore', 'agility', 'thieving', 'slayer', 'farming', 'runecrafting', 'hunter', 'construction', 'summoning'];
 // bank booths on the ground floor (where to stand)
 export const GROUND_BANKS = [{ x: 3094, y: 3492, name: 'Edgeville' }, { x: 3185, y: 3440, name: 'Varrock West' }, { x: 3253, y: 3420, name: 'Varrock East' }, { x: 3013, y: 3356, name: 'Falador East' }, { x: 3270, y: 3167, name: 'Al Kharid' }];
+// West of White Wolf Mountain (Catherby, Seers' Village, Camelot): bots get there by charter ship and come back by
+// home teleport, never on foot (the mountain's wolves kill anything under combat ~45; only `travel(..., { cross: true })`
+// walks it). Banks there, for openBank() when a bot is out west.
+export const inWest = s => !!s && s.y >= 3390 && s.y < 3540 && s.x >= 2600 && s.x < 2880;
+// which side of the water a bot is on: nobody walks between them, so deals and gatherings stay on one side
+export const sideOf = s => !s || s.y >= 6000 ? 'east' : inWest(s) ? 'west' : s.x >= 2790 && s.x <= 2880 && s.y >= 3320 && s.y < 3395 ? 'entrana' : s.x > 2750 && s.x < 2990 && s.y < 3200 && s.y > 2880 ? 'karamja' : 'east';
+export const WEST_BANKS = [{ x: 2809, y: 3440, name: 'Catherby' }, { x: 2725, y: 3492, name: "Seers' Village" }];
+export const WOLF_MOUNTAIN = { x: 2850, y: 3493, r: 40 };
 export const FOOD = ['Shrimps', 'Anchovies', 'Bread', 'Cooked chicken', 'Cooked meat', 'Sardine', 'Herring', 'Trout', 'Salmon', 'Pike', 'Tuna', 'Lobster', 'Cake', 'Meat pie', 'Swordfish', 'Kebab'];
 // Random event types the server may give bots: the ones with a proven solver (wave 1).
 // Sent to the server on every login, so it survives server restarts. Override: BOT_EVENTS=GENIE,ZOMBIE or BOT_EVENTS=none
@@ -902,9 +910,23 @@ export class Bot {
     }
 
     // Long trip: plan a route on the server's collision map (around DANGER zones), then walk it waypoint by waypoint.
-    async travel(x, y, { avoid = [...DANGER, ...dangersFor(this.name)], tol = 3, timeout = 900 } = {}) {
+    async travel(x, y, { avoid = [...DANGER, ...dangersFor(this.name)], tol = 3, timeout = 900, cross = false } = {}) {
         let s = await this.state(8);
         if (dist(s, { x, y }) <= tol && s.z === 0) return true;
+        // White Wolf Mountain lies between the east and Catherby/Seers: never walk it by accident (a market deal, a
+        // meetup, selling goods). Out west with somewhere to be in the east: home teleport first, or stay put.
+        // From the east: the charter ship is the caller's business (goWest in tasks.mjs), not a walk.
+        if (!cross && s.y < 6000 && y < 6000) {
+            if (inWest(s) && !inWest({ x, y }) && x >= 2880) {
+                this.log(`out west with business at ${x},${y}: home teleport rather than White Wolf Mountain`);
+                if (!(await this.homeTeleport().catch(() => false))) { this.log('home teleport not ready: staying out west for now'); return false; }
+                s = await this.state(8);
+            } else if (!inWest(s) && inWest({ x, y }) && s.x >= 2880) {
+                this.log(`travel to ${x},${y}: that's west of White Wolf Mountain (charter ship first)`);
+                return false;
+            }
+            avoid = [...avoid, WOLF_MOUNTAIN];
+        }
         // routes are planned on the ground floor: come down first
         if (s.z > 0 && s.y < 6000) {
             if (s.x > 3190 && s.x < 3220 && s.y > 3200 && s.y < 3235) await this.lumbridgeFloor(0);
@@ -929,7 +951,7 @@ export class Bot {
             // knocked off the path (a fight, a random event, a door that wouldn't open): re-plan from here once
             if (this._replanned) { this._replanned = false; return false; }
             this._replanned = true;
-            const again = await this.travel(x, y, { avoid, tol, timeout: Math.max(30, (end - Date.now()) / 1000) });
+            const again = await this.travel(x, y, { avoid, tol, timeout: Math.max(30, (end - Date.now()) / 1000), cross });
             this._replanned = false;
             return again;
         }
@@ -1156,8 +1178,10 @@ export class Bot {
         // the nearest bank: Lumbridge castle's top floor, or a ground-floor bank (Varrock West by the anvils and
         // the iron mine, Varrock East by Aubury, Falador East, Al Kharid from inside its toll gate; Draynor is skipped: dark wizards)
         const s0 = await this.state(1);
-        const varrock = s0.z === 0 && s0.y < 6000 ? GROUND_BANKS.filter(b => b.name !== 'Al Kharid' || s0.x >= 3268).reduce((a, b) => dist(s0, a) <= dist(s0, b) ? a : b) : GROUND_BANKS[0];
-        if (s0.z === 0 && s0.y < 6000 && dist(s0, varrock) < dist(s0, { x: 3208, y: 3220 })) {
+        const west = inWest(s0); // out west: the Catherby or Seers' Village bank (never a walk back over the mountain)
+        const varrock = west ? WEST_BANKS.reduce((a, b) => dist(s0, a) <= dist(s0, b) ? a : b)
+            : s0.z === 0 && s0.y < 6000 ? GROUND_BANKS.filter(b => b.name !== 'Al Kharid' || s0.x >= 3268).reduce((a, b) => dist(s0, a) <= dist(s0, b) ? a : b) : GROUND_BANKS[0];
+        if (west || (s0.z === 0 && s0.y < 6000 && dist(s0, varrock) < dist(s0, { x: 3208, y: 3220 }))) {
             await this.travel(varrock.x, varrock.y, { tol: 3 });
             for (let i = 0; i < 4; i++) {
                 const s = await this.state(8);

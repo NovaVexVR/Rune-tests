@@ -5,7 +5,7 @@ import { fearOf } from './phobias.mjs';
 import { readBoard } from './noticeboard.mjs';
 import { note } from './diary.mjs';
 import { doRitual, luckyOf } from './superstition.mjs';
-import { dist, rand, sleep, FOOD, gearInfo, GE } from './lib.mjs';
+import { dist, rand, sleep, FOOD, gearInfo, GE, inWest } from './lib.mjs';
 import { faction, TASK_NEEDS } from './market.mjs';
 import { getShears, shear, spin } from './quests.mjs';
 
@@ -81,7 +81,8 @@ export const SELL_ROUTES = [
     { shop: { x: 3229, y: 3436, npcs: ['Horvik'] }, items: /^(Bronze|Iron|Steel|Black|Mithril) (chainbody|platebody|platelegs|plateskirt|sq shield)$|^Studded (chaps|body)$/ },
     { shop: { x: 3072, y: 3430, npcs: ['Peksa'] }, items: /(med|full) helm$/ },
     { shop: { x: 3013, y: 3224, npcs: ['Gerrant'] }, items: /^Raw (shrimps|sardine|herring|anchovies|trout|pike|salmon|tuna|lobster|swordfish)$/ },
-    { shop: { x: 3232, y: 3424, npcs: ['Lowe'] }, items: /^((Oak|Willow|Maple) )?(shortbow|longbow|Shortbow|Longbow)$|^(Bronze|Iron|Steel|Mithril|Adamant) arrow$/ },
+    { shop: { x: 2957, y: 3204, npcs: ['Brian'] }, items: /^(Oak|Willow|Maple) (shortbow|longbow)$/ }, // Brian's Archery Supplies, Rimmington: high alchemy (Lowe's pays the low value)
+    { shop: { x: 3232, y: 3424, npcs: ['Lowe'] }, items: /^(Shortbow|Longbow)$|^(Bronze|Iron|Steel|Mithril|Adamant) arrow$/ },
     { shop: { x: 3203, y: 3416, npcs: ['Thessalia'] }, items: /^Leather (body|gloves|boots)$/ },
     { shop: { x: 3012, y: 3246, npcs: ['Grum'] }, items: /^(Gold|Sapphire|Emerald|Ruby|Diamond) (ring|necklace|amulet|bracelet)$/ }
 ];
@@ -96,6 +97,13 @@ export async function sellGoods(bot) {
     await bot.state(5);
     const goods = goodsToSell(bot);
     if (!goods.length) return 0;
+    // out west the shops are a home teleport away and the ship back costs 1,000gp: go only with a real load
+    if (inWest(bot.s)) {
+        // a shop pays the alchemy value less 3% of the item's value per one overstocked, down to about a third of the value
+        const worth = goods.reduce((t, g) => t + g.count * Math.floor(((bot.s.bank ?? []).find(i => i.name === g.name)?.value ?? 0) * 0.35), 0);
+        if (worth < 5 * CATH.fare) return 0;
+        bot.log(`goods: about ${worth}gp of goods banked: going east to sell them`);
+    }
     let earned = 0;
     for (const route of [...new Set(goods.map(g => g.route))]) {
         const mine = goods.filter(g => g.route === route);
@@ -144,11 +152,12 @@ export async function clearOut(bot) {
 // and thieves carry some food from the bank.
 export async function prepare(bot, taskId) {
     bot._lastTask = taskId;
+    if (WEST_TASKS.includes(taskId)) bot._westTask = taskId;
     // trapped inside Draynor Manor (its front doors don't open from inside): teleport out before anything else
     const s0 = bot.s;
     if (s0?.z === 0 && s0.x >= 3097 && s0.x <= 3126 && s0.y >= 3354 && s0.y <= 3374) { bot.log('inside Draynor Manor: teleporting out'); await bot.homeTeleport().catch(() => {}); }
     // out west (Catherby) for any other task: teleport home rather than walk over White Wolf Mountain's wolves
-    if (taskId !== 'catherby' && inCatherby(s0)) { bot.log('in Catherby for another task: teleporting home'); await bot.homeTeleport().catch(() => {}); }
+    if (!WEST_TASKS.includes(taskId) && inWest(s0)) { bot.log(`out west for another task (${taskId}): teleporting home`); await bot.homeTeleport().catch(() => {}); }
     await doRitual(bot, taskId).catch(() => {}); // a superstition (38)
     // a bag full of odds and ends (scripted bots were found idle for a day with 20 wool and no room to catch a fish)
     if ((bot.s.invFree ?? 28) < 4 && (await bot.openBank().catch(() => false))) {
@@ -178,14 +187,45 @@ export async function prepare(bot, taskId) {
 // 30% of its coins (bank + carried) and only once it has 200+, so wealth still grows. Body, legs and shield
 // (helms come from smiths and the market). Steel needs Defence 5.
 export const HORVIK = { x: 3229, y: 3436, npcs: ['Horvik'], sells: { 'Bronze sq shield': 48, 'Bronze chainbody': 60, 'Bronze platelegs': 80, 'Bronze platebody': 160, 'Iron sq shield': 168, 'Iron chainbody': 210, 'Iron platelegs': 280, 'Iron platebody': 560, 'Steel platebody': 2000 } };
-// gear shops (roadmap 54): spending grows with wealth, up to mithril. Prices are the shops' base values (what the budget
-// counts; the shop charges its own). Metal requirements: Defence for armour, Attack for weapons.
+// gear shops (roadmap 54): spending grows with wealth. Prices are the shops' base values (what the budget counts; the
+// shop charges its own). Metal requirements: Defence for armour, Attack for weapons (adamant 30, rune 40).
+// Adamant comes from ordinary shops (legs in Al Kharid, helms at Peksa's, a chainbody at Wayne's, swords in Varrock);
+// the adamant platebody and everything rune are upstairs in the Champions' Guild, which lets in 32 quest points.
+const CHAMPIONS = { door: { x: 3191, y: 3363 }, stairs: { x: 3188, y: 3355 }, qp: 32 };
+const inChampions = bot => (bot.s.questPoints ?? 0) >= CHAMPIONS.qp;
 export const GEAR_SHOPS = [
     { shop: HORVIK, sells: { ...HORVIK.sells, 'Black platebody': 3840, 'Mithril platebody': 5200 } },
-    { shop: { x: 3287, y: 3190, npcs: ['Zeke'] }, sells: { 'Bronze scimitar': 32, 'Iron scimitar': 112, 'Steel scimitar': 400, 'Mithril scimitar': 1040 } }
+    { shop: { x: 3287, y: 3190, npcs: ['Zeke'] }, sells: { 'Bronze scimitar': 32, 'Iron scimitar': 112, 'Steel scimitar': 400, 'Mithril scimitar': 1040 } },
+    { shop: { x: 3316, y: 3175, npcs: ['Louie Legs'] }, sells: { 'Steel platelegs': 1000, 'Black platelegs': 1920, 'Mithril platelegs': 2600, 'Adamant platelegs': 6464 } },
+    { shop: { x: 3076, y: 3429, npcs: ['Peksa'] }, sells: { 'Mithril med helm': 780, 'Mithril full helm': 1430, 'Adamant med helm': 1920, 'Adamant full helm': 3520 } },
+    { shop: { x: 2975, y: 3314, npcs: ['Wayne'] }, sells: { 'Adamant chainbody': 4800 } },
+    { shop: { x: 3208, y: 3399, npcs: ['Shopkeeper', 'Shop assistant'] }, sells: { 'Adamant sword': 2080, 'Adamant longsword': 3200 } },
+    { shop: { x: 3192, y: 3359, npcs: ['Valaine'] }, upstairs: CHAMPIONS, needs: inChampions, sells: { 'Adamant platebody': 16256 } },
+    { shop: { x: 3190, y: 3355, npcs: ['Scavvo'] }, upstairs: CHAMPIONS, needs: inChampions, sells: { 'Rune sword': 20800, 'Rune longsword': 32000, 'Rune chainbody': 50000, 'Rune platelegs': 64000 } }
 ];
 const METAL_LEVEL = { Bronze: 1, Iron: 1, Steel: 5, Black: 10, Mithril: 20, Adamant: 30, Rune: 40 };
 const canWield = (bot, name, slot) => (METAL_LEVEL[name.split(' ')[0]] ?? 1) <= bot.lvl(slot === 'weapon' ? 'attack' : 'defence');
+// into the Champions' Guild (the door opens to 32 quest points) and up its stairs, where the two shops are
+async function upstairsAt(bot, g) {
+    if ((await bot.state(6)).z === 1 && dist(bot.s, g.stairs) < 15) return true;
+    if (bot.s.y > g.door.y || dist(bot.s, g.door) > 12) {
+        await bot.travel(g.door.x, g.door.y + 2, { tol: 1 });
+        for (let i = 0; i < 3 && (await bot.state(8)).y >= g.door.y; i++) {
+            const door = bot.nearestScenery(l => l.name === 'Door' && l.ops.includes('Open') && dist(l, g.door) <= 1);
+            if (!door) { await bot.walkTo(g.door.x, g.door.y - 2, { tol: 1, timeout: 15, direct: true }); continue; } // standing open
+            await bot.act({ type: 'scenery', x: door.x, y: door.y, id: door.id, op: 'Open' });
+            await bot.waitIdle({ timeout: 10, quiet: 3, cond: st => st.y < g.door.y });
+        }
+        if (bot.s.y >= g.door.y) return false;
+    }
+    for (let i = 0; i < 3 && (await bot.state(10)).z === 0; i++) {
+        const st = bot.nearestScenery(l => /staircase/i.test(l.name) && l.ops.includes('Climb-up'));
+        if (!st) { await bot.walkTo(g.stairs.x + 1, g.stairs.y + 1, { tol: 1, timeout: 20, direct: true }); continue; }
+        await bot.act({ type: 'scenery', x: st.x, y: st.y, id: st.id, op: 'Climb-up' });
+        await bot.waitIdle({ timeout: 15, cond: x => x.z === 1 });
+    }
+    return bot.s.z === 1;
+}
 export async function buyArmour(bot) {
     if (Date.now() < (bot._armourTry ?? 0)) return 0;
     bot._armourTry = Date.now() + 6 * 3600_000;
@@ -194,21 +234,25 @@ export async function buyArmour(bot) {
     if (wealth < 200) return 0;
     let budget = Math.floor(wealth * 0.3);
     const best = slot => Math.max(-1, ...[...bot.s.worn, ...bot.s.inv, ...(bot.s.bank ?? [])].map(i => gearInfo(i.name)).filter(g => g?.slot === slot).map(g => g.score));
+    // the best piece per slot the budget reaches, across every shop it may enter; then one trip per shop
+    const offers = GEAR_SHOPS.filter(g => !g.needs || g.needs(bot)).flatMap(g => Object.entries(g.sells).map(([name, price]) => ({ g, name, price, info: gearInfo(name) }))).filter(o => o.info);
+    const want = [];
+    for (const slot of ['body', 'legs', 'weapon', 'shield', 'head']) {
+        const pick = offers.filter(o => o.info.slot === slot && o.info.score > best(slot) && o.price <= budget && canWield(bot, o.name, slot))
+            .sort((a, b) => b.info.score - a.info.score || a.price - b.price)[0];
+        if (pick) { want.push(pick); budget -= pick.price; }
+    }
+    if (!want.length) return 0;
+    const cost = want.reduce((t, w) => t + w.price, 0);
+    bot.log(`gear: shopping for ${want.map(w => `${w.name} (${w.g.shop.npcs[0]})`).join(', ')}: ${cost}gp of ${wealth}gp`);
+    // a shop that has sold some charges up to 130%; and the Al Kharid toll both ways
+    const purse = Math.ceil(cost * 1.3) + 20;
+    if (bot.s.coins < purse && (await bot.openBank())) { await bot.withdrawN('Coins', purse - bot.s.coins); await bot.leaveBank(); }
     let bought = 0;
-    for (const { shop, sells } of GEAR_SHOPS) {
-        const want = [];
-        for (const slot of ['body', 'legs', 'shield', 'weapon']) {
-            const pick = Object.entries(sells)
-                .filter(([name, price]) => gearInfo(name)?.slot === slot && gearInfo(name).score > best(slot) && price <= budget && canWield(bot, name, slot))
-                .sort((a, b) => gearInfo(b[0]).score - gearInfo(a[0]).score)[0];
-            if (pick) { want.push(pick); budget -= pick[1]; }
-        }
-        if (!want.length) continue;
-        const cost = want.reduce((t, [, p]) => t + p, 0);
-        bot.log(`gear: shopping at ${shop.npcs[0]}'s for ${want.map(w => w[0]).join(', ')} (${cost}gp of ${wealth}gp)`);
-        if (bot.s.coins < cost && (await bot.openBank())) { await bot.withdrawN('Coins', cost - bot.s.coins); await bot.leaveBank(); }
-        if (await bot.openShop(shop)) {
-            for (const [name, price] of want) if (bot.s.coins >= price && (await bot.buy(name, 1))) bought++;
+    for (const g of [...new Set(want.map(w => w.g))]) {
+        if (g.upstairs && !(await upstairsAt(bot, g.upstairs))) { bot.log(`gear: couldn't get up to ${g.shop.npcs[0]}'s`); continue; }
+        if (await bot.openShop(g.shop)) {
+            for (const w of want.filter(x => x.g === g)) if (bot.s.coins >= w.price && (await bot.buy(w.name, 1))) bought++;
             await bot.closeInterfaces();
         }
     }
@@ -1124,6 +1168,8 @@ export const HERBLORE = {
         await bot.depositAll(i => !KEEP(i.name));
         for (const it of (bot.s.bank ?? []).filter(i => /^(Grimy|Clean) /.test(i.name))) if (bot.s.invFree > 13) await bot.withdrawN(it.name, Math.min(it.count, 9));
         if (bot.s.coins < 60) await bot.withdrawN('Coins', 60 - bot.s.coins);
+        const vials = (bot.s.bank ?? []).find(i => i.name === 'Vial')?.count ?? 0; // blown by the crafters (or bought before): used before buying more
+        if (vials && bot.s.invFree > 4) await bot.withdrawN('Vial', Math.min(vials, 9, bot.s.invFree - 4));
         await bot.leaveBank();
         // clean what we can
         for (let i = 0; i < 20; i++) {
@@ -1137,7 +1183,7 @@ export const HERBLORE = {
         if (!herbs.length) { bot.log('herblore: no herbs I can use yet'); await bot.bankItems(i => /^(Grimy|Clean) /.test(i.name)); return; }
         const guams = herbs.filter(h => h.name === 'Clean guam').length;
         if (await bot.openShop(JATIX)) {
-            await bot.buy('Vial', herbs.length);
+            if (herbs.length > bot.count('Vial')) await bot.buy('Vial', herbs.length - bot.count('Vial'));
             if (guams) await bot.buy('Eye of newt', guams);
             await bot.closeInterfaces();
         }
@@ -1385,7 +1431,7 @@ async function toStronghold(bot) {
     if (inStronghold(await bot.state(1))) return true;
     for (const leg of AGILITY_LEGS) {
         let ok = false; // wolf fights on the mountain break walks: plan again from wherever the bot ended up
-        for (let t = 0; t < 3 && !ok; t++) ok = await bot.travel(leg.x, leg.y, { tol: 4, timeout: 900 });
+        for (let t = 0; t < 3 && !ok; t++) ok = await bot.travel(leg.x, leg.y, { tol: 4, timeout: 900, cross: true });
         if (!ok) { bot.log(`agility: stuck on the way at ${bot.s.x},${bot.s.y}`); return false; }
     }
     for (let i = 0; i < 4 && !inStronghold(await bot.state(8)); i++) {
@@ -1429,8 +1475,8 @@ export const AGILITY = {
         if (await bot.homeTeleport()) { await bot.state(1); if (dist(bot.s, { x: 3222, y: 3218 }) < 30) return; }
         bot.standGround = true;
         try {
-            for (const leg of [...AGILITY_LEGS].reverse()) await bot.travel(leg.x, leg.y, { tol: 4, timeout: 900 });
-            await bot.travel(3222, 3218, { tol: 4, timeout: 900 });
+            for (const leg of [...AGILITY_LEGS].reverse()) await bot.travel(leg.x, leg.y, { tol: 4, timeout: 900, cross: true });
+            await bot.travel(3222, 3218, { tol: 4, timeout: 900, cross: true });
         } finally { bot.standGround = false; }
     }
 };
@@ -1622,7 +1668,7 @@ async function bankHere(bot, pred) {
     await bot.leaveBank();
     return true;
 }
-export async function charterToCatherby(bot) {
+export async function charterToCatherby(bot, why = 'to fish lobsters') {
     if (inCatherby(bot.s)) return true;
     const coins = () => bot.s.coins ?? 0;
     if (coins() < CATH.fare && (await bot.openBank())) { await bot.withdrawN('Coins', CATH.fare + 50 - coins()); await bot.leaveBank(); }
@@ -1649,9 +1695,30 @@ export async function charterToCatherby(bot) {
         if (g) { await bot.act({ type: 'scenery', x: g.x, y: g.y, id: g.id, op: 'Cross' }); await bot.waitIdle({ timeout: 10, cond: x => x.z === 0 }); }
         else await bot.wait(3);
     }
-    if (inCatherby(bot.s)) { bot.log('catherby: arrived by charter ship'); note(bot.name, 'Took a charter ship to Catherby to fish lobsters.'); }
+    if (inCatherby(bot.s)) { bot.log('catherby: arrived by charter ship'); note(bot.name, `Took a charter ship to Catherby ${why}.`); }
     return inCatherby(bot.s);
 }
+// tasks that live west of White Wolf Mountain: a bot there given any other task teleports home first (prepare)
+export const WEST_TASKS = ['catherby', 'seers'];
+// Out west a bot stays a while (WEST_STAY_HOURS, default 4): the ship there costs 1,000gp, so its eastern tasks wait
+// and it keeps to the western task it came for. The runners ask before each step: that task's id, or null when the
+// bot isn't out west or its stay is over (the next eastern task then teleports it home, see prepare).
+const WEST_STAY = Number(process.env.WEST_STAY_HOURS ?? 4) * 3600_000;
+export function westStay(bot) {
+    if (!inWest(bot.s)) { bot._westSince = null; return null; }
+    bot._westSince ??= Date.now();
+    if (Date.now() - bot._westSince > WEST_STAY) return null;
+    return [bot._westTask, ...WEST_TASKS].filter(Boolean).find(id => taskById(id)?.canRun(bot) === true) ?? null;
+}
+// out west already (Catherby, Seers' Village), or there by the Port Sarim charter
+export async function goWest(bot, why) {
+    return inWest(await bot.state(3)) || charterToCatherby(bot, why);
+}
+const westFare = bot => {
+    if (inWest(bot.s)) return true;
+    const wealth = (bot.s.coins ?? 0) + ((bot.s.bank ?? []).find(i => i.name === 'Coins')?.count ?? 0);
+    return wealth >= 2 * CATH.fare || `saving for the charter west (${CATH.fare}gp, wants ${2 * CATH.fare})`;
+};
 export const CATHERBY = {
     id: 'catherby',
     skills: ['fishing', 'cooking'],
@@ -1693,3 +1760,349 @@ export const CATHERBY = {
     }
 };
 TASKS.push(CATHERBY);
+
+// ---- Seers' Village (moving west): the fletchers' town. Flax from the field south of the village is spun into bow
+// strings on the wheel upstairs in the house by the bank (Crafting 10, button 17 of the spinning menu); logs from the
+// trees around the village (oaks to the west, willows north-west from Woodcutting 30, maples behind the bank from 45)
+// are cut into unstrung bows; at the bank 13 bows and 13 strings at a time are strung (the same Fletching xp again).
+// Strung bows stay in the bank until sellGoods takes them to Brian's Archery Supplies in Rimmington, which pays their
+// high-alchemy value. Unstrung oak, willow and maple bows made back east are in the same bank and get strung too.
+const SEERS_AT = {
+    bank: { x: 2725, y: 3492 }, flax: { x: 2741, y: 3444 }, ladder: { x: 2715, y: 3470 }, wheel: { x: 2710, y: 3471 },
+    trees: { oak: { x: 2691, y: 3476 }, willow: { x: 2710, y: 3510 }, maple: { x: 2727, y: 3498 } }
+};
+// best first: [wood, Woodcutting, [bow, Fletching]...]
+const BOW_TIERS = [
+    { wood: 'maple', log: 'Maple logs', tree: 'Maple tree', wc: 45, bows: [['Maple longbow', 55], ['Maple shortbow', 50]] },
+    { wood: 'willow', log: 'Willow logs', tree: 'Willow', wc: 30, bows: [['Willow longbow', 40], ['Willow shortbow', 35]] },
+    { wood: 'oak', log: 'Oak logs', tree: 'Oak', wc: 15, bows: [['Oak longbow', 25], ['Oak shortbow', 20]] }
+];
+const STRING_LEVEL = Object.fromEntries(BOW_TIERS.flatMap(t => t.bows));
+const isAxe = n => /(^| )axe$/.test(n);
+const bankCount = (bot, name) => (bot.s.bank ?? []).filter(i => i.name === name).reduce((t, i) => t + i.count, 0);
+const carried = (bot, name) => bot.s.inv.filter(i => i.name === name && !i.noted).reduce((t, i) => t + i.count, 0);
+// skilling that runs as a script doesn't show as busy: wait while a count keeps changing
+async function whileChanging(bot, count, { stall = 8, timeout = 120 } = {}) {
+    let last = count(), still = 0;
+    for (const end = now() + timeout * 1000; now() < end && still < stall && last > 0; ) {
+        await bot.wait(1);
+        await bot.state(4);
+        if (await bot.handleInterrupts()) { still = 0; continue; }
+        const c = count();
+        if (c !== last) { last = c; still = 0; } else still++;
+    }
+}
+async function pickFlax(bot, until) {
+    await bot.travel(SEERS_AT.flax.x, SEERS_AT.flax.y, { tol: 4 });
+    for (let i = 0; i < 90 && now() < until; i++) {
+        const s = await bot.state(10);
+        if (await bot.handleInterrupts()) continue;
+        if (s.invFree === 0) break;
+        const plant = bot.nearestScenery(l => l.name === 'Flax' && l.ops.includes('Pick'));
+        if (!plant) { await bot.walkTo(SEERS_AT.flax.x + rand(-3, 3), SEERS_AT.flax.y + rand(-3, 3), { tol: 2, direct: true }); continue; }
+        const before = carried(bot, 'Flax');
+        await bot.act({ type: 'scenery', x: plant.x, y: plant.y, id: plant.id, op: 'Pick' });
+        await bot.waitIdle({ timeout: 10, quiet: 3, cond: st => st.inv.filter(x => x.name === 'Flax').length > before });
+    }
+    return carried(bot, 'Flax');
+}
+async function spinFlax(bot) {
+    const flax = carried(bot, 'Flax');
+    if (!flax) return 0;
+    if ((await bot.state(6)).z === 0) {
+        await bot.travel(SEERS_AT.ladder.x - 1, SEERS_AT.ladder.y + 1, { tol: 1 }); // through the house's door
+        for (let i = 0; i < 4 && (await bot.state(8)).z === 0; i++) {
+            const ladder = bot.nearestScenery(l => l.name === 'Ladder' && l.ops.includes('Climb-up') && dist(l, SEERS_AT.ladder) <= 2);
+            if (!ladder) { await bot.travel(SEERS_AT.ladder.x - 1, SEERS_AT.ladder.y + 1, { tol: 1 }); continue; }
+            await bot.act({ type: 'scenery', x: ladder.x, y: ladder.y, id: ladder.id, op: 'Climb-up' });
+            await bot.waitIdle({ timeout: 12, cond: st => st.z === 1 });
+        }
+    }
+    if (bot.s.z !== 1) { bot.log(`seers: couldn't get up to the spinning wheel (at ${bot.s.x},${bot.s.y},${bot.s.z})`); return 0; }
+    for (let i = 0; i < 6 && carried(bot, 'Flax'); i++) {
+        const s = await bot.state(10);
+        if (await bot.handleInterrupts()) continue;
+        if (s.iface === 459) { // spinning menu: flax -> bow string is button 17, the third option spins all
+            await bot.act({ type: 'button', iface: 459, child: 17, op: 2 });
+            await bot.waitIdle({ timeout: 120, quiet: 5, cond: st => !st.inv.some(x => x.name === 'Flax') });
+            continue;
+        }
+        const wheel = bot.nearestScenery(l => /spinning wheel/i.test(l.name) && l.ops.includes('Spin'), s);
+        if (!wheel) { await bot.walkTo(SEERS_AT.wheel.x + 1, SEERS_AT.wheel.y, { tol: 1, direct: true }); continue; }
+        await bot.act({ type: 'scenery', x: wheel.x, y: wheel.y, id: wheel.id, op: 'Spin' });
+        await bot.waitIdle({ timeout: 12, cond: st => st.iface === 459 });
+    }
+    await bot.closeInterfaces();
+    for (let i = 0; i < 4 && (await bot.state(8)).z === 1; i++) {
+        const ladder = bot.nearestScenery(l => l.name === 'Ladder' && l.ops.includes('Climb-down'));
+        if (!ladder) break;
+        await bot.act({ type: 'scenery', x: ladder.x, y: ladder.y, id: ladder.id, op: 'Climb-down' });
+        await bot.waitIdle({ timeout: 12, cond: st => st.z === 0 });
+    }
+    return carried(bot, 'Bow string');
+}
+// string the unstrung bows carried (the "make all" menu), one kind after another
+async function stringBows(bot) {
+    let made = 0;
+    for (let i = 0; i < 6; i++) {
+        const s = await bot.state(4);
+        const str = s.inv.find(x => x.name === 'Bow string' && !x.noted);
+        const bow = s.inv.find(x => !x.noted && / \(u\)$/.test(x.name) && bot.lvl('fletching') >= (STRING_LEVEL[x.name.replace(' (u)', '')] ?? 99));
+        if (!str || !bow) break;
+        const strung = bow.name.replace(' (u)', ''), before = carried(bot, strung);
+        await bot.act({ type: 'useitem', slot: str.slot, onSlot: bow.slot });
+        await bot.wait(2);
+        if ((await bot.state(4)).dialog?.skillMenu) await bot.act({ type: 'skillmenu', index: 0 });
+        await whileChanging(bot, () => Math.min(carried(bot, 'Bow string'), carried(bot, bow.name)));
+        made += carried(bot, strung) - before;
+    }
+    return made;
+}
+// one load of logs from the best trees the bot can cut and fletch, cut into unstrung bows
+async function cutBows(bot, tier, until) {
+    const at = SEERS_AT.trees[tier.wood];
+    const [bowName] = tier.bows.find(([, lvl]) => bot.lvl('fletching') >= lvl);
+    await bot.travel(at.x, at.y, { tol: 5 });
+    for (let i = 0; i < 200 && now() < until; i++) {
+        const s = await bot.state(14);
+        if (await bot.handleInterrupts()) continue;
+        if (s.invFree === 0) break;
+        const tree = bot.nearestScenery(l => l.name === tier.tree && l.ops.includes('Chop down'));
+        if (!tree) { await bot.walkTo(at.x + rand(-5, 5), at.y + rand(-5, 5), { tol: 3, direct: true }); await bot.wait(3); continue; }
+        await gatherOnce(bot, tree, 'Chop down', 'scenery', 45);
+    }
+    for (let i = 0; i < 4 && carried(bot, tier.log); i++) {
+        await bot.act({ type: 'useitem', item: 'Knife', onItem: tier.log });
+        await bot.wait(2);
+        const menu = (await bot.state(4)).dialog?.skillMenu;
+        if (menu) await bot.act({ type: 'skillmenu', index: Math.max(0, menu.findIndex(n => n.toLowerCase().startsWith(bowName.toLowerCase()))) });
+        await bot.waitIdle({ timeout: 120, quiet: 5, cond: st => !st.inv.some(x => x.name === tier.log) });
+    }
+    return bot.s.inv.filter(x => / \(u\)$/.test(x.name) && !x.noted).length;
+}
+export const SEERS = {
+    id: 'seers',
+    skills: ['fletching', 'crafting', 'woodcutting'],
+    canRun: bot => {
+        if (bot.lvl('fletching') < 20 || bot.lvl('woodcutting') < 15) return 'needs Fletching 20 and Woodcutting 15 (oak bows)';
+        if (bot.lvl('crafting') < 10) return 'needs Crafting 10 to spin bow strings';
+        const owns = test => [...bot.s.inv.filter(i => !i.noted), ...bot.s.worn, ...(bot.s.bank ?? [])].some(i => test(i.name));
+        if (!owns(n => n === 'Knife') || !owns(isAxe)) return 'need an axe (and a knife)';
+        return westFare(bot);
+    },
+    async run(bot, until) {
+        if (!(await goWest(bot, 'to make bows at Seers\' Village'))) return;
+        const tier = BOW_TIERS.find(t => bot.lvl('woodcutting') >= t.wc && t.bows.some(([, lvl]) => bot.lvl('fletching') >= lvl));
+        const stringable = () => Object.keys(STRING_LEVEL).filter(b => bot.lvl('fletching') >= STRING_LEVEL[b]).map(b => `${b} (u)`).filter(b => bankCount(bot, b));
+        let strung = 0, strings = 0, cut = 0;
+        while (now() < until) {
+            if (!(await bot.openBank())) { bot.log('seers: no bank'); return; }
+            await bot.depositAll(i => !(i.name === 'Knife' || isAxe(i.name)) || i.noted);
+            for (const tool of ['Knife', ...(bot.s.inv.some(i => isAxe(i.name)) || bot.s.worn.some(i => isAxe(i.name)) ? [] : [(bot.s.bank ?? []).find(i => isAxe(i.name))?.name])]) {
+                if (tool && !bot.has(tool)) await bot.withdraw(tool, 1);
+            }
+            const haveStrings = bankCount(bot, 'Bow string'), bows = stringable();
+            if (haveStrings && bows.length) {
+                // string 13 at a time: 13 bows, 13 strings beside the knife and the axe
+                const n = Math.min(13, haveStrings, bankCount(bot, bows[0]), Math.floor((bot.s.invFree) / 2));
+                await bot.withdrawN(bows[0], n);
+                await bot.withdrawN('Bow string', n);
+                await bot.leaveBank();
+                strung += await stringBows(bot);
+                continue;
+            }
+            await bot.leaveBank();
+            if (haveStrings < 13) { // strings first: every bow cut needs one
+                if (await pickFlax(bot, until)) strings += await spinFlax(bot);
+                continue;
+            }
+            cut += await cutBows(bot, tier, until);
+        }
+        if (bot.s.inv.some(i => /^(Bow string|Flax)$| \(u\)$|bow$| logs$/.test(i.name))) await bot.bankItems(i => !(i.name === 'Knife' || isAxe(i.name)));
+        bot.log(`seers: spun ${strings} bow strings, cut ${cut} ${tier.wood} bows, strung ${strung}`);
+    }
+};
+TASKS.push(SEERS);
+
+// ---- Glassblowing on Entrana (roadmap 51; members world). The monks' boat from Port Sarim is free but takes nobody
+// with weapons or armour, so the crafter banks all it wears and carries first and takes its gear out again afterwards.
+// On the island: seaweed from the north shore (ground spawns) is burnt to soda ash on a range, buckets are filled at
+// the sand pit, both melt in the furnace into molten glass (20 xp, the bucket comes back), and the pipe (a free one
+// lies in Fritz's house) blows the best piece its Crafting allows. Two rounds of 9 fill the bag; then the boat back
+// and the bank. Vials go to the herbalists; the rest is goods.
+const ENTRANA = {
+    monks: { x: 3047, y: 3236 }, dock: { x: 2833, y: 3336 }, shore: { x: 2806, y: 3384 }, pipe: { x: 2822, y: 3355 }, buckets: 9,
+    // what things are used on, and where to stand for it
+    sand: { x: 2816, y: 3341, id: 2645, at: { x: 2816, y: 3340 } }, furnace: { x: 2834, y: 3351, id: 11666, at: { x: 2833, y: 3352 } },
+    range: { x: 2844, y: 3367, id: 2728, at: { x: 2844, y: 3366 } }
+};
+export const onEntrana = s => !!s && s.y < 3395 && s.y >= 3320 && s.x >= 2790 && s.x <= 2880;
+// [piece, Crafting, button on the glassblowing menu (interface 542)], best xp first
+const GLASS_PIECES = [['Lantern lens', 49, 43], ['Unpowered orb', 46, 39], ['Fishbowl', 42, 44], ['Vial', 33, 38], ['Oil lamp', 12, 42], ['Candle lantern', 4, 41], ['Beer glass', 1, 40]];
+const GLASS_GOODS = /^(Lantern lens|Unpowered orb|Fishbowl|Vial|Oil lamp|Candle lantern|Beer glass|Molten glass|Soda ash|Seaweed|Bucket of sand)$/;
+const owned = (bot, name) => carried(bot, name) + bankCount(bot, name);
+// gear left in the bank (after Entrana, or however it got there): a slot with nothing worn or carried takes the best
+// banked piece the bot can wear
+export async function regear(bot, { weapon = true } = {}) {
+    const slots = ['weapon', 'head', 'body', 'legs', 'shield'].filter(sl => weapon || sl !== 'weapon');
+    const covered = sl => [...bot.s.worn, ...bot.s.inv].some(i => gearInfo(i.name)?.slot === sl);
+    const want = slots.filter(sl => !covered(sl))
+        .map(sl => (bot.s.bank ?? []).map(i => ({ i, g: gearInfo(i.name) })).filter(x => x.g?.slot === sl && canWield(bot, x.i.name, sl)).sort((a, b) => b.g.score - a.g.score)[0]?.i.name)
+        .filter(Boolean);
+    if (!want.length || !(await bot.openBank())) return 0;
+    for (const n of want) await bot.withdraw(n, 1);
+    await bot.leaveBank();
+    bot.log(`gear: took ${want.join(', ')} out of the bank`);
+    return bot.gearUp({ weapon });
+}
+// the boat: the monks at Port Sarim search you; the ones on Entrana's dock take you back
+async function entranaBoat(bot, there) {
+    const at = there ? ENTRANA.monks : ENTRANA.dock;
+    const arrived = st => onEntrana(st) === there && st.z === 0;
+    for (let i = 0; i < 4 && !arrived(await bot.state(8)); i++) {
+        if (onEntrana(bot.s) === there) { await offBoat(bot); continue; } // docked: just the gangplank left
+        if (dist(bot.s, at) > 4) await bot.travel(at.x, at.y, { tol: 3 });
+        if (!(await bot.talkTo('Monk of Entrana', { answer: /^yes/i, maxSteps: 40 }))) { await bot.walkTo(at.x, at.y, { tol: 1, direct: true }); continue; }
+        await bot.waitIdle({ timeout: 30, quiet: 4, cond: s => onEntrana(s) === there });
+        for (let k = 0; k < 10 && (await bot.state(6)).locked; k++) await bot.wait(3);
+        await offBoat(bot);
+    }
+    return arrived(bot.s);
+}
+// everything into the bank, the clothes off the bot's back too (the bank's deposit button, "Deposit Worn Equipment")
+async function stowForEntrana(bot) {
+    if (!(await bot.openBank())) return false;
+    const gear = bot.s.worn.map(i => i.name);
+    // tools and coins carried go into the bank too (an axe is a weapon to the monks): taken out again afterwards
+    const tools = bot.s.inv.filter(i => !i.noted && KEEP(i.name) && !FOOD.includes(i.name)).map(i => ({ name: i.name, count: i.count }));
+    bot._stowedTools = [...(bot._stowedTools ?? []), ...tools.filter(t => !(bot._stowedTools ?? []).some(x => x.name === t.name))];
+    if (gear.length) {
+        await bot.act({ type: 'button', iface: 762, child: 18 });
+        await bot.wait(2);
+        await bot.state(3);
+        for (let i = 0; i < 3 && bot.s.dialog; i++) { await bot.answerDialog(/worn equipment/i); await bot.state(3); }
+        if ((await bot.state(3)).iface !== 762 && !(await bot.openBank())) return false;
+        if (bot.s.worn.length) { bot.log(`glass: couldn't bank what I'm wearing (${bot.s.worn.map(i => i.name).join(', ')})`); await bot.leaveBank(); return false; }
+        bot._stowed = [...new Set([...(bot._stowed ?? []), ...gear])];
+    }
+    await bot.depositAll(i => i.name !== 'Glassblowing pipe' && i.name !== 'Bucket' || i.noted);
+    for (const [name, n] of [['Bucket', ENTRANA.buckets], ['Glassblowing pipe', 1]]) {
+        const short = n - carried(bot, name);
+        if (short > 0 && bankCount(bot, name)) await bot.withdrawN(name, short);
+        else if (short < 0) for (let k = 0; k < -short; k++) { const it = bot.s.inv.find(i => i.name === name); if (it) await bot.act({ type: 'deposit', slot: it.slot, amount: 1 }); await bot.state(2); }
+    }
+    await bot.leaveBank();
+    return carried(bot, 'Bucket') >= 3;
+}
+async function unstow(bot) {
+    if (!(await bot.openBank())) return false;
+    await bot.depositAll(i => GLASS_GOODS.test(i.name) || i.name === 'Bucket' || i.name === 'Glassblowing pipe');
+    for (const g of bot._stowed ?? []) if (bankCount(bot, g) && bot.s.invFree > 0) await bot.withdraw(g, 1);
+    for (const t of bot._stowedTools ?? []) if (bankCount(bot, t.name) && bot.s.invFree > 0 && !bot.has(t.name)) await bot.withdrawN(t.name, t.count);
+    bot._stowed = []; bot._stowedTools = [];
+    await bot.leaveBank();
+    await bot.gearUp().catch(() => {});
+    return true;
+}
+async function useOn(bot, item, spot) {
+    const it = (await bot.state(6)).inv.find(x => x.name === item && !x.noted);
+    if (!it) return false;
+    if (dist(bot.s, spot.at) > 1) await bot.travel(spot.at.x, spot.at.y, { tol: 1 });
+    return !!(await bot.act({ type: 'useitem', slot: it.slot, x: spot.x, y: spot.y, id: spot.id }));
+}
+// one round on the island: n seaweed -> soda ash, n buckets of sand, n molten glass, n pieces
+async function glassRound(bot, n, until) {
+    const [piece, , button] = GLASS_PIECES.find(([, lvl]) => bot.lvl('crafting') >= lvl);
+    // seaweed off the north shore (it grows back after a minute and a half)
+    await bot.travel(ENTRANA.shore.x, ENTRANA.shore.y, { tol: 3 });
+    for (let i = 0; i < 80 && carried(bot, 'Seaweed') + carried(bot, 'Soda ash') < n && now() < until; i++) {
+        const s = await bot.state(14);
+        if (await bot.handleInterrupts()) continue;
+        const weed = s.ground.filter(o => o.name === 'Seaweed').sort((a, b) => a.dist - b.dist)[0];
+        if (!weed) { await bot.wait(5); continue; }
+        const before = carried(bot, 'Seaweed');
+        await bot.act({ type: 'ground', x: weed.x, y: weed.y, id: weed.id });
+        await bot.waitIdle({ timeout: 12, quiet: 3, cond: st => st.inv.filter(x => x.name === 'Seaweed').length > before });
+    }
+    // burnt on the range
+    for (let i = 0; i < 4 && carried(bot, 'Seaweed'); i++) {
+        if (!(await useOn(bot, 'Seaweed', ENTRANA.range))) break;
+        await bot.wait(2);
+        await cookMenu(bot);
+        await bot.waitIdle({ timeout: 60, quiet: 5, cond: st => !st.inv.some(x => x.name === 'Seaweed') });
+    }
+    // sand
+    const ash = Math.min(n, carried(bot, 'Soda ash'));
+    for (let i = 0; i < 3 && carried(bot, 'Bucket of sand') < ash && carried(bot, 'Bucket'); i++) {
+        if (!(await useOn(bot, 'Bucket', ENTRANA.sand))) break;
+        await bot.wait(3);
+        await whileChanging(bot, () => carried(bot, 'Bucket'), { stall: 6, timeout: 60 });
+    }
+    // the furnace
+    for (let i = 0; i < 3 && carried(bot, 'Soda ash') && carried(bot, 'Bucket of sand'); i++) {
+        if (!(await useOn(bot, 'Soda ash', ENTRANA.furnace))) break;
+        await bot.wait(3);
+        if ((await bot.state(4)).dialog?.skillMenu) await bot.act({ type: 'skillmenu', index: 0 });
+        await bot.waitIdle({ timeout: 90, quiet: 6, cond: st => !st.inv.some(x => x.name === 'Soda ash') || !st.inv.some(x => x.name === 'Bucket of sand') });
+    }
+    // the pipe
+    const glass = carried(bot, 'Molten glass');
+    for (let i = 0; i < 3 && carried(bot, 'Molten glass'); i++) {
+        await bot.act({ type: 'useitem', item: 'Glassblowing pipe', onItem: 'Molten glass' });
+        await bot.waitIdle({ timeout: 8, cond: st => st.iface === 542 });
+        if (bot.s.iface === 542) await bot.act({ type: 'button', iface: 542, child: button, op: 2 }); // the third option makes all
+        await bot.waitIdle({ timeout: 120, quiet: 6, cond: st => !st.inv.some(x => x.name === 'Molten glass') });
+    }
+    return { piece, made: glass - carried(bot, 'Molten glass') };
+}
+export const GLASS = {
+    id: 'glass',
+    skills: ['crafting'],
+    canRun: bot => {
+        const wealth = (bot.s.coins ?? 0) + bankCount(bot, 'Coins');
+        return owned(bot, 'Bucket') >= 3 || wealth >= 30 || 'needs buckets for the sand (2gp each at the general store)';
+    },
+    async run(bot, until) {
+        const x0 = bot.s.stats.crafting.xp;
+        let made = 0, piece = '';
+        try {
+            while (now() < until) {
+                if (!onEntrana(await bot.state(6))) {
+                    if (until - now() < 10 * 60_000 && made) break; // no time for another trip
+                    // buckets from the general store if it has too few
+                    const short = ENTRANA.buckets - owned(bot, 'Bucket');
+                    if (short > 0) {
+                        if (bot.s.coins < short * 3 && bankCount(bot, 'Coins') && (await bot.openBank())) { await bot.withdrawN('Coins', short * 3 + 10); await bot.leaveBank(); }
+                        if (bot.s.coins >= 3 && (await bot.openShop(SHOPS.general))) { await bot.buy('Bucket', Math.min(short, Math.floor(bot.s.coins / 3))); await bot.closeInterfaces(); }
+                    }
+                    if (!(await stowForEntrana(bot))) { bot.log('glass: not ready for Entrana (bank, buckets or gear)'); return; }
+                    if (!(await entranaBoat(bot, true))) { bot.log(`glass: the monks wouldn't take me (carrying ${bot.s.inv.map(i => i.name).join(', ')})`); return; }
+                    bot.log('glass: on Entrana');
+                }
+                // the pipe: the one lying in Fritz's house, if it carries none
+                for (let i = 0; i < 8 && !bot.has('Glassblowing pipe') && now() < until; i++) {
+                    await bot.travel(ENTRANA.pipe.x, ENTRANA.pipe.y, { tol: 1 });
+                    const g = (await bot.state(6)).ground.find(o => o.name === 'Glassblowing pipe');
+                    if (!g) { await bot.wait(20); continue; }
+                    await bot.act({ type: 'ground', x: g.x, y: g.y, id: g.id });
+                    await bot.waitIdle({ timeout: 10, cond: st => st.inv.some(x => x.name === 'Glassblowing pipe') });
+                }
+                if (!bot.has('Glassblowing pipe')) { bot.log('glass: no glassblowing pipe to be had'); break; }
+                const n = Math.min(carried(bot, 'Bucket') + carried(bot, 'Bucket of sand'), bot.s.invFree + carried(bot, 'Seaweed') + carried(bot, 'Soda ash') + carried(bot, 'Molten glass'));
+                if (n >= 3 && now() < until) {
+                    const r = await glassRound(bot, n, until);
+                    made += r.made; piece = r.piece;
+                    if (r.made) continue;
+                }
+                // bag full of glass (or nothing came of the round): back to the mainland and the bank
+                if (!(await entranaBoat(bot, false))) { bot.log('glass: the boat back failed'); return; }
+                await unstow(bot);
+            }
+        } finally {
+            if (onEntrana(await bot.state(6).catch(() => bot.s))) await entranaBoat(bot, false).catch(() => {});
+            if (!onEntrana(bot.s) && (bot._stowed?.length || bot._stowedTools?.length || bot.s.inv.some(i => GLASS_GOODS.test(i.name)))) await unstow(bot).catch(() => {});
+            bot.log(`glass: blew ${made} ${piece || 'pieces'}, +${Math.round(bot.s.stats.crafting.xp - x0)} Crafting xp`);
+        }
+    }
+};
+TASKS.push(GLASS);
