@@ -1968,6 +1968,11 @@ async function entranaBoat(bot, there) {
         for (let k = 0; k < 10 && (await bot.state(6)).locked; k++) await bot.wait(3);
         await offBoat(bot);
     }
+    // back at Port Sarim the ship docks at z 0 (3048,3234), still aboard: the gangplank beside it leads ashore
+    if (!there) {
+        const plank = (await bot.state(4), bot.nearestScenery(l => /gangplank/i.test(l.name) && l.ops.some(o => /cross/i.test(o)) && l.dist <= 3));
+        if (plank) { await bot.act({ type: 'scenery', x: plank.x, y: plank.y, id: plank.id, op: 'Cross' }); await bot.waitIdle({ timeout: 10, quiet: 3 }); }
+    }
     return arrived(bot.s);
 }
 // everything into the bank, the clothes off the bot's back too (the bank's deposit button, "Deposit Worn Equipment")
