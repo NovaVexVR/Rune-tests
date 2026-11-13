@@ -138,6 +138,7 @@ log('server is up');
 if (!args.has('--server-only')) {
     const bots = path.join(HERE, 'bots');
     fs.mkdirSync(path.join(bots, 'logs'), { recursive: true });
+    fs.mkdirSync(path.join(bots, 'market'), { recursive: true }); // runtime state, not in git: a fresh checkout has none
     start('scripted bots', process.execPath, ['scripted.mjs', '10', 'scriptbot'], { cwd: bots }, path.join(bots, 'logs', 'scripted.out'));
     start('Claude-directed bots', process.execPath, ['claude_runner.mjs', '5'], { cwd: bots }, path.join(bots, 'logs', 'claude_runner.out'));
     log('bots started (logs in bots/logs/); `node bots/status.mjs` shows levels');

@@ -26,7 +26,7 @@ function initialState() {
 }
 
 export const STATE = fs.existsSync(FILE) ? JSON.parse(fs.readFileSync(FILE, 'utf8')) : initialState();
-export const saveState = () => fs.writeFileSync(FILE, JSON.stringify(STATE, null, 2));
+export const saveState = () => { fs.mkdirSync(path.dirname(FILE), { recursive: true }); fs.writeFileSync(FILE, JSON.stringify(STATE, null, 2)); }; // market/ isn't in git: a fresh checkout has none
 if (!fs.existsSync(FILE)) saveState();
 
 export function teamOf(name) {
