@@ -1654,7 +1654,7 @@ TASKS.push(JEWELLERY);
 // (interface 95, Catherby = button 25, 1,000gp) and stays: lobsters from the shore, cooked on the range there from
 // Cooking 40, banked at the booths beside the shops. Bots there don't walk back east (White Wolf Mountain).
 const CATH = { trader: { x: 3039, y: 3195 }, bank: { x: 2809, y: 3440 }, range: { x: 2817, y: 3444 }, spots: { x: 2848, y: 3428 }, fare: 1000 };
-export const inCatherby = s => s?.z === 0 && s.x >= 2780 && s.x <= 2880 && s.y >= 3400 && s.y <= 3460;
+export const inCatherby = s => s?.z === 0 && s.x >= 2780 && s.x <= 2861 && s.y >= 3400 && s.y <= 3460; // Taverley's ground starts at x 2865
 async function bankHere(bot, pred) {
     await bot.travel(CATH.bank.x, CATH.bank.y, { tol: 2 });
     for (let i = 0; i < 3 && (await bot.state(8)).iface !== 762; i++) {

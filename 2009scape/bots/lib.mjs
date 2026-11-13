@@ -19,11 +19,13 @@ export const GROUND_BANKS = [{ x: 3094, y: 3492, name: 'Edgeville' }, { x: 3185,
 // West of White Wolf Mountain (Catherby, Seers' Village, Camelot): bots get there by charter ship and come back by
 // home teleport, never on foot (the mountain's wolves kill anything under combat ~45; only `travel(..., { cross: true })`
 // walks it). Banks there, for openBank() when a bot is out west.
-export const inWest = s => !!s && s.y >= 3390 && s.y < 3540 && s.x >= 2600 && s.x < 2880;
+// The line between the two sides runs just east of Catherby's shore: Taverley's open ground reaches west to x 2865.
+const WEST_EDGE = 2862;
+export const inWest = s => !!s && s.y >= 3390 && s.y < 3540 && s.x >= 2600 && s.x < WEST_EDGE;
 // which side of the water a bot is on: nobody walks between them, so deals and gatherings stay on one side
 export const sideOf = s => !s || s.y >= 6000 ? 'east' : inWest(s) ? 'west' : s.x >= 2790 && s.x <= 2880 && s.y >= 3320 && s.y < 3395 ? 'entrana' : s.x > 2750 && s.x < 2990 && s.y < 3200 && s.y > 2880 ? 'karamja' : 'east';
 export const WEST_BANKS = [{ x: 2809, y: 3440, name: 'Catherby' }, { x: 2725, y: 3492, name: "Seers' Village" }];
-export const WOLF_MOUNTAIN = { x: 2850, y: 3493, r: 40 };
+export const WOLF_MOUNTAIN = { x: 2845, y: 3493, r: 35 }; // both ends of the pass (2866,3456 from Taverley, 2847,3452 from Catherby) lead into it
 export const FOOD = ['Shrimps', 'Anchovies', 'Bread', 'Cooked chicken', 'Cooked meat', 'Sardine', 'Herring', 'Trout', 'Salmon', 'Pike', 'Tuna', 'Lobster', 'Cake', 'Meat pie', 'Swordfish', 'Kebab'];
 // Random event types the server may give bots: the ones with a proven solver (wave 1).
 // Sent to the server on every login, so it survives server restarts. Override: BOT_EVENTS=GENIE,ZOMBIE or BOT_EVENTS=none
@@ -917,11 +919,11 @@ export class Bot {
         // meetup, selling goods). Out west with somewhere to be in the east: home teleport first, or stay put.
         // From the east: the charter ship is the caller's business (goWest in tasks.mjs), not a walk.
         if (!cross && s.y < 6000 && y < 6000) {
-            if (inWest(s) && !inWest({ x, y }) && x >= 2880) {
+            if (inWest(s) && !inWest({ x, y }) && x >= WEST_EDGE) {
                 this.log(`out west with business at ${x},${y}: home teleport rather than White Wolf Mountain`);
                 if (!(await this.homeTeleport().catch(() => false))) { this.log('home teleport not ready: staying out west for now'); return false; }
                 s = await this.state(8);
-            } else if (!inWest(s) && inWest({ x, y }) && s.x >= 2880) {
+            } else if (!inWest(s) && inWest({ x, y }) && s.x >= WEST_EDGE) {
                 this.log(`travel to ${x},${y}: that's west of White Wolf Mountain (charter ship first)`);
                 return false;
             }
@@ -1226,15 +1228,12 @@ export class Bot {
         await this.state(2);
     }
 
-    // take exactly n of an item (as 10s, 5s and 1s); noted: as bank notes, one bag slot however many
+    // take exactly n of an item (the bank's Withdraw-X: one step, whatever the amount); noted: as bank notes, one bag
+    // slot however many
     async withdrawN(item, n, { noted = false } = {}) {
-        const banked = () => (this.s.bank ?? []).filter(i => i.name === item).reduce((t, i) => t + i.count, 0);
-        if (n >= banked()) return this.withdraw(item, 'all', { noted });
-        for (let left = n; left > 0 && banked() > 0 && (noted || this.s.invFree > 0); ) {
-            const k = left >= 10 ? 10 : left >= 5 ? 5 : 1;
-            await this.withdraw(item, k, { noted });
-            left -= k;
-        }
+        const banked = (this.s.bank ?? []).filter(i => i.name === item).reduce((t, i) => t + i.count, 0);
+        if (n <= 0 || !banked) return;
+        return this.withdraw(item, n >= banked ? 'all' : Math.floor(n), { noted });
     }
     // for trading and selling
     withdrawNoted(item, n) { return this.withdrawN(item, n, { noted: true }); }

@@ -402,7 +402,9 @@ object BotRegistry {
                 // toggle and the take happen together on the game thread (what BankInterface does for the 1/5/10/All
                 // buttons), then the toggle goes back off: queued as a packet, a later noted withdrawal in the same tick
                 // flipped the toggle for earlier ones too, and bots ended up with noted hammers, knives and pickaxes.
-                val amount = when ((a["amount"] as? Number)?.toInt()) { 1 -> 1; 5 -> 5; 10 -> 10; else -> p.bank.getAmount(p.bank.get(slot)) } // JSON numbers arrive as Long
+                // any amount (the bank's Withdraw-X); no number, or "all": the whole stack. JSON numbers arrive as Long.
+                val have = p.bank.getAmount(p.bank.get(slot))
+                val amount = (a["amount"] as? Number)?.toInt()?.takeIf { it > 0 }?.coerceAtMost(have) ?: have
                 p.bank.isNoteItems = a["noted"] == true
                 try { p.bank.takeItem(slot, amount) } finally { p.bank.isNoteItems = false }
                 p.bank.update()

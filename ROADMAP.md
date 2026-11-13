@@ -55,7 +55,7 @@ What's planned for the bot world, in priority order, plus how the built systems 
 28. *(done 2026-11-07: 59 bots online on 4 cores: the server ~40% of one core and 3.6 GB (Java's default heap), the bot runners ~11% CPU and 240 MB together, the machine 95% idle. A 4-core, 8 GB computer is plenty; the heap can be capped with -Xmx2g if memory is tight)* **Performance check for running locally:** CPU and memory of the server and 60+ bots with every feature on; tune polling and bot count to the user's machine before the switch.
 
 ### Milestone: reset to level 1 and start the real run
-Clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, remove the test bots (`testbot`, `qbot*`, `pbot*`, `mbot*`, `gebot*`, `dbot*`, `lbot*`, `sbot*`, `abot*`, `ebot*`, `rjbot*`, `icbot*`, `drbot*`, `ksbot*`) and the newcomers' orders (`orders/newbie*.json`), and start the fleet with `launch.mjs`. Human players join the fresh world.
+Clear `Server/data/players/`, `bots/market/`, `bots/diaries/`, `bots/recaps/`, remove the test bots (`testbot`, `qbot*`, `pbot*`, `mbot*`, `gebot*`, `dbot*`, `lbot*`, `sbot*`, `abot*`, `ebot*`, `rjbot*`, `icbot*`, `drbot*`, `ksbot*`, `fbot*`, `cbot*`, `gbot*`) and the newcomers' orders (`orders/newbie*.json`), and start the fleet with `launch.mjs`. Human players join the fresh world.
 
 25. **Human players** joining the server and trading or chatting with bots.
 
