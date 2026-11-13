@@ -104,7 +104,13 @@ State on 2026-11-09 ~22:00 UTC: roadmap items 1-59 are done or deliberately defe
 2. Ernest the Chicken (deferred: manor lever maze).
 3. Watch the newest live features: stalls (now demand-driven), celebrations (cascade fixed 2026-11-09), meetups (verified), deaths at the Barbarian Village longhall (37 -> 14 per 2 h after the fixes).
 
-## Usage rules (from the user)
+## Standing rules (from the user)
+- **Leave the economy alone.** 100k gold per bot is normal in the real game; the director only alerts when the average passes 100k.
+- **Make it like the real game** (e.g. auto-retaliate off keeps skilling when attacked).
+- **Members world:** members content is open to bots; don't limit them to free-to-play.
+- **Human players are on hold.**
+- **Level-1 reset** just before human players join: ask the user first.
+- Work and push only on `claude/sleepy-galileo-gzbdn7`; commits end with the session's co-author lines; no model names in commits or files; no PR unless asked.
 - **Keep usage low.** Don't spend tokens on anything not asked for: no unrequested status checks, polling loops, screenshots or dashboard refreshes.
 - **Dashboard snapshots only when the user asks for one.** Never refresh it on your own initiative or as part of other work.
 - Prefer one larger batch of work with a short summary over many small check-ins.
