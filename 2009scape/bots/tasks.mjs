@@ -178,6 +178,7 @@ export async function prepare(bot, taskId) {
     await bot.gearUp({ weapon: !['ranged', 'magic'].includes(taskId) }).catch(() => {});
     if (taskId === 'melee') await buyArmour(bot).catch(e => bot.log(`armour: ${e.message}`));
     if (['melee', 'ranged', 'magic', 'thieving'].includes(taskId)) {
+        await regear(bot, { weapon: !['ranged', 'magic'].includes(taskId) }).catch(() => {}); // gear left in the bank (an Entrana trip cut short)
         const food = await bot.ensureFood(4).catch(() => 0);
         if (food < 2) await catchFood(bot, 6).catch(e => bot.log(`food: ${e.message}`)); // nothing banked: catch and cook some
     }
@@ -1871,7 +1872,7 @@ async function cutBows(bot, tier, until) {
         if (!tree) { await bot.walkTo(at.x + rand(-5, 5), at.y + rand(-5, 5), { tol: 3, direct: true }); await bot.wait(3); continue; }
         await gatherOnce(bot, tree, 'Chop down', 'scenery', 45);
     }
-    for (let i = 0; i < 4 && carried(bot, tier.log); i++) {
+    for (let i = 0; i < 8 && carried(bot, tier.log); i++) { // the menu makes 10 at most at a time, and a level-up stops it
         await bot.act({ type: 'useitem', item: 'Knife', onItem: tier.log });
         await bot.wait(2);
         const menu = (await bot.state(4)).dialog?.skillMenu;
@@ -1934,7 +1935,7 @@ const ENTRANA = {
     monks: { x: 3047, y: 3236 }, dock: { x: 2833, y: 3336 }, shore: { x: 2806, y: 3384 }, pipe: { x: 2822, y: 3355 }, buckets: 9,
     // what things are used on, and where to stand for it
     sand: { x: 2816, y: 3341, id: 2645, at: { x: 2816, y: 3340 } }, furnace: { x: 2834, y: 3351, id: 11666, at: { x: 2833, y: 3352 } },
-    range: { x: 2844, y: 3367, id: 2728, at: { x: 2844, y: 3366 } }
+    range: { x: 2856, y: 3334, id: 2728, at: { x: 2856, y: 3335 } } // by the dock, open to the north (the one at 2844,3367 is behind a wall from the south)
 };
 export const onEntrana = s => !!s && s.y < 3395 && s.y >= 3320 && s.x >= 2790 && s.x <= 2880;
 // [piece, Crafting, button on the glassblowing menu (interface 542)], best xp first
@@ -2002,6 +2003,7 @@ async function unstow(bot) {
     bot._stowed = []; bot._stowedTools = [];
     await bot.leaveBank();
     await bot.gearUp().catch(() => {});
+    await regear(bot).catch(() => {}); // whatever a restart mid-trip left in the bank
     return true;
 }
 async function useOn(bot, item, spot) {
