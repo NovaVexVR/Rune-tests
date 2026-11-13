@@ -54,7 +54,7 @@ export const MELEE_LADDER = [
 ];
 
 // what a bot keeps on it when it banks: its tools and some food
-const KEEP = name => /pickaxe$|(^| )axe$|^Hammer$|^Tinderbox$|^Small fishing net$|^Knife$|^Chisel$|^Shears$|^Fly fishing rod$|^Lobster pot$|^Feather$|^Needle$|^Thread$|^Air talisman$|^(Red|Yellow|Black|White) bead$|^Enchanted (beef|rat meat|bear meat|chicken)$|^Cadava (berries|potion)$|^Coins$/.test(name) || FOOD.includes(name);
+const KEEP = name => /pickaxe$|(^| )axe$|^Hammer$|^Tinderbox$|^Small fishing net$|^Knife$|^Chisel$|^Shears$|^Fly fishing rod$|^Lobster pot$|^Harpoon$|^Feather$|^Needle$|^Thread$|^Air talisman$|^(Red|Yellow|Black|White) bead$|^Enchanted (beef|rat meat|bear meat|chicken)$|^Cadava (berries|potion)$|^Coins$/.test(name) || FOOD.includes(name);
 
 // ---- bank clear-outs ----
 // Bots bank everything. Goods normally leave the bank through trades and market days (marketday.mjs takes surplus
@@ -1654,6 +1654,7 @@ TASKS.push(JEWELLERY);
 // ---- Catherby (moving west, members world): a fisher with Fishing 40 and the fare charters a ship from Port Sarim
 // (interface 95, Catherby = button 25, 1,000gp) and stays: lobsters from the shore, cooked on the range there from
 // Cooking 40, banked at the booths beside the shops. Bots there don't walk back east (White Wolf Mountain).
+const HARRY = { x: 2836, y: 3446, npcs: ['Harry'] }; // Harry's Fishing Shop, Catherby: harpoon 45gp, lobster pot 20gp
 const CATH = { trader: { x: 3039, y: 3195 }, bank: { x: 2809, y: 3440 }, range: { x: 2817, y: 3444 }, spots: { x: 2848, y: 3428 }, fare: 1000 };
 export const inCatherby = s => s?.z === 0 && s.x >= 2780 && s.x <= 2861 && s.y >= 3400 && s.y <= 3460; // Taverley's ground starts at x 2865
 async function bankHere(bot, pred) {
@@ -1725,38 +1726,49 @@ export const CATHERBY = {
     skills: ['fishing', 'cooking'],
     canRun: bot => {
         if (bot.lvl('fishing') < 40) return 'needs Fishing 40';
-        if (!bot.has('Lobster pot') && !bot.s.bank?.some(i => i.name === 'Lobster pot')) return 'needs a lobster pot';
+        if (bot.lvl('fishing') < 50 && !bot.has('Lobster pot') && !bot.s.bank?.some(i => i.name === 'Lobster pot')) return 'needs a lobster pot';
         if (inCatherby(bot.s)) return true;
         const wealth = (bot.s.coins ?? 0) + ((bot.s.bank ?? []).find(i => i.name === 'Coins')?.count ?? 0);
         return wealth >= 2 * CATH.fare || `saving for the charter to Catherby (${CATH.fare}gp, wants ${2 * CATH.fare})`;
     },
     async run(bot, until) {
-        if (!bot.has('Lobster pot') && (await bot.openBank())) { await bot.withdraw('Lobster pot', 1); await bot.leaveBank(); }
+        // from Fishing 50 the harpoon (tuna and swordfish, same spots) pays better than the cage; Harry's sells one here
+        const owns = item => bot.has(item) || (bot.s.bank ?? []).some(i => i.name === item);
+        const harpoon = bot.lvl('fishing') >= 50;
+        const tool = harpoon ? 'Harpoon' : 'Lobster pot', op = harpoon ? 'Harpoon' : 'Cage';
+        if (!bot.has(tool) && owns(tool) && (await bot.openBank())) { await bot.withdraw(tool, 1); await bot.leaveBank(); }
         if (!(await charterToCatherby(bot))) return;
-        const n = name => bot.s.inv.filter(i => i.name === name && !i.noted).reduce((t, i) => t + i.count, 0);
+        if (!bot.has(tool)) {
+            if (bot.s.coins < 60 && (await bot.openBank())) { await bot.withdrawN('Coins', 100); await bot.leaveBank(); }
+            if (await bot.openShop(HARRY)) { await bot.buy(tool, 1); await bot.closeInterfaces(); }
+            if (!bot.has(tool)) { bot.log(`catherby: no ${tool}`); return; }
+        }
+        const RAW = /^Raw (lobster|tuna|swordfish)$/, COOKED = /^(Lobster|Tuna|Swordfish)$/, BURNT = /^Burnt (lobster|tuna|swordfish|fish)$/;
+        const cookable = i => RAW.test(i.name) && !i.noted && bot.lvl('cooking') >= COOK_LEVEL[i.name];
+        const count = re => bot.s.inv.filter(i => re.test(i.name) && !i.noted).reduce((t, i) => t + i.count, 0);
         while (now() < until) {
             await bot.travel(CATH.spots.x, CATH.spots.y, { tol: 4 });
             for (let i = 0; i < 80 && bot.s.invFree > 0 && now() < until; i++) {
                 const st = await bot.state(12);
                 if (await bot.handleInterrupts()) continue;
-                const spot = bot.nearestNpc(x => /fishing spot/i.test(x.name) && x.ops.includes('Cage'));
+                const spot = bot.nearestNpc(x => /fishing spot/i.test(x.name) && x.ops.includes(op));
                 if (!spot) { await bot.wait(4); continue; }
-                await gatherOnce(bot, spot, 'Cage', 'npc', 60);
+                await gatherOnce(bot, spot, op, 'npc', 60);
             }
-            // cook on the range (Cooking 40 for lobsters), then bank the lot
-            if (bot.lvl('cooking') >= 40 && n('Raw lobster')) {
+            // cook on the range (lobster 40, tuna 30, swordfish 45), then bank the lot
+            if (bot.s.inv.some(cookable)) {
                 await bot.travel(CATH.range.x, CATH.range.y - 1, { tol: 1 });
-                for (let i = 0; i < 4 && n('Raw lobster'); i++) {
-                    const raw = (await bot.state(8)).inv.find(x => x.name === 'Raw lobster');
+                for (let i = 0; i < 6 && (await bot.state(8)).inv.some(cookable); i++) {
+                    const raw = bot.s.inv.find(cookable);
                     await bot.act({ type: 'useitem', slot: raw.slot, x: CATH.range.x, y: CATH.range.y }).catch(() => {});
                     await bot.wait(2);
                     await cookMenu(bot);
-                    await bot.waitIdle({ timeout: 90, quiet: 5, cond: x => !x.inv.some(y => y.name === 'Raw lobster') });
+                    await bot.waitIdle({ timeout: 90, quiet: 5, cond: x => !x.inv.some(y => y.name === raw.name) });
                 }
             }
-            const caught = n('Raw lobster') + n('Lobster');
-            await bankHere(bot, i => /^(Raw lobster|Lobster|Burnt lobster)$/.test(i.name));
-            bot.log(`catherby: banked ${caught} lobsters`);
+            const caught = count(RAW) + count(COOKED);
+            await bankHere(bot, i => RAW.test(i.name) || COOKED.test(i.name) || BURNT.test(i.name));
+            bot.log(`catherby: banked ${caught} ${harpoon ? 'tuna and swordfish' : 'lobsters'}`);
         }
     }
 };
@@ -1770,10 +1782,12 @@ TASKS.push(CATHERBY);
 // high-alchemy value. Unstrung oak, willow and maple bows made back east are in the same bank and get strung too.
 const SEERS_AT = {
     bank: { x: 2725, y: 3492 }, flax: { x: 2741, y: 3444 }, ladder: { x: 2715, y: 3470 }, wheel: { x: 2710, y: 3471 },
-    trees: { oak: { x: 2691, y: 3476 }, willow: { x: 2710, y: 3510 }, maple: { x: 2727, y: 3498 } }
+    trees: { yew: { x: 2709, y: 3462 }, oak: { x: 2691, y: 3476 }, willow: { x: 2710, y: 3510 }, maple: { x: 2727, y: 3498 } }
 };
 // best first: [wood, Woodcutting, [bow, Fletching]...]
+// (yew bows sell to no shop here that stocks them: they go to market days and the GE)
 const BOW_TIERS = [
+    { wood: 'yew', log: 'Yew logs', tree: 'Yew', wc: 60, bows: [['Yew longbow', 70], ['Yew shortbow', 65]] },
     { wood: 'maple', log: 'Maple logs', tree: 'Maple tree', wc: 45, bows: [['Maple longbow', 55], ['Maple shortbow', 50]] },
     { wood: 'willow', log: 'Willow logs', tree: 'Willow', wc: 30, bows: [['Willow longbow', 40], ['Willow shortbow', 35]] },
     { wood: 'oak', log: 'Oak logs', tree: 'Oak', wc: 15, bows: [['Oak longbow', 25], ['Oak shortbow', 20]] }

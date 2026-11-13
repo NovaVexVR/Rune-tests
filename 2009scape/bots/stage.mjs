@@ -35,6 +35,7 @@ const inv = [], bank = d.core_data.bank ?? [];
 for (const a of args) {
     const [k, v] = [a.slice(0, a.indexOf('=')), a.slice(a.indexOf('=') + 1)];
     if (k === 'at') d.core_data.location = v;
+    else if (k === 'quest') { const [id, st] = v.split(':'); const q = d.quests.questStages.find(x => x.questId === id); if (q) q.questStage = st; else d.quests.questStages.push({ questId: id, questStage: st }); } // quest=<index>:<stage>, after quests=all to leave one open
     else if (k === 'quests' && v === 'all') for (const q of d.quests.questStages) q.questStage = '100'; // every quest done (the server counts the points at login), e.g. for the Champions' Guild door
     else if (k === 'item') {
         const it = item(v);

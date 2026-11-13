@@ -789,6 +789,63 @@ export async function spin(bot) {
     return count(bot, 'Ball of wool');
 }
 
+// Black Knights' Fortress (12 quest points to start; 3 QP, 2,500gp): Sir Amik Varze on the White Knights' Castle top
+// floor; into the fortress in the guards' uniform (bronze med helm + iron chainbody, worn) through the sturdy door, the
+// secret wall, then a chain of ladders (server destinations in BKFortressPlugin) to the grill over the meeting room; the
+// cabbage goes down the hole on floor 1 behind another secret wall; out by home teleport, then back to Sir Amik.
+const BKF = { amikStairs: [{ x: 2954, y: 3338, z: 0 }, { x: 2960, y: 3338, z: 1 }], amik: { x: 2962, y: 3337 }, door: { x: 3016, y: 3514 }, outside: { x: 3016, y: 3513 } };
+// [object id, x, y, floor it's on, option, floor it takes you to]
+const BKF_LADDERS = [[2341, 3016, 3517, 0, 'Push', 0], [17148, 3015, 3519, 0, 'Climb-up', 1], [17148, 3016, 3519, 1, 'Climb-up', 2], [17149, 3017, 3516, 2, 'Climb-down', 1],
+    [17160, 3022, 3518, 1, 'Climb-down', 0]]; // from 3017,3515 through the door at 3019,3515 (the ladders at 3023/3025,3513 lead into the knights)
+const BKF_ANSWERS = /i seek a quest|laugh in the face of danger|i suppose i'll give it a go|i'll do my best/i;
+async function useScenery(bot, id, x, y, op, cond, timeout = 15) {
+    const before = { x: bot.s.x, y: bot.s.y, z: bot.s.z };
+    const r = await bot.act({ type: 'scenery', x, y, id, op });
+    await bot.waitIdle({ timeout, quiet: 3, cond: st => cond(st, before) });
+    await bot.state(10);
+    return r;
+}
+async function bkfAmik(bot) {
+    if (bot.s.z !== 2) {
+        await bot.travel(BKF.amikStairs[0].x + 1, BKF.amikStairs[0].y + 1, { tol: 2 });
+        for (const st of BKF.amikStairs) {
+            if ((await bot.state(8)).z !== st.z) continue;
+            await useScenery(bot, bot.nearestScenery(l => /staircase/i.test(l.name) && l.x === st.x && l.y === st.y)?.id ?? 0, st.x, st.y, 'Climb-up', x => x.z === st.z + 1);
+        }
+    }
+    if (bot.s.z !== 2) { bot.log(`quest: couldn't climb to Sir Amik (at ${bot.s.x},${bot.s.y},${bot.s.z})`); return false; }
+    await bot.walkTo(BKF.amik.x + 1, BKF.amik.y, { tol: 2, timeout: 40, direct: true });
+    await bot.talkTo('Sir Amik Varze', { answer: BKF_ANSWERS, maxSteps: 80 });
+    await bot.state(5);
+    // back down (the castle's stairs, in reverse)
+    for (const st of [...BKF.amikStairs].reverse()) {
+        const down = bot.nearestScenery(l => /staircase/i.test(l.name) && l.ops.includes('Climb-down'));
+        if (!down || bot.s.z === 0) break;
+        await useScenery(bot, down.id, down.x, down.y, 'Climb-down', x => x.z < bot.s.z);
+    }
+    return true;
+}
+async function bkfInside(bot) {
+    for (const piece of ['Bronze med helm', 'Iron chainbody']) if (!bot.s.worn.some(i => i.name === piece)) await bot.equip(piece);
+    if (!['Bronze med helm', 'Iron chainbody'].every(p => bot.s.worn.some(i => i.name === p))) { bot.log('quest: the fortress needs a bronze med helm and an iron chainbody, worn'); return false; }
+    await bot.travel(BKF.outside.x, BKF.outside.y, { tol: 0 });
+    await useScenery(bot, 2337, BKF.door.x, BKF.door.y, 'Open', st => st.y >= 3515);
+    if (bot.s.y < 3515) { bot.log(`quest: the fortress guard door didn't let me in (at ${bot.s.x},${bot.s.y})`); return false; }
+    for (const [id, x, y, z, op, to] of BKF_LADDERS) {
+        if (bot.s.z !== z) continue;
+        // black knights inside interrupt a climb: fight them off (handleInterrupts) and try again
+        for (let t = 0; t < 5; t++) {
+            const before = { x: bot.s.x, y: bot.s.y, z: bot.s.z };
+            await useScenery(bot, id, x, y, op, (st, b) => st.z === to && (st.x !== b.x || st.y !== b.y || st.z !== b.z), 20);
+            if (bot.s.z !== z || (to === z && dist(bot.s, before) > 0 && bot.s.y > y)) break; // a floor change, or through the secret wall
+            if (to === z && bot.s.y > y) break;
+            while ((await bot.state(6)).attacking || bot.s.inCombat) { await bot.handleInterrupts(); await bot.wait(2); }
+        }
+        bot.log(`quest: fortress ${op} at ${x},${y},${z} -> now ${bot.s.x},${bot.s.y},${bot.s.z}`);
+        if (bot.s.z !== to) return false;
+    }
+    return bot.s.z === 0;
+}
 export const QUESTS = {
     cooks_assistant: {
         name: "Cook's Assistant",
@@ -937,6 +994,50 @@ export const QUESTS = {
                 } else if (!(await vsKillCount(bot))) return false;
                 await bot.state(5);
                 bot.log(`quest: Vampire Slayer stage ${st} -> ${stageOf(bot, this.name)}`);
+            }
+            return stageOf(bot, this.name) >= 100;
+        }
+    },
+    black_knights_fortress: {
+        name: "Black Knights' Fortress",
+        items: [],
+        async start(bot) {
+            if (stageOf(bot, this.name) > 0) return true;
+            if ((bot.s.questPoints ?? 0) < 12) return false;
+            if ((bot.s.combat ?? 3) < 40) { bot.log("quest: Black Knights' Fortress waits for combat 40 (level-33 black knights all over the fortress)"); return false; }
+            await bkfAmik(bot);
+            return stageOf(bot, this.name) > 0;
+        },
+        async finish(bot) {
+            const kit = ['Bronze med helm', 'Iron chainbody', 'Cabbage'];
+            const missing = kit.filter(n => !bot.has(n) && !bot.s.worn.some(i => i.name === n));
+            if (missing.length && (await bot.openBank())) { for (const n of missing) await bot.withdraw(n, 1).catch(() => {}); await bot.leaveBank(); }
+            await bot.ensureFood(6).catch(() => {});
+            bot.standGround = true; // the knights are everywhere: fleeing from one runs into the next
+            try { return await this.steps(bot); } finally { bot.standGround = false; }
+        },
+        async steps(bot) {
+            for (let i = 0; i < 6 && stageOf(bot, this.name) < 100; i++) {
+                const st = stageOf(bot, this.name);
+                if (st === 10) {
+                    if (!(await bkfInside(bot))) return false;
+                    await useScenery(bot, 2342, 3026, 3507, 'Listen-at', () => false, 12);
+                    for (let k = 0; k < 30 && (await bot.state(6)).dialog; k++) await bot.answerDialog();
+                } else if (st === 20) {
+                    if (!bot.has('Cabbage')) { bot.log("quest: Black Knights' Fortress needs a cabbage"); return false; }
+                    if (bot.s.z === 0 && !(dist(bot.s, { x: 3024, y: 3510 }) < 8)) { if (!(await bkfInside(bot))) return false; }
+                    if (bot.s.z === 0) await useScenery(bot, 17148, 3021, 3510, 'Climb-up', x => x.z === 1);
+                    await useScenery(bot, 2341, 3030, 3510, 'Push', (x, b) => x.x !== b.x || x.y !== b.y);
+                    const cab = bot.s.inv.find(x => x.name === 'Cabbage');
+                    await bot.act({ type: 'useitem', slot: cab.slot, x: 3031, y: 3507, id: 2336 });
+                    await bot.wait(4);
+                    for (let k = 0; k < 30 && (await bot.state(6)).dialog; k++) await bot.answerDialog();
+                } else if (st === 30) {
+                    if (dist(bot.s, { x: 3020, y: 3512 }) < 20) await bot.homeTeleport();
+                    await bkfAmik(bot);
+                } else break;
+                await bot.state(5);
+                bot.log(`quest: Black Knights' Fortress stage ${st} -> ${stageOf(bot, this.name)}`);
             }
             return stageOf(bot, this.name) >= 100;
         }

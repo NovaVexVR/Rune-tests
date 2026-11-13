@@ -1165,7 +1165,7 @@ export class Bot {
     // tools that came out of the bank as notes (the bank's note toggle is shared by every withdrawal in a tick) are
     // useless: put them back and take them out as real ones
     async unnoteTools() {
-        const TOOL = /pickaxe$|(^| )axe$|^Hammer$|^Tinderbox$|fishing net$|fishing rod$|^Lobster pot$|^Knife$|^Chisel$|^Shears$|^Needle$|^Bucket$|^Pot$/;
+        const TOOL = /pickaxe$|(^| )axe$|^Hammer$|^Tinderbox$|fishing net$|fishing rod$|^Lobster pot$|^Harpoon$|^Knife$|^Chisel$|^Shears$|^Needle$|^Bucket$|^Pot$/;
         const bad = (this.s.inv ?? []).filter(i => i.noted && TOOL.test(i.name));
         if (!bad.length) return;
         this.log(`bank: ${bad.map(i => i.name).join(', ')} came out as notes; swapping for real ones`);
